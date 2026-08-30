@@ -48,7 +48,7 @@ type Lead = {
     validation_status: string;
     website_domain: string | null;
     upload_batch: { batch_code: string } | null;
-    agent: { name: string };
+    agent: { name: string } | null;
     can_update: boolean;
     can_send_email: boolean;
     email_replies_count: number;
@@ -344,7 +344,7 @@ Regards,`;
                                             </div>
                                         </td>
                                         <td className="p-3">
-                                            {lead.agent.name}
+                                            {lead.agent?.name || 'Unassigned'}
                                         </td>
                                         <td className="p-3">
                                             <div className="flex flex-col items-start gap-1">

@@ -140,6 +140,18 @@ it('lets administrators view all leads', function () {
     $this->actingAs($administrator)->get(route('leads.index'))->assertOk()->assertSee($own->company_name)->assertSee($other->company_name);
 });
 
+it('renders leads without an assigned owner', function () {
+    $administrator = User::factory()->administrator()->create();
+    $formerAgent = User::factory()->create();
+    $lead = Lead::factory()->for($formerAgent, 'agent')->create();
+    $formerAgent->delete();
+
+    $this->actingAs($administrator)->get(route('leads.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('leads/index')
+        ->where('leads.data.0.id', $lead->id)
+        ->where('leads.data.0.agent', null));
+});
+
 it('exposes bulk lead deletion only to administrators', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create();
