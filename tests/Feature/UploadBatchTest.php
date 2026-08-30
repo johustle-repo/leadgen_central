@@ -7,6 +7,21 @@ use App\Models\UploadRow;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
+
+it('shows upload history for a soft deleted owner without crashing', function () {
+    $administrator = User::factory()->create(['role' => 'administrator']);
+    $formerAgent = User::factory()->create(['name' => 'Former Agent']);
+    $batch = UploadBatch::factory()->for($formerAgent)->create();
+    $formerAgent->delete();
+
+    $response = $this->actingAs($administrator)->get(route('uploads.index'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('uploads/index')
+        ->where('batches.data.0.id', $batch->id)
+        ->where('batches.data.0.user.name', 'Former Agent'));
+});
 
 it('uploads maps and processes valid and invalid CSV rows', function () {
     Storage::fake('local');

@@ -23,7 +23,7 @@ type Batch = {
     error_rows: number;
     processing_status: string;
     created_at: string;
-    user: { name: string };
+    user: { name: string } | null;
 };
 export default function UploadIndex({
     batches,
@@ -81,7 +81,7 @@ export default function UploadIndex({
                                             </div>
                                         </td>
                                         <td className="p-3">
-                                            {batch.user.name}
+                                            {batch.user?.name ?? 'Former user'}
                                         </td>
                                         <td className="p-3">
                                             {batch.total_rows}
