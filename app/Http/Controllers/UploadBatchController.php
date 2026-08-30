@@ -7,6 +7,7 @@ use App\Http\Requests\StoreUploadBatchRequest;
 use App\Jobs\ProcessUploadBatch;
 use App\Models\UploadBatch;
 use App\Services\CsvHeaderMapper;
+use App\Services\UploadBatchCreator;
 use App\Services\UploadBatchDeletion;
 use App\Services\UploadBatchReanalyzer;
 use App\UploadRowStatus;
@@ -38,22 +39,19 @@ class UploadBatchController extends Controller
         return Inertia::render('uploads/create');
     }
 
-    public function store(StoreUploadBatchRequest $request, CsvHeaderMapper $mapper): RedirectResponse
+    public function store(StoreUploadBatchRequest $request, UploadBatchCreator $creator): RedirectResponse
     {
-        $file = $request->file('file');
-        $stream = fopen($file->getRealPath(), 'rb');
-        $headers = $stream ? fgetcsv($stream, escape: '') : false;
-        if (is_resource($stream)) {
-            fclose($stream);
+        $files = $request->file('files');
+        $files = is_array($files) ? $files : [$request->file('file')];
+        $files = array_values(array_filter($files));
+
+        if (count($files) > 1) {
+            $batches = $creator->createAndQueueMany($files, $request->user());
+
+            return redirect()->route('uploads.index')->with('toast', ['type' => 'success', 'message' => "{$batches->count()} raw files uploaded and queued for cleaning."]);
         }
-        if (! is_array($headers) || count(array_filter($headers, fn ($header) => trim((string) $header) !== '')) === 0) {
-            throw ValidationException::withMessages(['file' => 'The CSV file must contain a readable header row.']);
-        }
-        if (count($headers) !== count(array_unique($headers))) {
-            throw ValidationException::withMessages(['file' => 'CSV headers must be unique.']);
-        }
-        $stored = $file->store('lead-imports');
-        $batch = UploadBatch::create(['user_id' => $request->user()->id, 'original_filename' => $file->getClientOriginalName(), 'stored_filename' => $stored, 'file_size' => $file->getSize(), 'headers' => $headers, 'column_mapping' => $mapper->map($headers)]);
+
+        $batch = $creator->createForMapping($files[0], $request->user());
 
         return redirect()->route('uploads.mapping', $batch);
     }

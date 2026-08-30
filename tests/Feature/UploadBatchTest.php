@@ -37,6 +37,39 @@ it('uploads maps and processes valid and invalid CSV rows', function () {
     $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 3, 'processing_status' => 'rejected']);
 });
 
+it('uploads and processes multiple compatible raw files together', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $firstFile = UploadedFile::fake()->createWithContent('03-23-2026-Lead-1-Raw.csv', "Company,Email\nAcme One,one@acme.test\n");
+    $secondFile = UploadedFile::fake()->createWithContent('03-24-2026-Lead-2-Raw.csv', "Company,Email\nAcme Two,two@acme.test\n");
+
+    $response = $this->actingAs($agent)->post(route('uploads.store'), ['files' => [$firstFile, $secondFile]]);
+
+    $response->assertRedirect(route('uploads.index'))->assertSessionHas('toast', [
+        'type' => 'success',
+        'message' => '2 raw files uploaded and queued for cleaning.',
+    ]);
+    $this->assertDatabaseCount('upload_batches', 2);
+    $this->assertDatabaseHas('upload_batches', ['user_id' => $agent->id, 'original_filename' => '03-23-2026-Lead-1-Raw.csv', 'processing_status' => 'completed']);
+    $this->assertDatabaseHas('upload_batches', ['user_id' => $agent->id, 'original_filename' => '03-24-2026-Lead-2-Raw.csv', 'processing_status' => 'completed']);
+    $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Acme One', 'email' => 'one@acme.test']);
+    $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Acme Two', 'email' => 'two@acme.test']);
+    expect(Storage::disk('local')->allFiles('lead-imports'))->toHaveCount(2);
+});
+
+it('rejects all selected files when one cannot map a company column', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $validFile = UploadedFile::fake()->createWithContent('valid.csv', "Company,Email\nAcme,hello@acme.test\n");
+    $invalidFile = UploadedFile::fake()->createWithContent('invalid.csv', "Email,Phone\nhello@example.com,123\n");
+
+    $response = $this->actingAs($agent)->post(route('uploads.store'), ['files' => [$validFile, $invalidFile]]);
+
+    $response->assertSessionHasErrors('files.1');
+    $this->assertDatabaseCount('upload_batches', 0);
+    expect(Storage::disk('local')->allFiles('lead-imports'))->toBeEmpty();
+});
+
 it('rejects an empty CSV file', function () {
     Storage::fake('local');
     $agent = User::factory()->create();

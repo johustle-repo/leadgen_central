@@ -1,16 +1,19 @@
 import { Form, Head } from '@inertiajs/react';
 import { UploadCloud } from 'lucide-react';
+import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { index, store } from '@/routes/uploads';
 export default function UploadCreate() {
+    const [selectedFileCount, setSelectedFileCount] = useState(0);
+
     return (
         <>
             <Head title="Upload Leads" />
             <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title="Upload leads"
-                    description="Upload a CSV, review its column mapping, then process it."
+                    description="Upload one raw CSV for mapping review, or select multiple compatible files to clean them together."
                 />
                 <Form
                     {...store.form()}
@@ -21,22 +24,36 @@ export default function UploadCreate() {
                             <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-12 text-center hover:bg-muted/40">
                                 <UploadCloud className="size-10 text-primary" />
                                 <span className="font-medium">
-                                    Choose a CSV file
+                                    Choose raw CSV files
                                 </span>
                                 <span className="text-sm text-muted-foreground">
-                                    CSV or TXT, up to the configured limit
+                                    Select up to 50 CSV or TXT files
                                 </span>
                                 <input
-                                    name="file"
+                                    name="files[]"
                                     type="file"
                                     accept=".csv,text/csv"
+                                    multiple
                                     required
                                     className="max-w-full text-sm"
+                                    onChange={(event) =>
+                                        setSelectedFileCount(
+                                            event.target.files?.length ?? 0,
+                                        )
+                                    }
                                 />
+                                {selectedFileCount > 0 && (
+                                    <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                                        {selectedFileCount}{' '}
+                                        {selectedFileCount === 1
+                                            ? 'file selected'
+                                            : 'files selected'}
+                                    </span>
+                                )}
                             </label>
-                            {errors.file && (
+                            {Object.values(errors)[0] && (
                                 <p className="text-sm text-destructive">
-                                    {errors.file}
+                                    {Object.values(errors)[0]}
                                 </p>
                             )}
                             {progress && (
@@ -52,7 +69,9 @@ export default function UploadCreate() {
                             <Button type="submit" disabled={processing}>
                                 {processing
                                     ? 'Uploading…'
-                                    : 'Review column mapping'}
+                                    : selectedFileCount > 1
+                                      ? `Upload and clean ${selectedFileCount} files`
+                                      : 'Review column mapping'}
                             </Button>
                         </div>
                     )}
