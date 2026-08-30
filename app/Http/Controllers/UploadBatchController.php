@@ -25,12 +25,22 @@ class UploadBatchController extends Controller
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', UploadBatch::class);
-        $query = UploadBatch::with('user:id,name')->latest();
+        $sort = $request->string('sort')->toString();
+        $sortOptions = [
+            'oldest' => ['created_at', 'asc'],
+            'filename_asc' => ['original_filename', 'asc'],
+            'filename_desc' => ['original_filename', 'desc'],
+            'status' => ['processing_status', 'asc'],
+            'newest' => ['created_at', 'desc'],
+        ];
+        $sort = array_key_exists($sort, $sortOptions) ? $sort : 'newest';
+        $sorting = $sortOptions[$sort];
+        $query = UploadBatch::with('user:id,name')->orderBy($sorting[0], $sorting[1])->orderByDesc('id');
         if (! $request->user()->canViewAllLeads()) {
             $query->whereBelongsTo($request->user());
         }
 
-        return Inertia::render('uploads/index', ['batches' => $query->paginate(15)->withQueryString()]);
+        return Inertia::render('uploads/index', ['batches' => $query->paginate(15)->withQueryString(), 'sort' => $sort]);
     }
 
     public function create(): Response

@@ -23,6 +23,30 @@ it('shows upload history for a soft deleted owner without crashing', function ()
         ->where('batches.data.0.user.name', 'Former Agent'));
 });
 
+it('sorts upload history by filename', function () {
+    $administrator = User::factory()->administrator()->create();
+    $zuluBatch = UploadBatch::factory()->create(['original_filename' => 'zulu.csv']);
+    $alphaBatch = UploadBatch::factory()->create(['original_filename' => 'alpha.csv']);
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['sort' => 'filename_asc']))->assertInertia(fn (Assert $page) => $page
+        ->component('uploads/index')
+        ->where('sort', 'filename_asc')
+        ->where('batches.data.0.id', $alphaBatch->id)
+        ->where('batches.data.1.id', $zuluBatch->id));
+});
+
+it('falls back to newest sorting for unsupported input', function () {
+    $administrator = User::factory()->administrator()->create();
+    $olderBatch = UploadBatch::factory()->create(['created_at' => '2026-08-01 09:00:00']);
+    $newerBatch = UploadBatch::factory()->create(['created_at' => '2026-08-31 09:00:00']);
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['sort' => 'created_at desc; drop table']))->assertInertia(fn (Assert $page) => $page
+        ->component('uploads/index')
+        ->where('sort', 'newest')
+        ->where('batches.data.0.id', $newerBatch->id)
+        ->where('batches.data.1.id', $olderBatch->id));
+});
+
 it('uploads maps and processes valid and invalid CSV rows', function () {
     Storage::fake('local');
     $agent = User::factory()->create();

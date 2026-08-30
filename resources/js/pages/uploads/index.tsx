@@ -30,11 +30,13 @@ type Batch = {
 };
 export default function UploadIndex({
     batches,
+    sort,
 }: {
     batches: {
         data: Batch[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
+    sort: string;
 }) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
@@ -112,6 +114,29 @@ export default function UploadIndex({
                         </div>
                     }
                 />
+                <div className="flex justify-end">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Sort by</span>
+                        <select
+                            value={sort}
+                            onChange={(event) =>
+                                router.get(
+                                    index.url(),
+                                    { sort: event.target.value },
+                                    { preserveState: true, replace: true },
+                                )
+                            }
+                            className="h-9 rounded-md border bg-background px-3 text-sm text-foreground"
+                            aria-label="Sort upload history"
+                        >
+                            <option value="newest">Newest first</option>
+                            <option value="oldest">Oldest first</option>
+                            <option value="filename_asc">Filename A–Z</option>
+                            <option value="filename_desc">Filename Z–A</option>
+                            <option value="status">Status</option>
+                        </select>
+                    </label>
+                </div>
                 <div className="overflow-hidden rounded-xl border bg-card">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
