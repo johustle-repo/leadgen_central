@@ -1,0 +1,148 @@
+import { Form, Head } from '@inertiajs/react';
+import { PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { index, store, update } from '@/routes/users';
+type User = {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    team: string | null;
+    status: string;
+};
+export default function UserForm({
+    managedUser,
+    roles,
+    statuses,
+}: {
+    managedUser: User | null;
+    roles: string[];
+    statuses: string[];
+}) {
+    return (
+        <>
+            <Head title={managedUser ? 'Edit User' : 'Add User'} />
+            <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-4 md:p-6">
+                <PageHeader
+                    title={managedUser ? 'Edit user' : 'Add user'}
+                    description="Manage identity, access role, team, and account status."
+                />
+                <Form
+                    {...(managedUser
+                        ? update.form(managedUser.id)
+                        : store.form())}
+                    className="rounded-xl border bg-card p-6"
+                >
+                    {({ errors, processing }) => (
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            {[
+                                ['name', 'Name', 'text'],
+                                ['email', 'Email', 'email'],
+                                ['team', 'Team (optional)', 'text'],
+                                [
+                                    'password',
+                                    managedUser
+                                        ? 'New password (optional)'
+                                        : 'Password',
+                                    'password',
+                                ],
+                                [
+                                    'password_confirmation',
+                                    'Confirm password',
+                                    'password',
+                                ],
+                            ].map(([name, label, type]) => (
+                                <div
+                                    key={name}
+                                    className={
+                                        name === 'name' || name === 'email'
+                                            ? 'sm:col-span-2'
+                                            : ''
+                                    }
+                                >
+                                    <Label htmlFor={name}>{label}</Label>
+                                    <Input
+                                        id={name}
+                                        name={name}
+                                        type={type}
+                                        defaultValue={
+                                            name === 'password' ||
+                                            name === 'password_confirmation'
+                                                ? ''
+                                                : String(
+                                                      managedUser?.[
+                                                          name as keyof User
+                                                      ] ?? '',
+                                                  )
+                                        }
+                                        required={
+                                            (!managedUser &&
+                                                (name === 'password' ||
+                                                    name ===
+                                                        'password_confirmation')) ||
+                                            name === 'name' ||
+                                            name === 'email'
+                                        }
+                                        className="mt-2"
+                                    />
+                                    {errors[name] && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {errors[name]}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                            <div>
+                                <Label htmlFor="role">Role</Label>
+                                <select
+                                    id="role"
+                                    name="role"
+                                    defaultValue={managedUser?.role ?? 'agent'}
+                                    className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                >
+                                    {roles.map((role) => (
+                                        <option key={role} value={role}>
+                                            {role.replaceAll('_', ' ')}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <Label htmlFor="status">Status</Label>
+                                <select
+                                    id="status"
+                                    name="status"
+                                    defaultValue={
+                                        managedUser?.status ?? 'active'
+                                    }
+                                    className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                >
+                                    {statuses.map((status) => (
+                                        <option key={status} value={status}>
+                                            {status}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.status && (
+                                    <p className="mt-1 text-sm text-destructive">
+                                        {errors.status}
+                                    </p>
+                                )}
+                            </div>
+                            <Button
+                                type="submit"
+                                disabled={processing}
+                                className="sm:col-span-2"
+                            >
+                                {processing ? 'Saving…' : 'Save user'}
+                            </Button>
+                        </div>
+                    )}
+                </Form>
+            </div>
+        </>
+    );
+}
+UserForm.layout = { breadcrumbs: [{ title: 'Users', href: index() }] };

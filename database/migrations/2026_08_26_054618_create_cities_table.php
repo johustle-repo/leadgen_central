@@ -1,0 +1,35 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('cities', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('country_id')->constrained()->cascadeOnDelete();
+            $table->string('name');
+            $table->string('normalized_name')->index();
+            $table->string('state_province')->nullable();
+            $table->string('timezone')->index();
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
+            $table->timestamps();
+            $table->unique(['country_id', 'normalized_name', 'state_province']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('cities');
+    }
+};
