@@ -21,7 +21,7 @@ export default function UploadCreate() {
                 >
                     {({ errors, processing, progress }) => (
                         <div className="flex flex-col gap-5">
-                            <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-12 text-center hover:bg-muted/40">
+                            <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-12 text-center focus-within:ring-2 focus-within:ring-ring hover:bg-muted/40">
                                 <UploadCloud className="size-10 text-primary" />
                                 <span className="font-medium">
                                     Choose raw CSV files
@@ -35,21 +35,34 @@ export default function UploadCreate() {
                                     accept=".csv,text/csv"
                                     multiple
                                     required
-                                    className="mx-auto block w-fit max-w-full text-sm"
+                                    className="sr-only"
                                     onChange={(event) =>
                                         setSelectedFileCount(
                                             event.target.files?.length ?? 0,
                                         )
                                     }
                                 />
-                                {selectedFileCount > 0 && (
-                                    <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                                        {selectedFileCount}{' '}
-                                        {selectedFileCount === 1
-                                            ? 'file selected'
-                                            : 'files selected'}
-                                    </span>
-                                )}
+                                <span className="inline-flex min-w-36 items-center justify-center rounded-md border bg-background px-4 py-2 text-sm font-medium shadow-xs hover:bg-muted">
+                                    Choose files
+                                </span>
+                                <span
+                                    className={
+                                        selectedFileCount > 0
+                                            ? 'rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary'
+                                            : 'text-sm text-muted-foreground'
+                                    }
+                                >
+                                    {selectedFileCount > 0 ? (
+                                        <>
+                                            {selectedFileCount}{' '}
+                                            {selectedFileCount === 1
+                                                ? 'file selected'
+                                                : 'files selected'}
+                                        </>
+                                    ) : (
+                                        'No files selected'
+                                    )}
+                                </span>
                             </label>
                             {Object.values(errors)[0] && (
                                 <p className="text-sm text-destructive">
