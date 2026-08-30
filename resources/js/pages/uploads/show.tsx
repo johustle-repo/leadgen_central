@@ -19,7 +19,7 @@ type Batch = {
     error_rows: number;
     processing_status: string;
     failure_message: string | null;
-    user: { name: string };
+    user: { name: string } | null;
 };
 type Row = {
     id: number;
@@ -57,7 +57,7 @@ export default function UploadShow({
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title={batch.batch_code}
-                    description={`${batch.original_filename} · ${batch.user.name}`}
+                    description={`${batch.original_filename} · ${batch.user?.name || 'Former user'}`}
                     actions={
                         <div className="flex items-center gap-2">
                             <a

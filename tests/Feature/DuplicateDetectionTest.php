@@ -3,12 +3,14 @@
 use App\Models\City;
 use App\Models\Country;
 use App\Models\DuplicateLog;
+use App\Models\DuplicateMatch;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\User;
 use App\Services\DuplicateDetectionService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 
 it('retains original ownership and logs a second agents exact duplicate upload', function () {
     Storage::fake('local');
@@ -114,4 +116,16 @@ it('restricts duplicate review to administrators and sub-administrators', functi
 
     $this->actingAs($agent)->get(route('duplicates.index'))->assertForbidden();
     $this->actingAs($reviewer)->get(route('duplicates.index'))->assertOk();
+});
+
+it('returns historical duplicate matches when a related lead was deleted', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $existingLead = Lead::factory()->create();
+    $match = DuplicateMatch::factory()->for($existingLead, 'existingLead')->create();
+    $existingLead->delete();
+
+    $this->actingAs($reviewer)->get(route('duplicates.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('duplicates/index')
+        ->where('matches.data.0.id', $match->id)
+        ->where('matches.data.0.existing_lead', null));
 });

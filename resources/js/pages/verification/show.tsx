@@ -15,7 +15,7 @@ type Note = {
     note: string;
     note_type: string | null;
     created_at: string;
-    user: User;
+    user: User | null;
 };
 type History = {
     id: number;
@@ -23,7 +23,7 @@ type History = {
     new_status: string;
     remarks: string | null;
     created_at: string;
-    changer: User;
+    changer: User | null;
 };
 type Forwarding = {
     id: number;
@@ -32,7 +32,7 @@ type Forwarding = {
     team: string | null;
     remarks: string | null;
     forwarded_at: string;
-    forwarder: User;
+    forwarder: User | null;
 };
 type Lead = Record<string, string | number | null | object[]> & {
     id: number;
@@ -40,7 +40,7 @@ type Lead = Record<string, string | number | null | object[]> & {
     company_name: string;
     status: string;
     validation_status: string;
-    agent: User;
+    agent: User | null;
     structured_notes: Note[];
     status_history: History[];
     forwardings: Forwarding[];
@@ -79,7 +79,7 @@ export default function VerificationShow({
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title={lead.company_name}
-                    description={`${lead.lead_code} · ${lead.agent.name} · ${lead.upload_batch?.batch_code ?? 'Manual entry'}`}
+                    description={`${lead.lead_code} · ${lead.agent?.name || 'Unassigned'} · ${lead.upload_batch?.batch_code ?? 'Manual entry'}`}
                     actions={
                         <div className="flex gap-2">
                             <Button asChild variant="outline" size="sm">
@@ -258,7 +258,8 @@ export default function VerificationShow({
                                     >
                                         <p>{note.note}</p>
                                         <p className="mt-2 text-xs text-muted-foreground">
-                                            {note.user.name} ·{' '}
+                                            {note.user?.name || 'Deleted user'}{' '}
+                                            ·{' '}
                                             {new Date(
                                                 note.created_at,
                                             ).toLocaleString()}
@@ -330,7 +331,9 @@ export default function VerificationShow({
                                                 item.recipient_email}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {item.forwarder.name} ·{' '}
+                                            {item.forwarder?.name ||
+                                                'Deleted user'}{' '}
+                                            ·{' '}
                                             {new Date(
                                                 item.forwarded_at,
                                             ).toLocaleString()}
@@ -352,7 +355,9 @@ export default function VerificationShow({
                                             {item.new_status}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {item.changer.name} ·{' '}
+                                            {item.changer?.name ||
+                                                'Deleted user'}{' '}
+                                            ·{' '}
                                             {new Date(
                                                 item.created_at,
                                             ).toLocaleString()}

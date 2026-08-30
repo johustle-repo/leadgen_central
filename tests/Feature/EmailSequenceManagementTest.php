@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\EmailSequence;
+use App\Models\EmailSequenceEnrollment;
 use App\Models\GmailConnection;
 use App\Models\Lead;
 use App\Models\User;
@@ -51,4 +52,16 @@ it('saves customized sequence messages', function () {
     $response->assertRedirect()->assertSessionHas('toast.message', 'Email sequence saved successfully.');
     $this->assertDatabaseHas('email_sequences', ['user_id' => $agent->id, 'name' => 'DUSCAFF Sales Sequence']);
     expect(EmailSequence::query()->firstOrFail()->steps[1]['subject'])->toBe('Our customized follow-up');
+});
+
+it('retains sequence activity after its lead is deleted', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create();
+    $enrollment = EmailSequenceEnrollment::factory()->for($lead)->create(['agent_id' => $agent->id]);
+    $lead->delete();
+
+    $this->actingAs($agent)->get(route('email-sequences.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('email-sequences/index')
+        ->where('enrollments.data.0.id', $enrollment->id)
+        ->where('enrollments.data.0.lead', null));
 });

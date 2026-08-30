@@ -16,7 +16,7 @@ type Lead = {
     status: string;
     validation_status: string;
     structured_notes_count: number;
-    agent: { name: string };
+    agent: { name: string } | null;
 };
 
 export default function VerificationIndex({
@@ -98,7 +98,7 @@ export default function VerificationIndex({
                                             </p>
                                         </td>
                                         <td className="p-3">
-                                            {lead.agent.name}
+                                            {lead.agent?.name || 'Unassigned'}
                                         </td>
                                         <td className="p-3">
                                             <StatusBadge value={lead.status} />

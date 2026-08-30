@@ -2,6 +2,7 @@
 
 use App\Models\Lead;
 use App\Models\User;
+use Inertia\Testing\AssertableInertia as Assert;
 
 it('lets a sub-administrator classify a lead and records status history', function () {
     $reviewer = User::factory()->subAdministrator()->create();
@@ -51,4 +52,20 @@ it('does not forward a lead before it is qualified', function () {
 
     $response->assertSessionHasErrors('lead');
     $this->assertDatabaseCount('lead_forwardings', 0);
+});
+
+it('renders verification records after their owner account is deleted', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $formerAgent = User::factory()->create();
+    $lead = Lead::factory()->for($formerAgent, 'agent')->create(['status' => 'needs_review']);
+    $formerAgent->delete();
+
+    $this->actingAs($reviewer)->get(route('verification.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('verification/index')
+        ->where('leads.data.0.id', $lead->id)
+        ->where('leads.data.0.agent', null));
+    $this->actingAs($reviewer)->get(route('verification.show', $lead))->assertInertia(fn (Assert $page) => $page
+        ->component('verification/show')
+        ->where('lead.id', $lead->id)
+        ->where('lead.agent', null));
 });

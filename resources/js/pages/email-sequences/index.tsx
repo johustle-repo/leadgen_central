@@ -28,7 +28,7 @@ type Enrollment = {
     next_send_at: string | null;
     stop_reason: string | null;
     last_error: string | null;
-    lead: Lead;
+    lead: Lead | null;
     messages: Array<{ id: number; step_number: number; sent_at: string }>;
 };
 type Props = {
@@ -312,12 +312,14 @@ export default function EmailSequencesIndex({
                                     <tr key={item.id}>
                                         <td className="p-3 pl-6">
                                             <p className="font-medium">
-                                                {item.lead.contact_person ||
-                                                    item.lead.email}
+                                                {item.lead?.contact_person ||
+                                                    item.lead?.email ||
+                                                    'Deleted lead'}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {item.lead.company_name} ·{' '}
-                                                {item.lead.email}
+                                                {item.lead
+                                                    ? `${item.lead.company_name} · ${item.lead.email}`
+                                                    : 'Enrollment retained for history'}
                                             </p>
                                         </td>
                                         <td className="p-3">

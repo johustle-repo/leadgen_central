@@ -15,7 +15,7 @@ type Lead = {
     city: string | null;
     country: string | null;
     created_at: string;
-    agent: { name: string };
+    agent: { name: string } | null;
 };
 type Match = {
     id: number;
@@ -23,7 +23,7 @@ type Match = {
     match_score: number | null;
     matched_fields: string[];
     status: string;
-    existing_lead: Lead;
+    existing_lead: Lead | null;
     incoming_lead: Lead | null;
     upload_row: { raw_data: Record<string, string> } | null;
 };
@@ -151,7 +151,7 @@ function LeadPanel({
                     </div>
                     <div>
                         <dt className="text-muted-foreground">Owner</dt>
-                        <dd>{lead.agent.name}</dd>
+                        <dd>{lead.agent?.name || 'Unassigned'}</dd>
                     </div>
                 </dl>
             ) : (
