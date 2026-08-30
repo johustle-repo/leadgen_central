@@ -31,14 +31,14 @@ type Reply = {
     classification_reason: string | null;
     is_read: boolean;
     received_at: string;
-    agent: { name: string };
+    agent: { name: string } | null;
     lead: {
         id: number;
         lead_code: string;
         company_name: string;
         contact_person: string | null;
         email: string | null;
-    };
+    } | null;
 };
 
 type Props = {
@@ -322,12 +322,14 @@ export default function EmailRepliesIndex({
                                 <div className="flex flex-col justify-between gap-3 border-t pt-4 md:flex-row md:items-center">
                                     <div className="text-sm">
                                         <p className="font-medium">
-                                            {reply.lead.company_name} ·{' '}
-                                            {reply.lead.lead_code}
+                                            {reply.lead
+                                                ? `${reply.lead.company_name} · ${reply.lead.lead_code}`
+                                                : 'Deleted lead · Reply retained'}
                                         </p>
                                         <p className="text-muted-foreground">
-                                            Owner: {reply.agent.name} ·{' '}
-                                            {reply.classification_reason}
+                                            Owner:{' '}
+                                            {reply.agent?.name || 'Unassigned'}{' '}
+                                            · {reply.classification_reason}
                                         </p>
                                     </div>
                                     <div className="flex flex-wrap gap-2">

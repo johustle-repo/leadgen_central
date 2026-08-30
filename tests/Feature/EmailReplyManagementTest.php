@@ -56,6 +56,20 @@ it('shows only the actual reply without the quoted outreach message', function (
         ->where('replies.data.0.actual_reply', 'Can you send your product prices?'));
 });
 
+it('renders a retained reply after its lead is deleted', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create();
+    $connection = GmailConnection::factory()->for($agent)->create();
+    $reply = EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create();
+    $lead->delete();
+
+    $this->actingAs($administrator)->get(route('email-replies.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('email-replies/index')
+        ->where('replies.data.0.id', $reply->id)
+        ->where('replies.data.0.lead', null));
+});
+
 it('forbids an agent from changing another agents reply', function () {
     $agent = User::factory()->create();
     $otherAgent = User::factory()->create();
