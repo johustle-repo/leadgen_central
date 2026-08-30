@@ -35,7 +35,7 @@ export default function UploadCreate() {
                                     accept=".csv,text/csv"
                                     multiple
                                     required
-                                    className="max-w-full text-sm"
+                                    className="mx-auto block w-fit max-w-full text-sm"
                                     onChange={(event) =>
                                         setSelectedFileCount(
                                             event.target.files?.length ?? 0,
