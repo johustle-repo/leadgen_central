@@ -33,6 +33,7 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
     Route::get('uploads', [UploadBatchController::class, 'index'])->name('uploads.index');
     Route::get('uploads/create', [UploadBatchController::class, 'create'])->name('uploads.create');
     Route::post('uploads', [UploadBatchController::class, 'store'])->name('uploads.store');
+    Route::delete('uploads/bulk', [UploadBatchController::class, 'bulkDestroy'])->name('uploads.bulk-destroy');
     Route::get('uploads/{uploadBatch}/mapping', [UploadBatchController::class, 'mapping'])->name('uploads.mapping');
     Route::post('uploads/{uploadBatch}/process', [UploadBatchController::class, 'process'])->name('uploads.process');
     Route::post('uploads/{uploadBatch}/reanalyze', [UploadBatchController::class, 'reanalyze'])->name('uploads.reanalyze');

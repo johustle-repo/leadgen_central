@@ -56,6 +56,64 @@ it('prevents deletion while an upload is processing', function () {
     $this->assertModelExists($batch);
 });
 
+it('allows an administrator to bulk delete selected upload histories', function () {
+    Storage::fake('local');
+    $administrator = User::factory()->administrator()->create();
+    $owner = User::factory()->create();
+    $completedBatch = UploadBatch::factory()->for($owner)->create([
+        'stored_filename' => 'lead-imports/completed.csv',
+        'processing_status' => 'completed',
+    ]);
+    $failedBatch = UploadBatch::factory()->for($owner)->create([
+        'stored_filename' => 'lead-imports/failed.csv',
+        'processing_status' => 'failed',
+    ]);
+    $lead = Lead::factory()->for($owner, 'agent')->for($completedBatch, 'uploadBatch')->create();
+    Storage::disk('local')->put($completedBatch->stored_filename, "Company\nAcme\n");
+    Storage::disk('local')->put($failedBatch->stored_filename, "Company\nFailed\n");
+
+    $response = $this->actingAs($administrator)->delete(route('uploads.bulk-destroy'), [
+        'upload_batch_ids' => [$completedBatch->id, $failedBatch->id],
+    ]);
+
+    $response->assertRedirect(route('uploads.index'))->assertSessionHas('toast', [
+        'type' => 'success',
+        'message' => '2 upload histories deleted successfully.',
+    ]);
+    $this->assertModelMissing($completedBatch);
+    $this->assertModelMissing($failedBatch);
+    $this->assertModelExists($lead);
+    expect($lead->refresh()->upload_batch_id)->toBeNull();
+    Storage::disk('local')->assertMissing($completedBatch->stored_filename);
+    Storage::disk('local')->assertMissing($failedBatch->stored_filename);
+    $this->assertDatabaseCount('audit_logs', 2);
+});
+
+it('prevents non-administrators from bulk deleting upload history', function () {
+    $agent = User::factory()->create();
+    $batch = UploadBatch::factory()->for($agent)->create(['processing_status' => 'completed']);
+
+    $this->actingAs($agent)->delete(route('uploads.bulk-destroy'), [
+        'upload_batch_ids' => [$batch->id],
+    ])->assertForbidden();
+
+    $this->assertModelExists($batch);
+});
+
+it('does not partially bulk delete when a selected upload is still processing', function () {
+    $administrator = User::factory()->administrator()->create();
+    $completedBatch = UploadBatch::factory()->create(['processing_status' => 'completed']);
+    $processingBatch = UploadBatch::factory()->create(['processing_status' => 'processing']);
+
+    $this->actingAs($administrator)->delete(route('uploads.bulk-destroy'), [
+        'upload_batch_ids' => [$completedBatch->id, $processingBatch->id],
+    ])->assertForbidden();
+
+    $this->assertModelExists($completedBatch);
+    $this->assertModelExists($processingBatch);
+    $this->assertDatabaseCount('audit_logs', 0);
+});
+
 it('allows only administrators to view audit logs', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create();

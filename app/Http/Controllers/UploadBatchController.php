@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\BulkDeleteUploadBatchesRequest;
 use App\Http\Requests\ConfirmUploadMappingRequest;
 use App\Http\Requests\StoreUploadBatchRequest;
 use App\Jobs\ProcessUploadBatch;
@@ -144,5 +145,17 @@ class UploadBatchController extends Controller
         $deletion->delete($uploadBatch, $request->user(), $request->ip(), $request->userAgent());
 
         return redirect()->route('uploads.index')->with('toast', ['type' => 'success', 'message' => 'Upload history deleted. Imported leads were preserved.']);
+    }
+
+    public function bulkDestroy(BulkDeleteUploadBatchesRequest $request, UploadBatchDeletion $deletion): RedirectResponse
+    {
+        $batches = UploadBatch::query()->whereKey($request->validated('upload_batch_ids'))->get();
+        $batches->each(fn (UploadBatch $batch) => Gate::authorize('delete', $batch));
+        $batches->each(fn (UploadBatch $batch) => $deletion->delete($batch, $request->user(), $request->ip(), $request->userAgent()));
+
+        return redirect()->route('uploads.index')->with('toast', [
+            'type' => 'success',
+            'message' => "{$batches->count()} upload histories deleted successfully.",
+        ]);
     }
 }

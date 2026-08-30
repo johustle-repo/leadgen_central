@@ -1,10 +1,13 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { RotateCcw, Trash2, Upload } from 'lucide-react';
+import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
+    bulkDestroy,
     cleaned,
     create,
     destroy,
@@ -34,6 +37,50 @@ export default function UploadIndex({
     };
 }) {
     const { auth } = usePage<{ auth: Auth }>().props;
+    const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
+    const isAdministrator = auth.user.role === 'administrator';
+    const deletableBatchIds = batches.data
+        .filter((batch) =>
+            ['completed', 'failed'].includes(batch.processing_status),
+        )
+        .map((batch) => batch.id);
+    const selectedVisibleBatchIds = selectedBatchIds.filter((id) =>
+        deletableBatchIds.includes(id),
+    );
+    const allDeletableBatchesSelected =
+        deletableBatchIds.length > 0 &&
+        deletableBatchIds.every((id) => selectedVisibleBatchIds.includes(id));
+
+    const toggleAllBatches = (checked: boolean) => {
+        setSelectedBatchIds(checked ? deletableBatchIds : []);
+    };
+
+    const toggleBatch = (batchId: number, checked: boolean) => {
+        setSelectedBatchIds((current) =>
+            checked
+                ? [
+                      ...current.filter((id) => deletableBatchIds.includes(id)),
+                      batchId,
+                  ]
+                : current.filter((id) => id !== batchId),
+        );
+    };
+
+    const deleteSelectedBatches = () => {
+        if (
+            !window.confirm(
+                `Delete ${selectedVisibleBatchIds.length} selected upload histories? Imported leads will be preserved, but the raw files and row history will be removed.`,
+            )
+        ) {
+            return;
+        }
+
+        router.delete(bulkDestroy.url(), {
+            data: { upload_batch_ids: selectedVisibleBatchIds },
+            preserveScroll: true,
+            onSuccess: () => setSelectedBatchIds([]),
+        });
+    };
 
     return (
         <>
@@ -43,12 +90,26 @@ export default function UploadIndex({
                     title="Upload history"
                     description="Track every CSV batch and its row-level results."
                     actions={
-                        <Button asChild>
-                            <Link href={create()}>
-                                <Upload />
-                                Upload CSV
-                            </Link>
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {isAdministrator &&
+                                selectedVisibleBatchIds.length > 0 && (
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        onClick={deleteSelectedBatches}
+                                    >
+                                        <Trash2 />
+                                        Delete selected (
+                                        {selectedVisibleBatchIds.length})
+                                    </Button>
+                                )}
+                            <Button asChild>
+                                <Link href={create()}>
+                                    <Upload />
+                                    Upload CSV
+                                </Link>
+                            </Button>
+                        </div>
                     }
                 />
                 <div className="overflow-hidden rounded-xl border bg-card">
@@ -56,6 +117,25 @@ export default function UploadIndex({
                         <table className="w-full text-sm">
                             <thead className="bg-muted/60 text-left">
                                 <tr>
+                                    {isAdministrator && (
+                                        <th className="w-12 p-3">
+                                            <Checkbox
+                                                checked={
+                                                    allDeletableBatchesSelected
+                                                }
+                                                onCheckedChange={(checked) =>
+                                                    toggleAllBatches(
+                                                        checked === true,
+                                                    )
+                                                }
+                                                disabled={
+                                                    deletableBatchIds.length ===
+                                                    0
+                                                }
+                                                aria-label="Select all deletable uploads on this page"
+                                            />
+                                        </th>
+                                    )}
                                     <th className="p-3">Batch</th>
                                     <th className="p-3">Owner</th>
                                     <th className="p-3">Rows</th>
@@ -69,6 +149,29 @@ export default function UploadIndex({
                             <tbody className="divide-y">
                                 {batches.data.map((batch) => (
                                     <tr key={batch.id}>
+                                        {isAdministrator && (
+                                            <td className="p-3">
+                                                <Checkbox
+                                                    checked={selectedVisibleBatchIds.includes(
+                                                        batch.id,
+                                                    )}
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        toggleBatch(
+                                                            batch.id,
+                                                            checked === true,
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        !deletableBatchIds.includes(
+                                                            batch.id,
+                                                        )
+                                                    }
+                                                    aria-label={`Select ${batch.original_filename}`}
+                                                />
+                                            </td>
+                                        )}
                                         <td className="p-3">
                                             <Link
                                                 href={show(batch.id)}
