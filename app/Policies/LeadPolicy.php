@@ -44,7 +44,7 @@ class LeadPolicy
      */
     public function delete(User $user, Lead $lead): bool
     {
-        return $user->isAdministrator() || $lead->agent_id === $user->id;
+        return $user->isAdministrator();
     }
 
     /**

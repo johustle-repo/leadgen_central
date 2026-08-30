@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AuditLog;
 use App\Models\Lead;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -137,6 +138,67 @@ it('lets administrators view all leads', function () {
     $other = Lead::factory()->create(['company_name' => 'Second Company']);
     $administrator = User::factory()->administrator()->create();
     $this->actingAs($administrator)->get(route('leads.index'))->assertOk()->assertSee($own->company_name)->assertSee($other->company_name);
+});
+
+it('exposes bulk lead deletion only to administrators', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create();
+
+    $this->actingAs($administrator)->get(route('leads.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('leads/index')
+        ->where('canBulkDelete', true));
+    $this->actingAs($agent)->get(route('leads.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('leads/index')
+        ->where('canBulkDelete', false));
+});
+
+it('allows an administrator to bulk delete selected leads and records an audit event', function () {
+    $administrator = User::factory()->administrator()->create();
+    $leads = Lead::factory()->count(2)->create();
+
+    $response = $this->actingAs($administrator)
+        ->withServerVariables(['REMOTE_ADDR' => '203.0.113.10', 'HTTP_USER_AGENT' => 'Audit Test Browser'])
+        ->delete(route('leads.bulk-destroy'), ['lead_ids' => $leads->modelKeys()]);
+
+    $response->assertRedirect(route('leads.index'))->assertSessionHas('toast', [
+        'type' => 'success',
+        'message' => '2 lead(s) deleted successfully.',
+    ]);
+    $leads->each(fn (Lead $lead) => $this->assertSoftDeleted($lead));
+    $this->assertDatabaseHas('audit_logs', [
+        'user_id' => $administrator->id,
+        'action' => 'lead.bulk_deleted',
+        'auditable_type' => 'lead',
+        'auditable_id' => $leads->first()->id,
+        'ip_address' => '203.0.113.10',
+    ]);
+    expect(AuditLog::firstOrFail()->metadata)->toMatchArray([
+        'lead_ids' => $leads->modelKeys(),
+        'count' => 2,
+    ]);
+});
+
+it('prevents non-administrators from deleting leads', function (string $role) {
+    $user = $role === 'agent'
+        ? User::factory()->create()
+        : User::factory()->subAdministrator()->create();
+    $lead = Lead::factory()->for($user, 'agent')->create();
+
+    $this->actingAs($user)->delete(route('leads.bulk-destroy'), ['lead_ids' => [$lead->id]])->assertForbidden();
+    $this->actingAs($user)->delete(route('leads.destroy', $lead))->assertForbidden();
+
+    $this->assertNotSoftDeleted($lead);
+    $this->assertDatabaseCount('audit_logs', 0);
+})->with(['agent', 'sub-administrator']);
+
+it('requires at least one valid lead for bulk deletion', function () {
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)
+        ->delete(route('leads.bulk-destroy'), ['lead_ids' => []])
+        ->assertSessionHasErrors('lead_ids');
+
+    $this->assertDatabaseCount('audit_logs', 0);
 });
 
 it('combines enhanced search filters while preserving agent ownership restrictions', function () {

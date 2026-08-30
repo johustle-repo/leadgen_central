@@ -28,6 +28,7 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('leads/raw.csv', [LeadController::class, 'downloadRaw'])->name('leads.download-raw');
     Route::get('leads/cleaned.csv', [LeadController::class, 'downloadCleaned'])->name('leads.download-cleaned');
+    Route::delete('leads/bulk', [LeadController::class, 'bulkDestroy'])->name('leads.bulk-destroy');
     Route::resource('leads', LeadController::class);
     Route::get('uploads', [UploadBatchController::class, 'index'])->name('uploads.index');
     Route::get('uploads/create', [UploadBatchController::class, 'create'])->name('uploads.create');

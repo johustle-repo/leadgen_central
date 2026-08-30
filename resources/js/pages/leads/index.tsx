@@ -7,6 +7,7 @@ import {
     Plus,
     Search,
     Send,
+    Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -14,6 +15,7 @@ import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -25,6 +27,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    bulkDestroy,
     create,
     downloadCleaned,
     downloadRaw,
@@ -57,10 +60,49 @@ type Props = {
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     filters: Record<string, string>;
+    canBulkDelete: boolean;
 };
-export default function LeadsIndex({ leads, filters }: Props) {
+export default function LeadsIndex({ leads, filters, canBulkDelete }: Props) {
     const [composeLead, setComposeLead] = useState<Lead | null>(null);
+    const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const emailForm = useForm({ subject: '', body: '' });
+    const visibleLeadIds = leads.data.map((lead) => lead.id);
+    const selectedVisibleLeadIds = selectedLeadIds.filter((id) =>
+        visibleLeadIds.includes(id),
+    );
+    const allVisibleLeadsSelected =
+        visibleLeadIds.length > 0 &&
+        visibleLeadIds.every((id) => selectedVisibleLeadIds.includes(id));
+
+    const toggleAllVisibleLeads = (checked: boolean) => {
+        setSelectedLeadIds(checked ? visibleLeadIds : []);
+    };
+
+    const toggleLead = (leadId: number, checked: boolean) => {
+        setSelectedLeadIds((current) =>
+            checked
+                ? [
+                      ...current.filter((id) => visibleLeadIds.includes(id)),
+                      leadId,
+                  ]
+                : current.filter((id) => id !== leadId),
+        );
+    };
+
+    const deleteSelectedLeads = () => {
+        setDeleting(true);
+        router.delete(bulkDestroy.url(), {
+            data: { lead_ids: selectedVisibleLeadIds },
+            preserveScroll: true,
+            onSuccess: () => {
+                setSelectedLeadIds([]);
+                setDeleteDialogOpen(false);
+            },
+            onFinish: () => setDeleting(false),
+        });
+    };
 
     const emailBody = (lead: Lead) => `Hi ${lead.contact_person || 'there'},
 
@@ -126,12 +168,28 @@ Regards,`;
                     title="Leads"
                     description="Search, filter, and manage authorized lead records."
                     actions={
-                        <Button asChild>
-                            <Link href={create()}>
-                                <Plus />
-                                Add lead
-                            </Link>
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {canBulkDelete &&
+                                selectedVisibleLeadIds.length > 0 && (
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        onClick={() =>
+                                            setDeleteDialogOpen(true)
+                                        }
+                                    >
+                                        <Trash2 />
+                                        Delete selected (
+                                        {selectedVisibleLeadIds.length})
+                                    </Button>
+                                )}
+                            <Button asChild>
+                                <Link href={create()}>
+                                    <Plus />
+                                    Add lead
+                                </Link>
+                            </Button>
+                        </div>
                     }
                 />
                 <form
@@ -216,6 +274,21 @@ Regards,`;
                         <table className="w-full text-sm">
                             <thead className="bg-muted/60 text-left">
                                 <tr>
+                                    {canBulkDelete && (
+                                        <th className="w-12 p-3">
+                                            <Checkbox
+                                                checked={
+                                                    allVisibleLeadsSelected
+                                                }
+                                                onCheckedChange={(checked) =>
+                                                    toggleAllVisibleLeads(
+                                                        checked === true,
+                                                    )
+                                                }
+                                                aria-label="Select all leads on this page"
+                                            />
+                                        </th>
+                                    )}
                                     <th className="p-3">Company</th>
                                     <th className="p-3">Location</th>
                                     <th className="p-3">Contact</th>
@@ -229,6 +302,24 @@ Regards,`;
                             <tbody className="divide-y">
                                 {leads.data.map((lead) => (
                                     <tr key={lead.id}>
+                                        {canBulkDelete && (
+                                            <td className="p-3">
+                                                <Checkbox
+                                                    checked={selectedVisibleLeadIds.includes(
+                                                        lead.id,
+                                                    )}
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        toggleLead(
+                                                            lead.id,
+                                                            checked === true,
+                                                        )
+                                                    }
+                                                    aria-label={`Select ${lead.company_name}`}
+                                                />
+                                            </td>
+                                        )}
                                         <td className="p-3">
                                             <Link
                                                 href={edit(lead.id)}
@@ -328,6 +419,40 @@ Regards,`;
                 </div>
                 <Pagination links={leads.links} />
             </div>
+
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete selected leads?</DialogTitle>
+                        <DialogDescription>
+                            {selectedVisibleLeadIds.length} selected lead(s)
+                            will be removed from the active lead list. This
+                            action is recorded in the audit log.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setDeleteDialogOpen(false)}
+                            disabled={deleting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={deleteSelectedLeads}
+                            disabled={
+                                deleting || selectedVisibleLeadIds.length === 0
+                            }
+                        >
+                            <Trash2 />
+                            {deleting ? 'Deleting…' : 'Delete leads'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog
                 open={composeLead !== null}

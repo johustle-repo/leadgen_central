@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\BulkDeleteLeadsRequest;
 use App\Http\Requests\DownloadRawLeadsRequest;
 use App\Http\Requests\StoreLeadRequest;
 use App\Http\Requests\UpdateLeadRequest;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\User;
+use App\Services\LeadBulkDeletion;
 use App\Services\LeadCreator;
 use App\Services\LocationMatchingService;
 use App\Services\TimezoneReferenceResolver;
@@ -134,7 +136,7 @@ class LeadController extends Controller
             'can_send_email' => $lead->agent_id === $user->id && filter_var($lead->email, FILTER_VALIDATE_EMAIL) !== false,
         ]);
 
-        return Inertia::render('leads/index', ['leads' => $leads, 'filters' => [...$request->only(['search', 'status', 'source', 'country', 'validation_status', 'agent_id', 'upload_batch_id', 'duplicate_status', 'date_from', 'date_to', 'sort', 'direction']), 'per_page' => (string) $perPage], 'agents' => $user->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [], 'batches' => $user->canViewAllLeads() ? UploadBatch::query()->latest()->limit(200)->get(['id', 'batch_code']) : []]);
+        return Inertia::render('leads/index', ['leads' => $leads, 'filters' => [...$request->only(['search', 'status', 'source', 'country', 'validation_status', 'agent_id', 'upload_batch_id', 'duplicate_status', 'date_from', 'date_to', 'sort', 'direction']), 'per_page' => (string) $perPage], 'canBulkDelete' => $user->isAdministrator(), 'agents' => $user->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [], 'batches' => $user->canViewAllLeads() ? UploadBatch::query()->latest()->limit(200)->get(['id', 'batch_code']) : []]);
     }
 
     /**
@@ -214,6 +216,18 @@ class LeadController extends Controller
         $lead->delete();
 
         return redirect()->route('leads.index')->with('toast', ['type' => 'success', 'message' => 'Lead archived.']);
+    }
+
+    public function bulkDestroy(BulkDeleteLeadsRequest $request, LeadBulkDeletion $deletion): RedirectResponse
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 401);
+        $deletedCount = $deletion->delete($request->validated('lead_ids'), $actor, $request->ip(), $request->userAgent());
+
+        return redirect()->route('leads.index')->with('toast', [
+            'type' => 'success',
+            'message' => "{$deletedCount} lead(s) deleted successfully.",
+        ]);
     }
 
     /** @param array{date_from?: string, date_to?: string} $dates */
