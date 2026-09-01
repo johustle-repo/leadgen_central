@@ -72,7 +72,7 @@
             "phpstan analyse"
         ],
         "test": [
-            "@php artisan config:clear --ansi",
+            "@php artisan optimize:clear --ansi",
             "@lint:check",
             "@types:check",
             "@php artisan test"
