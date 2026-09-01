@@ -15,8 +15,12 @@ class EmailReplyClassifier
             return ['classification' => EmailReplyClassification::Bounce, 'reason' => 'Detected a delivery failure or bounced email response.'];
         }
 
-        if (($autoSubmitted !== null && mb_strtolower($autoSubmitted) !== 'no') || $this->contains($content, ['out of office', 'automatic reply', 'auto-reply', 'away from the office'])) {
-            return ['classification' => EmailReplyClassification::AutomaticReply, 'reason' => 'Detected an automatic or out-of-office response.'];
+        if ($this->contains($content, ['out of office', 'away from the office', 'currently away', 'on annual leave', 'on vacation', 'limited access to email', 'returning on', 'will return on'])) {
+            return ['classification' => EmailReplyClassification::OutOfOffice, 'reason' => 'Detected an out-of-office or absence response.'];
+        }
+
+        if (($autoSubmitted !== null && mb_strtolower($autoSubmitted) !== 'no') || $this->contains($content, ['automatic reply', 'auto-reply', 'automated response'])) {
+            return ['classification' => EmailReplyClassification::AutomaticReply, 'reason' => 'Detected an automated email response.'];
         }
 
         if ($this->contains($content, ['remove me', 'unsubscribe', 'do not contact', "don't contact", 'stop emailing', 'take me off your list', 'opt me out'])) {

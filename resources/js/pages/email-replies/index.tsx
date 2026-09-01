@@ -25,6 +25,7 @@ type Classification =
     | 'possible_lead'
     | 'not_lead'
     | 'needs_review'
+    | 'out_of_office'
     | 'automatic_reply';
 
 type Reply = {
@@ -78,6 +79,8 @@ const classificationStyles: Record<Classification, string> = {
     not_lead: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
     needs_review:
         'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+    out_of_office:
+        'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
     automatic_reply:
         'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300',
 };
@@ -285,6 +288,7 @@ export default function EmailRepliesIndex({
                         <option value="not_now">Not now</option>
                         <option value="do_not_contact">Do not contact</option>
                         <option value="bounce">Bounce</option>
+                        <option value="out_of_office">Out of office</option>
                         <option value="needs_review">Needs review</option>
                         <option value="automatic_reply">Automatic reply</option>
                         <option value="possible_lead">

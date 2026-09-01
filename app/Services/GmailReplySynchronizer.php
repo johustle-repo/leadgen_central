@@ -62,6 +62,7 @@ class GmailReplySynchronizer
                 EmailReplyClassification::PossibleLead->value,
                 EmailReplyClassification::NotLead->value,
                 EmailReplyClassification::NeedsReview->value,
+                EmailReplyClassification::AutomaticReply->value,
             ])
             ->where(function ($query): void {
                 $query
@@ -72,6 +73,11 @@ class GmailReplySynchronizer
                 foreach ($replies as $reply) {
                     $actualReply = $this->replyText->extract($reply->body_text ?: $reply->body_preview);
                     $classification = $this->classifier->classify($reply->subject, $actualReply);
+
+                    if ($reply->classification === EmailReplyClassification::AutomaticReply
+                        && $classification['classification'] === EmailReplyClassification::NeedsReview) {
+                        continue;
+                    }
 
                     if ($reply->classification === $classification['classification']
                         && $reply->classification_reason === $classification['reason']) {

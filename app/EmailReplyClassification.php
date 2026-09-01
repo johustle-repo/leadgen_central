@@ -12,5 +12,6 @@ enum EmailReplyClassification: string
     case PossibleLead = 'possible_lead';
     case NotLead = 'not_lead';
     case NeedsReview = 'needs_review';
+    case OutOfOffice = 'out_of_office';
     case AutomaticReply = 'automatic_reply';
 }

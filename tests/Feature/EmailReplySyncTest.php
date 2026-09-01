@@ -103,7 +103,18 @@ it('classifies reply intent without a paid AI service', function (string $subjec
     'not interested' => ['Re: Scaffolding', 'No thanks, we are not interested.', EmailReplyClassification::NotInterested],
     'not now' => ['Re: Scaffolding', 'Not right now. Please check back later.', EmailReplyClassification::NotNow],
     'do not contact' => ['Re: Scaffolding', 'Please remove me and do not contact me again.', EmailReplyClassification::DoNotContact],
+    'out of office' => ['Automatic Reply', 'I am currently out of office and will return on Monday.', EmailReplyClassification::OutOfOffice],
 ]);
+
+it('keeps generic automated responses separate from out-of-office replies', function () {
+    $result = app(EmailReplyClassifier::class)->classify(
+        'Automated response',
+        'Your request has been received.',
+        'auto-replied',
+    );
+
+    expect($result['classification'])->toBe(EmailReplyClassification::AutomaticReply);
+});
 
 it('stores the complete message but previews and classifies only the actual reply', function () {
     Http::preventStrayRequests();
