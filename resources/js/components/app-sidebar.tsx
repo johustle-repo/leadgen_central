@@ -43,7 +43,7 @@ export function AppSidebar() {
 
     const { auth, notificationCounts } = usePage<{
         auth: Auth;
-        notificationCounts: { email_replies_today: number };
+        notificationCounts: { unread_email_replies: number };
     }>().props;
     const mainNavItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
@@ -52,7 +52,7 @@ export function AppSidebar() {
             title: 'Email Replies',
             href: emailReplyIndex(),
             icon: MailSearch,
-            badge: notificationCounts.email_replies_today,
+            badge: notificationCounts.unread_email_replies,
         },
         { title: 'Email Sequences', href: emailSequenceIndex(), icon: Mails },
         { title: 'Upload Leads', href: uploadCreate(), icon: Upload },

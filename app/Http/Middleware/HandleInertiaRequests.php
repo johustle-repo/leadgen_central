@@ -44,17 +44,15 @@ class HandleInertiaRequests extends Middleware
             ],
             'flash' => ['toast' => fn () => $request->session()->get('toast')],
             'notificationCounts' => [
-                'email_replies_today' => function () use ($request): int {
+                'unread_email_replies' => function () use ($request): int {
                     $user = $request->user();
                     if ($user === null) {
                         return 0;
                     }
 
-                    $start = now('Asia/Manila')->startOfDay();
-
                     return EmailReply::query()
                         ->when(! $user->canViewAllLeads(), fn ($query) => $query->whereBelongsTo($user, 'agent'))
-                        ->whereBetween('received_at', [$start->clone()->utc(), $start->clone()->endOfDay()->utc()])
+                        ->where('is_read', false)
                         ->count();
                 },
             ],

@@ -60,7 +60,7 @@ it('filters replies by classification date and search text', function () {
         ->where('filters.date', '2026-09-01'));
 });
 
-it('shares todays owned reply count for the sidebar badge', function () {
+it('shares only the owned unread reply count for the sidebar badge', function () {
     $this->travelTo('2026-09-01 12:00:00');
     $agent = User::factory()->create();
     $otherAgent = User::factory()->create();
@@ -68,14 +68,14 @@ it('shares todays owned reply count for the sidebar badge', function () {
     $otherLead = Lead::factory()->for($otherAgent, 'agent')->create();
     $connection = GmailConnection::factory()->for($agent)->create();
     $otherConnection = GmailConnection::factory()->for($otherAgent)->create();
-    EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create(['received_at' => now()]);
-    EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create(['received_at' => now()->subDay()]);
+    EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create(['received_at' => now(), 'is_read' => true]);
+    EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create(['received_at' => now()->subDay(), 'is_read' => false]);
     EmailReply::factory()->for($otherConnection, 'gmailConnection')->for($otherAgent, 'agent')->for($otherLead)->create(['received_at' => now()]);
 
     $response = $this->actingAs($agent)->get(route('email-replies.index'));
 
     $response->assertInertia(fn (Assert $page) => $page
-        ->where('notificationCounts.email_replies_today', 1));
+        ->where('notificationCounts.unread_email_replies', 1));
 });
 
 it('allows an agent to confirm the classification of their own reply', function () {
