@@ -117,4 +117,10 @@ class Lead extends Model
     {
         return $this->hasMany(EmailSequenceEnrollment::class);
     }
+
+    /** @return HasMany<LeadAttachment, $this> */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(LeadAttachment::class);
+    }
 }

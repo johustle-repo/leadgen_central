@@ -1,5 +1,13 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import {
+    ArrowLeft,
+    ArrowRight,
+    Download,
+    FileText,
+    Paperclip,
+    Trash2,
+    Upload,
+} from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -7,6 +15,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { store as storeForwarding } from '@/routes/leads/forwardings';
 import { store as storeNote } from '@/routes/leads/notes';
+import {
+    destroy as destroyAttachment,
+    download as downloadAttachment,
+    store as storeAttachment,
+} from '@/routes/leads/attachments';
 import { index, show, update } from '@/routes/verification';
 
 type User = { id: number; name: string };
@@ -34,6 +47,15 @@ type Forwarding = {
     forwarded_at: string;
     forwarder: User | null;
 };
+type Attachment = {
+    id: number;
+    original_name: string;
+    label: string | null;
+    mime_type: string;
+    file_size: number;
+    created_at: string;
+    uploader: User | null;
+};
 type Lead = Record<string, string | number | null | object[]> & {
     id: number;
     lead_code: string;
@@ -44,6 +66,7 @@ type Lead = Record<string, string | number | null | object[]> & {
     structured_notes: Note[];
     status_history: History[];
     forwardings: Forwarding[];
+    attachments: Attachment[];
     upload_batch: { batch_code: string } | null;
 };
 const editableFields = [
@@ -61,6 +84,11 @@ const editableFields = [
     ['email', 'Email'],
     ['phone', 'Phone'],
 ] as const;
+
+const fileSize = (bytes: number) =>
+    bytes >= 1024 * 1024
+        ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+        : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 export default function VerificationShow({
     lead,
@@ -215,6 +243,136 @@ export default function VerificationShow({
                         )}
                     </Form>
                     <aside className="flex flex-col gap-4">
+                        <section className="rounded-xl border bg-card p-5">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h2 className="flex items-center gap-2 font-semibold">
+                                        <Paperclip className="size-4" />
+                                        Contact documents
+                                    </h2>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Private PDF, Excel, CSV, or Word files,
+                                        up to 20 MB each.
+                                    </p>
+                                </div>
+                                <span className="rounded-full bg-muted px-2 py-1 text-xs">
+                                    {lead.attachments.length}
+                                </span>
+                            </div>
+                            {lead.status === 'possible_lead' ? (
+                                <Form
+                                    {...storeAttachment.form(lead.id)}
+                                    resetOnSuccess
+                                    className="mt-4 space-y-3 rounded-lg border border-dashed p-3"
+                                >
+                                    {({ errors, processing, progress }) => (
+                                        <>
+                                            <Input
+                                                name="label"
+                                                placeholder="Document label (optional)"
+                                            />
+                                            <Input
+                                                name="attachment"
+                                                type="file"
+                                                required
+                                                accept=".pdf,.csv,.xls,.xlsx,.doc,.docx"
+                                            />
+                                            {errors.attachment && (
+                                                <p className="text-xs text-destructive">
+                                                    {errors.attachment}
+                                                </p>
+                                            )}
+                                            {progress && (
+                                                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                                                    <div
+                                                        className="h-full bg-primary transition-all"
+                                                        style={{
+                                                            width: `${progress.percentage}%`,
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+                                            <Button
+                                                size="sm"
+                                                className="w-full"
+                                                disabled={processing}
+                                            >
+                                                <Upload />
+                                                {processing
+                                                    ? 'Uploading…'
+                                                    : 'Attach document'}
+                                            </Button>
+                                        </>
+                                    )}
+                                </Form>
+                            ) : (
+                                <p className="mt-4 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                                    Mark this contact as a Possible Lead before
+                                    attaching supporting documents.
+                                </p>
+                            )}
+                            <div className="mt-4 space-y-2">
+                                {lead.attachments.map((attachment) => (
+                                    <div
+                                        key={attachment.id}
+                                        className="flex items-center gap-3 rounded-lg border p-3"
+                                    >
+                                        <FileText className="size-5 shrink-0 text-primary" />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium">
+                                                {attachment.label ||
+                                                    attachment.original_name}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {attachment.original_name} ·{' '}
+                                                {fileSize(attachment.file_size)}{' '}
+                                                ·{' '}
+                                                {attachment.uploader?.name ||
+                                                    'Deleted user'}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            asChild
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            <a
+                                                href={downloadAttachment.url({
+                                                    lead: lead.id,
+                                                    leadAttachment:
+                                                        attachment.id,
+                                                })}
+                                                aria-label="Download document"
+                                            >
+                                                <Download />
+                                            </a>
+                                        </Button>
+                                        <Form
+                                            {...destroyAttachment.form({
+                                                lead: lead.id,
+                                                leadAttachment: attachment.id,
+                                            })}
+                                        >
+                                            {({ processing }) => (
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    disabled={processing}
+                                                    aria-label="Remove document"
+                                                >
+                                                    <Trash2 />
+                                                </Button>
+                                            )}
+                                        </Form>
+                                    </div>
+                                ))}
+                                {!lead.attachments.length && (
+                                    <p className="py-3 text-center text-xs text-muted-foreground">
+                                        No supporting documents attached yet.
+                                    </p>
+                                )}
+                            </div>
+                        </section>
                         <section className="rounded-xl border bg-card p-5">
                             <h2 className="font-semibold">Notes</h2>
                             <Form
