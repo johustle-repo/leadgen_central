@@ -22,7 +22,7 @@ class GmailReplySynchronizer
     {
         $connection->loadMissing('user');
         $accessToken = $this->gmail->accessToken($connection);
-        $this->reclassifyLegacyReplies($connection);
+        $this->reclassifyStoredReplies($connection);
         $since = ($connection->last_synced_at?->subMinutes(2) ?? now()->subDays(7))->timestamp;
         $query = "in:inbox after:{$since}";
         $created = 0;
@@ -54,17 +54,10 @@ class GmailReplySynchronizer
         return $created;
     }
 
-    private function reclassifyLegacyReplies(GmailConnection $connection): void
+    private function reclassifyStoredReplies(GmailConnection $connection): void
     {
         EmailReply::query()
             ->whereBelongsTo($connection, 'gmailConnection')
-            ->whereIn('classification', [
-                EmailReplyClassification::PossibleLead->value,
-                EmailReplyClassification::NotLead->value,
-                EmailReplyClassification::NeedsReview->value,
-                EmailReplyClassification::AutomaticReply->value,
-                EmailReplyClassification::Interested->value,
-            ])
             ->where(function ($query): void {
                 $query
                     ->whereNull('classification_reason')

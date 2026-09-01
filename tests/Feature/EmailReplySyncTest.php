@@ -162,7 +162,7 @@ it('stores the complete message but previews and classifies only the actual repl
     ]);
 });
 
-it('reclassifies legacy replies during sync while preserving manual classifications', function () {
+it('reclassifies every stored automatic reply during sync while preserving manual classifications', function () {
     Http::preventStrayRequests();
     $agent = User::factory()->create();
     $lead = Lead::factory()->for($agent, 'agent')->create();
@@ -200,11 +200,22 @@ it('reclassifies legacy replies during sync while preserving manual classificati
             'classification' => EmailReplyClassification::Interested,
             'classification_reason' => 'Detected interest, pricing, or meeting intent.',
         ]);
+    $incorrectBounceReply = EmailReply::factory()
+        ->for($connection, 'gmailConnection')
+        ->for($agent, 'agent')
+        ->for($lead)
+        ->create([
+            'subject' => 'Re: Scaffolding',
+            'body_text' => 'I am interested. Please send your pricing.',
+            'classification' => EmailReplyClassification::Bounce,
+            'classification_reason' => 'Previous automatic classification.',
+        ]);
     Http::fake(fn () => Http::response(['messages' => []]));
 
     app(GmailReplySynchronizer::class)->sync($connection);
 
     expect($legacyReply->refresh()->classification)->toBe(EmailReplyClassification::NotNow)
         ->and($manualReply->refresh()->classification)->toBe(EmailReplyClassification::PossibleLead)
-        ->and($retiredReply->refresh()->classification)->toBe(EmailReplyClassification::Retired);
+        ->and($retiredReply->refresh()->classification)->toBe(EmailReplyClassification::Retired)
+        ->and($incorrectBounceReply->refresh()->classification)->toBe(EmailReplyClassification::Interested);
 });
