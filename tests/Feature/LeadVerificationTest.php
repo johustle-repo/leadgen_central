@@ -47,6 +47,50 @@ it('lets a sub-administrator save a contact to the possible leads list', functio
     $this->assertDatabaseHas('lead_status_histories', ['lead_id' => $lead->id, 'new_status' => 'possible_lead', 'changed_by' => $reviewer->id, 'remarks' => 'Potential buyer with active projects.']);
 });
 
+it('lets administrators add a possible lead and assign it to an active agent', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $owner = User::factory()->create(['name' => 'Assigned Agent']);
+
+    $this->actingAs($reviewer)->get(route('verification.possible-leads.create'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('verification/possible-create')
+            ->where('agents.0.id', $owner->id)
+            ->where('defaults.lead_date', today()->toDateString()));
+
+    $response = $this->actingAs($reviewer)->post(route('verification.possible-leads.store'), [
+        'agent_id' => $owner->id,
+        'lead_date' => '2026-09-02',
+        'company_name' => 'Atlas Scaffolding',
+        'contact_person' => 'MARIA SANTOS',
+        'email' => 'maria@atlas.test',
+        'country_code' => 'us',
+        'city' => 'Texas',
+        'data_source' => 'Manual',
+        'notes' => 'Requested pricing for an upcoming project.',
+    ]);
+
+    $lead = Lead::query()->where('email', 'maria@atlas.test')->firstOrFail();
+    $response->assertRedirect(route('verification.show', $lead))->assertSessionHas('toast.message', 'Possible lead added successfully.');
+    expect($lead->status->value)->toBe('possible_lead')
+        ->and($lead->agent_id)->toBe($owner->id)
+        ->and($lead->contact_person)->toBe('Maria Santos')
+        ->and($lead->country_code)->toBe('US')
+        ->and($lead->created_by)->toBe($reviewer->id);
+    $this->assertDatabaseHas('lead_status_histories', ['lead_id' => $lead->id, 'old_status' => 'raw', 'new_status' => 'possible_lead', 'changed_by' => $reviewer->id]);
+});
+
+it('prevents agents and inactive owners from adding possible leads', function () {
+    $agent = User::factory()->create();
+    $reviewer = User::factory()->administrator()->create();
+    $inactiveOwner = User::factory()->create(['status' => 'inactive']);
+    $payload = ['agent_id' => $inactiveOwner->id, 'lead_date' => today()->toDateString(), 'company_name' => 'Blocked Company'];
+
+    $this->actingAs($agent)->get(route('verification.possible-leads.create'))->assertForbidden();
+    $this->actingAs($agent)->post(route('verification.possible-leads.store'), $payload)->assertForbidden();
+    $this->actingAs($reviewer)->post(route('verification.possible-leads.store'), $payload)->assertSessionHasErrors('agent_id');
+    $this->assertDatabaseMissing('leads', ['company_name' => 'Blocked Company']);
+});
+
 it('exports only matching possible leads as a safe CSV and records the export', function () {
     $reviewer = User::factory()->administrator()->create();
     Lead::factory()->create(['status' => 'possible_lead', 'company_name' => '=Potential Buyer', 'contact_person' => 'Maria Santos', 'email' => 'maria@example.test']);

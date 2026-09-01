@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\FilterVerificationRequest;
 use App\Http\Requests\MarkPossibleLeadRequest;
+use App\Http\Requests\StorePossibleLeadRequest;
 use App\Http\Requests\VerifyLeadRequest;
 use App\Models\AuditLog;
 use App\Models\Lead;
 use App\Models\LeadAttachment;
 use App\Models\User;
 use App\Services\CsvCellSanitizer;
+use App\Services\LeadCreator;
 use App\Services\LeadVerificationService;
 use App\UserRole;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,6 +50,30 @@ class VerificationController extends Controller
             'filters' => ['status' => $status ?? '', 'search' => $search],
             'summary' => $summary,
         ]);
+    }
+
+    public function createPossible(Request $request): Response
+    {
+        abort_unless($request->user()->canViewAllLeads(), 403);
+
+        return Inertia::render('verification/possible-create', [
+            'agents' => User::query()->where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'defaults' => ['lead_date' => today()->toDateString(), 'data_source' => 'Manual'],
+        ]);
+    }
+
+    public function storePossible(StorePossibleLeadRequest $request, LeadCreator $creator, LeadVerificationService $verification): RedirectResponse
+    {
+        $data = $request->validated();
+        $owner = User::query()->whereKey($data['agent_id'])->firstOrFail();
+        $lead = $creator->create($data, $owner, $request->user());
+        $verification->verify($lead, [
+            ...$lead->only(['company_name', 'website', 'city', 'country', 'country_code', 'timezone', 'contact_person', 'position', 'email', 'phone', 'industry']),
+            'status' => 'possible_lead',
+            'remarks' => 'Added directly to Possible Leads by '.$request->user()->name.'.',
+        ], $request->user());
+
+        return redirect()->route('verification.show', $lead)->with('toast', ['type' => 'success', 'message' => 'Possible lead added successfully.']);
     }
 
     public function show(Request $request, Lead $lead): Response

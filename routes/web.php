@@ -45,6 +45,8 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::get('uploads/{uploadBatch}/errors.csv', [UploadBatchController::class, 'errors'])->middleware('throttle:data-exports')->name('uploads.errors');
     Route::get('uploads/{uploadBatch}/cleaned.csv', [UploadBatchController::class, 'cleaned'])->middleware('throttle:data-exports')->name('uploads.cleaned');
     Route::get('verification', [VerificationController::class, 'index'])->name('verification.index');
+    Route::get('verification/possible-leads/create', [VerificationController::class, 'createPossible'])->name('verification.possible-leads.create');
+    Route::post('verification/possible-leads', [VerificationController::class, 'storePossible'])->name('verification.possible-leads.store');
     Route::get('verification/possible-leads.csv', [VerificationController::class, 'exportPossible'])->middleware('throttle:data-exports')->name('verification.possible-leads.export');
     Route::put('verification/{lead}/possible', [VerificationController::class, 'markPossible'])->name('verification.possible');
     Route::get('verification/{lead}', [VerificationController::class, 'show'])->name('verification.show');

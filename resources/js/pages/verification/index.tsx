@@ -1,5 +1,12 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { Download, FileText, Search, Sparkles, UserCheck } from 'lucide-react';
+import {
+    Download,
+    FileText,
+    Plus,
+    Search,
+    Sparkles,
+    UserCheck,
+} from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
@@ -69,12 +76,20 @@ export default function VerificationIndex({
                     title="Lead verification"
                     description="Search contacts, classify opportunities, keep supporting documents, and export a sales-ready Possible Leads list."
                     actions={
-                        <Button asChild variant="outline">
-                            <a href={exportUrl}>
-                                <Download />
-                                Export possible leads
-                            </a>
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                            <Button asChild>
+                                <Link href={possibleLeads.create()}>
+                                    <Plus />
+                                    Add Possible Lead
+                                </Link>
+                            </Button>
+                            <Button asChild variant="outline">
+                                <a href={exportUrl}>
+                                    <Download />
+                                    Export possible leads
+                                </a>
+                            </Button>
+                        </div>
                     }
                 />
 
