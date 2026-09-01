@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\EmailReplyClassification;
 use App\Models\EmailReply;
 use App\Models\EmailSequenceEnrollment;
 use App\Models\GmailConnection;
@@ -22,8 +21,7 @@ class GmailReplySynchronizer
     {
         $connection->loadMissing('user');
         $accessToken = $this->gmail->accessToken($connection);
-        $this->reclassifyStoredReplies($connection);
-        $since = ($connection->last_synced_at?->subMinutes(2) ?? now()->subDays(7))->timestamp;
+        $since = ($connection->last_synced_at?->subMinutes(2) ?? now()->subDay())->timestamp;
         $query = "in:inbox after:{$since}";
         $created = 0;
         $pageToken = null;
@@ -52,38 +50,6 @@ class GmailReplySynchronizer
         ]);
 
         return $created;
-    }
-
-    private function reclassifyStoredReplies(GmailConnection $connection): void
-    {
-        EmailReply::query()
-            ->whereBelongsTo($connection, 'gmailConnection')
-            ->where(function ($query): void {
-                $query
-                    ->whereNull('classification_reason')
-                    ->orWhere('classification_reason', 'not like', 'Updated manually by %');
-            })
-            ->chunkById(200, function ($replies): void {
-                foreach ($replies as $reply) {
-                    $actualReply = $this->replyText->extract($reply->body_text ?: $reply->body_preview);
-                    $classification = $this->classifier->classify($reply->subject, $actualReply);
-
-                    if ($reply->classification === EmailReplyClassification::AutomaticReply
-                        && $classification['classification'] === EmailReplyClassification::NeedsReview) {
-                        continue;
-                    }
-
-                    if ($reply->classification === $classification['classification']
-                        && $reply->classification_reason === $classification['reason']) {
-                        continue;
-                    }
-
-                    $reply->update([
-                        'classification' => $classification['classification'],
-                        'classification_reason' => $classification['reason'],
-                    ]);
-                }
-            });
     }
 
     /** @param array<string, mixed> $message */

@@ -162,7 +162,7 @@ it('stores the complete message but previews and classifies only the actual repl
     ]);
 });
 
-it('reclassifies every stored automatic reply during sync while preserving manual classifications', function () {
+it('leaves stored classifications unchanged while fetching latest replies', function () {
     Http::preventStrayRequests();
     $agent = User::factory()->create();
     $lead = Lead::factory()->for($agent, 'agent')->create();
@@ -214,8 +214,40 @@ it('reclassifies every stored automatic reply during sync while preserving manua
 
     app(GmailReplySynchronizer::class)->sync($connection);
 
-    expect($legacyReply->refresh()->classification)->toBe(EmailReplyClassification::NotNow)
+    expect($legacyReply->refresh()->classification)->toBe(EmailReplyClassification::PossibleLead)
         ->and($manualReply->refresh()->classification)->toBe(EmailReplyClassification::PossibleLead)
-        ->and($retiredReply->refresh()->classification)->toBe(EmailReplyClassification::Retired)
-        ->and($incorrectBounceReply->refresh()->classification)->toBe(EmailReplyClassification::Interested);
+        ->and($retiredReply->refresh()->classification)->toBe(EmailReplyClassification::Interested)
+        ->and($incorrectBounceReply->refresh()->classification)->toBe(EmailReplyClassification::Bounce);
+});
+
+it('requests only messages received since the latest successful sync with an overlap', function () {
+    Http::preventStrayRequests();
+    $this->travelTo('2026-09-01 12:00:00');
+    $agent = User::factory()->create();
+    $connection = GmailConnection::factory()->for($agent)->create([
+        'gmail_address' => 'agent@gmail.com',
+        'token_expires_at' => now()->addHour(),
+        'last_synced_at' => '2026-09-01 11:50:00',
+    ]);
+    Http::fake(['https://gmail.googleapis.com/gmail/v1/users/me/messages*' => Http::response(['messages' => []])]);
+
+    app(GmailReplySynchronizer::class)->sync($connection);
+
+    Http::assertSent(fn (Request $request): bool => $request['q'] === 'in:inbox after:1788263280');
+});
+
+it('requests only the latest day when Gmail has not been synchronized before', function () {
+    Http::preventStrayRequests();
+    $this->travelTo('2026-09-01 12:00:00');
+    $agent = User::factory()->create();
+    $connection = GmailConnection::factory()->for($agent)->create([
+        'gmail_address' => 'agent@gmail.com',
+        'token_expires_at' => now()->addHour(),
+        'last_synced_at' => null,
+    ]);
+    Http::fake(['https://gmail.googleapis.com/gmail/v1/users/me/messages*' => Http::response(['messages' => []])]);
+
+    app(GmailReplySynchronizer::class)->sync($connection);
+
+    Http::assertSent(fn (Request $request): bool => $request['q'] === 'in:inbox after:1788177600');
 });
