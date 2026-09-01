@@ -225,7 +225,7 @@ Regards,`;
                     <Button type="submit" variant="secondary">
                         Apply filters
                     </Button>
-                    <Button asChild variant="outline" className="lg:col-span-2">
+                    <Button asChild variant="outline">
                         <a
                             href={downloadRaw.url({
                                 query: {
@@ -239,7 +239,7 @@ Regards,`;
                             Download raw CSV
                         </a>
                     </Button>
-                    <Button asChild variant="outline" className="lg:col-span-2">
+                    <Button asChild variant="outline">
                         <a
                             href={downloadCleaned.url({
                                 query: {
