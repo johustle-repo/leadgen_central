@@ -150,6 +150,17 @@ it('filters leads by one lead date', function () {
         ->where('leads.data.0.id', $matching->id));
 });
 
+it('prefills todays date in the leads filter', function () {
+    $this->travelTo('2026-09-01 10:00:00');
+    $agent = User::factory()->create();
+
+    $response = $this->actingAs($agent)->get(route('leads.index'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('leads/index')
+        ->where('filters.date', '2026-09-01'));
+});
+
 it('prevents agents from viewing another agents lead', function () {
     $agent = User::factory()->create();
     $otherLead = Lead::factory()->create();

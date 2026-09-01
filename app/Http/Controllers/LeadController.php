@@ -133,7 +133,7 @@ class LeadController extends Controller
             'can_send_email' => $lead->agent_id === $user->id && filter_var($lead->email, FILTER_VALIDATE_EMAIL) !== false,
         ]);
 
-        return Inertia::render('leads/index', ['leads' => $leads, 'filters' => [...$request->only(['search', 'status', 'source', 'country', 'validation_status', 'agent_id', 'upload_batch_id', 'duplicate_status', 'date', 'sort', 'direction']), 'per_page' => (string) $perPage], 'canBulkDelete' => $user->isAdministrator(), 'agents' => $user->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [], 'batches' => $user->canViewAllLeads() ? UploadBatch::query()->latest()->limit(200)->get(['id', 'batch_code']) : []]);
+        return Inertia::render('leads/index', ['leads' => $leads, 'filters' => [...$request->only(['search', 'status', 'source', 'country', 'validation_status', 'agent_id', 'upload_batch_id', 'duplicate_status', 'sort', 'direction']), 'date' => $request->string('date')->toString() ?: today()->toDateString(), 'per_page' => (string) $perPage], 'canBulkDelete' => $user->isAdministrator(), 'agents' => $user->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [], 'batches' => $user->canViewAllLeads() ? UploadBatch::query()->latest()->limit(200)->get(['id', 'batch_code']) : []]);
     }
 
     /**
