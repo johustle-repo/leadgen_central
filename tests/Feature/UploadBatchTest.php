@@ -29,6 +29,7 @@ it('shows upload history for a soft deleted owner without crashing', function ()
     $response->assertInertia(fn (Assert $page) => $page
         ->component('uploads/index')
         ->where('batches.data.0.id', $batch->id)
+        ->where('batches.data.0.created_at', fn (string $value): bool => $value !== '')
         ->where('batches.data.0.user.name', 'Former Agent'));
 });
 

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     bulkDestroy,
-    cleaned,
     create,
     destroy,
     index,
@@ -28,6 +27,15 @@ type Batch = {
     created_at: string;
     user: { name: string } | null;
 };
+
+const formatUploadedDate = (value: string) =>
+    new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+    }).format(new Date(value));
+
 export default function UploadIndex({
     batches,
     sort,
@@ -163,6 +171,7 @@ export default function UploadIndex({
                                     )}
                                     <th className="p-3">Batch</th>
                                     <th className="p-3">Owner</th>
+                                    <th className="p-3">Date uploaded</th>
                                     <th className="p-3">Rows</th>
                                     <th className="p-3">Accepted</th>
                                     <th className="p-3">Rejected</th>
@@ -211,6 +220,11 @@ export default function UploadIndex({
                                         <td className="p-3">
                                             {batch.user?.name ?? 'Former user'}
                                         </td>
+                                        <td className="p-3 whitespace-nowrap">
+                                            {formatUploadedDate(
+                                                batch.created_at,
+                                            )}
+                                        </td>
                                         <td className="p-3">
                                             {batch.total_rows}
                                         </td>
@@ -230,18 +244,6 @@ export default function UploadIndex({
                                         </td>
                                         <td className="p-3">
                                             <div className="flex items-center gap-2">
-                                                {batch.processing_status ===
-                                                    'completed' && (
-                                                    <a
-                                                        href={cleaned.url(
-                                                            batch.id,
-                                                        )}
-                                                        download
-                                                        className="inline-flex rounded-md border px-3 py-2 text-xs font-medium whitespace-nowrap hover:bg-muted"
-                                                    >
-                                                        Download cleaned CSV
-                                                    </a>
-                                                )}
                                                 {batch.processing_status ===
                                                     'completed' && (
                                                     <Link
