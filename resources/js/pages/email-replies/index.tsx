@@ -101,11 +101,16 @@ function formatManilaDateTime(value: string): string {
 
 function ClassificationBadge({ value }: { value: Classification }) {
     return (
-        <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${classificationStyles[value]}`}
-        >
-            {value.replaceAll('_', ' ')}
-        </span>
+        <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">
+                Classification
+            </span>
+            <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${classificationStyles[value]}`}
+            >
+                {value.replaceAll('_', ' ')}
+            </span>
+        </div>
     );
 }
 
