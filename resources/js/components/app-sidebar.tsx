@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import { usePage, usePoll } from '@inertiajs/react';
 import {
     CopyCheck,
+    ChartNoAxesCombined,
     ClipboardList,
     FileClock,
     LayoutGrid,
@@ -26,6 +27,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as analyticsIndex } from '@/routes/analytics';
 import { index as auditLogIndex } from '@/routes/audit-logs';
 import { index as duplicateIndex } from '@/routes/duplicates';
 import { index as emailReplyIndex } from '@/routes/email-replies';
@@ -47,6 +49,11 @@ export function AppSidebar() {
     }>().props;
     const mainNavItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+        {
+            title: 'Analytics',
+            href: analyticsIndex(),
+            icon: ChartNoAxesCombined,
+        },
         { title: 'Leads', href: leadIndex(), icon: Waypoints },
         {
             title: 'Email Replies',
