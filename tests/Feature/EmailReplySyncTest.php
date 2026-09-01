@@ -93,6 +93,76 @@ it('does not save unrelated personal inbox messages', function () {
     $this->assertDatabaseCount('email_replies', 0);
 });
 
+it('stores a Gmail delivery failure when its failed recipient belongs to the agent', function () {
+    Http::preventStrayRequests();
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create([
+        'contact_person' => 'George Precon',
+        'email' => 'george@preconindustries.com',
+    ]);
+    $connection = GmailConnection::factory()->for($agent)->create([
+        'gmail_address' => 'agent@gmail.com',
+        'token_expires_at' => now()->addHour(),
+    ]);
+    $body = rtrim(strtr(base64_encode("Address not found\nYour message wasn't delivered to george@preconindustries.com because the address couldn't be found."), '+/', '-_'), '=');
+    Http::fake(fn (Request $request) => str_contains($request->url(), '/messages/bounce-1')
+        ? Http::response([
+            'id' => 'bounce-1',
+            'threadId' => 'thread-bounce-1',
+            'internalDate' => '1788273240000',
+            'payload' => [
+                'mimeType' => 'text/plain',
+                'headers' => [
+                    ['name' => 'From', 'value' => 'Mail Delivery Subsystem <mailer-daemon@googlemail.com>'],
+                    ['name' => 'Subject', 'value' => 'Duscaff Scaffolding - Global Quality Now at China Pricing'],
+                    ['name' => 'X-Failed-Recipients', 'value' => 'george@preconindustries.com'],
+                ],
+                'body' => ['data' => $body],
+            ],
+        ])
+        : Http::response(['messages' => [['id' => 'bounce-1']]]));
+
+    $created = app(GmailReplySynchronizer::class)->sync($connection);
+
+    expect($created)->toBe(1);
+    $this->assertDatabaseHas('email_replies', [
+        'lead_id' => $lead->id,
+        'gmail_message_id' => 'bounce-1',
+        'sender_name' => 'George Precon',
+        'sender_email' => 'george@preconindustries.com',
+        'classification' => 'bounce',
+        'is_read' => false,
+    ]);
+});
+
+it('does not store a delivery failure for a recipient outside the agents leads', function () {
+    Http::preventStrayRequests();
+    $agent = User::factory()->create();
+    $connection = GmailConnection::factory()->for($agent)->create([
+        'gmail_address' => 'agent@gmail.com',
+        'token_expires_at' => now()->addHour(),
+    ]);
+    $body = rtrim(strtr(base64_encode("Address not found\nYour message wasn't delivered to stranger@example.com."), '+/', '-_'), '=');
+    Http::fake(fn (Request $request) => str_contains($request->url(), '/messages/unmatched-bounce')
+        ? Http::response([
+            'id' => 'unmatched-bounce',
+            'payload' => [
+                'mimeType' => 'text/plain',
+                'headers' => [
+                    ['name' => 'From', 'value' => 'Mail Delivery Subsystem <mailer-daemon@googlemail.com>'],
+                    ['name' => 'Subject', 'value' => 'Delivery Status Notification'],
+                ],
+                'body' => ['data' => $body],
+            ],
+        ])
+        : Http::response(['messages' => [['id' => 'unmatched-bounce']]]));
+
+    $created = app(GmailReplySynchronizer::class)->sync($connection);
+
+    expect($created)->toBe(0);
+    $this->assertDatabaseCount('email_replies', 0);
+});
+
 it('classifies reply intent without a paid AI service', function (string $subject, string $body, EmailReplyClassification $expected) {
     $result = app(EmailReplyClassifier::class)->classify($subject, $body);
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\EmailReplyClassification;
 use App\Models\EmailReply;
 use App\Models\EmailSequenceEnrollment;
 use App\Models\GmailConnection;
@@ -67,19 +68,20 @@ class GmailReplySynchronizer
             return 0;
         }
 
-        $lead = Lead::query()
-            ->whereBelongsTo($connection->user, 'agent')
-            ->whereRaw('LOWER(email) = ?', [$senderEmail])
-            ->latest('id')
-            ->first();
-        if ($lead === null) {
-            return 0;
-        }
-
         $subject = $headers['subject'] ?? '(No subject)';
         $body = Str::limit($this->bodyText($payload), 50000, '');
         $actualReply = $this->replyText->extract($body);
         $classification = $this->classifier->classify($subject, $actualReply, $headers['auto-submitted'] ?? null);
+        $lead = $this->matchedLead($connection, $senderEmail, $headers, $body, $classification['classification']);
+        if ($lead === null) {
+            return 0;
+        }
+
+        if ($classification['classification'] === EmailReplyClassification::Bounce && mb_strtolower((string) $lead->email) !== $senderEmail) {
+            $senderName = $lead->contact_person ?: $senderName;
+            $senderEmail = mb_strtolower((string) $lead->email);
+        }
+
         $internalDate = $message['internalDate'] ?? null;
         $receivedTimestamp = is_numeric($internalDate) ? intdiv((int) $internalDate, 1000) : now()->timestamp;
         $reply = EmailReply::query()->firstOrCreate(
@@ -113,6 +115,62 @@ class GmailReplySynchronizer
         }
 
         return $reply->wasRecentlyCreated ? 1 : 0;
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function matchedLead(
+        GmailConnection $connection,
+        string $senderEmail,
+        array $headers,
+        string $body,
+        EmailReplyClassification $classification,
+    ): ?Lead {
+        $ownedLeads = Lead::query()->whereBelongsTo($connection->user, 'agent');
+        $senderLead = (clone $ownedLeads)
+            ->whereRaw('LOWER(email) = ?', [$senderEmail])
+            ->latest('id')
+            ->first();
+
+        if ($senderLead !== null || $classification !== EmailReplyClassification::Bounce) {
+            return $senderLead;
+        }
+
+        foreach ($this->bounceRecipientEmails($headers, $body) as $recipientEmail) {
+            $recipientLead = (clone $ownedLeads)
+                ->whereRaw('LOWER(email) = ?', [$recipientEmail])
+                ->latest('id')
+                ->first();
+            if ($recipientLead !== null) {
+                return $recipientLead;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     * @return list<string>
+     */
+    private function bounceRecipientEmails(array $headers, string $body): array
+    {
+        $content = implode("\n", array_filter([
+            $headers['x-failed-recipients'] ?? null,
+            $headers['final-recipient'] ?? null,
+            $headers['original-recipient'] ?? null,
+            $body,
+        ]));
+
+        preg_match_all('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/iu', $content, $matches);
+
+        $emails = array_map(fn (string $email): string => mb_strtolower(trim($email)), $matches[0]);
+
+        return array_values(array_unique(array_filter(
+            $emails,
+            fn (string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
+        )));
     }
 
     /** @return array{0: string|null, 1: string|null} */
