@@ -2,16 +2,26 @@ import { Form, Head, router, usePoll } from '@inertiajs/react';
 import {
     AlertCircle,
     CheckCircle2,
+    ChevronRight,
     Inbox,
     Mail,
+    MailOpen,
     RefreshCw,
     Sparkles,
     Unplug,
 } from 'lucide-react';
+import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { index, update } from '@/routes/email-replies';
 import { connect, disconnect, sync } from '@/routes/gmail';
@@ -107,18 +117,22 @@ function formatManilaDateTime(value: string): string {
 
 function ClassificationBadge({ value }: { value: Classification }) {
     return (
-        <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">
-                Classification
-            </span>
-            <span
-                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${classificationStyles[value]}`}
-            >
-                {value.replaceAll('_', ' ')}
-            </span>
-        </div>
+        <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${classificationStyles[value]}`}
+        >
+            {value.replaceAll('_', ' ')}
+        </span>
     );
 }
+
+const manualClassifications: Classification[] = [
+    'interested',
+    'not_interested',
+    'not_now',
+    'do_not_contact',
+    'bounce',
+    'needs_review',
+];
 
 export default function EmailRepliesIndex({
     replies,
@@ -126,6 +140,10 @@ export default function EmailRepliesIndex({
     connection,
     summary,
 }: Props) {
+    const [selectedReplyId, setSelectedReplyId] = useState<number | null>(null);
+    const selectedReply =
+        replies.data.find((reply) => reply.id === selectedReplyId) ?? null;
+
     usePoll(30000, {
         only: ['replies', 'connection', 'summary'],
     });
@@ -316,149 +334,204 @@ export default function EmailRepliesIndex({
                     </div>
                 </form>
 
-                <div className="grid gap-4">
-                    {replies.data.map((reply) => (
-                        <Card
-                            key={reply.id}
-                            className={
-                                reply.is_read
-                                    ? ''
-                                    : 'border-cyan-500/30 bg-cyan-500/3'
-                            }
-                        >
-                            <CardHeader className="gap-3 pb-3">
-                                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-                                    <div>
-                                        <CardTitle className="text-base">
-                                            {reply.subject || '(No subject)'}
-                                        </CardTitle>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            {reply.sender_name
-                                                ? `${reply.sender_name} · `
-                                                : ''}
-                                            {reply.sender_email} ·{' '}
-                                            {formatManilaDateTime(
-                                                reply.received_at,
-                                            )}
+                <Card className="overflow-hidden">
+                    {!!replies.data.length && (
+                        <div className="hidden grid-cols-[minmax(180px,0.8fr)_minmax(0,1.8fr)_auto] gap-5 border-b bg-muted/30 px-5 py-2.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase md:grid">
+                            <span>Sender</span>
+                            <span>Message</span>
+                            <span className="pr-8">Classification</span>
+                        </div>
+                    )}
+                    <div className="divide-y">
+                        {replies.data.map((reply) => (
+                            <button
+                                key={reply.id}
+                                type="button"
+                                onClick={() => setSelectedReplyId(reply.id)}
+                                className={`group grid w-full gap-3 px-4 py-4 text-left transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none md:grid-cols-[minmax(180px,0.8fr)_minmax(0,1.8fr)_auto] md:items-center md:gap-5 md:px-5 ${reply.is_read ? 'bg-card' : 'bg-cyan-500/5'}`}
+                            >
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <span
+                                        className={`size-2 shrink-0 rounded-full ${reply.is_read ? 'bg-transparent' : 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.75)]'}`}
+                                    />
+                                    <div className="min-w-0">
+                                        <p
+                                            className={`truncate text-sm ${reply.is_read ? 'font-medium' : 'font-bold'}`}
+                                        >
+                                            {reply.sender_name ||
+                                                reply.sender_email}
+                                        </p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {reply.sender_email}
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {!reply.is_read && (
-                                            <span className="size-2 rounded-full bg-cyan-400" />
-                                        )}
-                                        <ClassificationBadge
-                                            value={reply.classification}
-                                        />
-                                    </div>
                                 </div>
-                            </CardHeader>
-                            <CardContent className="grid gap-4">
-                                <div className="rounded-xl border bg-background/60 p-4">
-                                    <p className="text-sm leading-6 whitespace-pre-wrap">
+                                <div className="min-w-0 pl-5 md:pl-0">
+                                    <p
+                                        className={`truncate text-sm ${reply.is_read ? 'font-medium' : 'font-semibold'}`}
+                                    >
+                                        {reply.subject || '(No subject)'}
+                                    </p>
+                                    <p className="mt-1 truncate text-sm text-muted-foreground">
                                         {reply.actual_reply ||
                                             reply.body_preview ||
                                             'No readable message body.'}
                                     </p>
                                 </div>
-                                <div className="flex flex-col justify-between gap-3 border-t pt-4 md:flex-row md:items-center">
-                                    <div className="text-sm">
-                                        <p className="font-medium">
-                                            {reply.lead
-                                                ? `${reply.lead.company_name} · ${reply.lead.lead_code}`
-                                                : 'Deleted lead · Reply retained'}
-                                        </p>
-                                        <p className="text-muted-foreground">
-                                            Owner:{' '}
-                                            {reply.agent?.name || 'Unassigned'}{' '}
-                                            · {reply.classification_reason}
-                                        </p>
+                                <div className="flex items-center justify-between gap-3 pl-5 md:min-w-52 md:justify-end md:pl-0">
+                                    <div className="flex flex-col items-start gap-1.5 md:items-end">
+                                        <ClassificationBadge
+                                            value={reply.classification}
+                                        />
+                                        <span className="text-xs whitespace-nowrap text-muted-foreground">
+                                            {formatManilaDateTime(
+                                                reply.received_at,
+                                            )}
+                                        </span>
                                     </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {!reply.is_read && (
-                                            <Form {...update.form(reply.id)}>
-                                                <input
-                                                    type="hidden"
-                                                    name="is_read"
-                                                    value="1"
-                                                />
-                                                <Button
-                                                    type="submit"
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    <CheckCircle2 /> Mark read
-                                                </Button>
-                                            </Form>
-                                        )}
-                                        {(
-                                            [
-                                                'interested',
-                                                'not_interested',
-                                                'not_now',
-                                                'do_not_contact',
-                                                'bounce',
-                                                'needs_review',
-                                            ] as Classification[]
-                                        ).map((classification) => (
-                                            <Form
-                                                key={classification}
-                                                {...update.form(reply.id)}
-                                            >
-                                                <input
-                                                    type="hidden"
-                                                    name="classification"
-                                                    value={classification}
-                                                />
-                                                <input
-                                                    type="hidden"
-                                                    name="is_read"
-                                                    value="1"
-                                                />
-                                                <Button
-                                                    type="submit"
-                                                    size="sm"
-                                                    variant={
-                                                        reply.classification ===
-                                                        classification
-                                                            ? 'secondary'
-                                                            : 'outline'
-                                                    }
-                                                >
-                                                    {classification
-                                                        .replaceAll('_', ' ')
-                                                        .replace(
-                                                            /^./,
-                                                            (value) =>
-                                                                value.toUpperCase(),
-                                                        )}
-                                                </Button>
-                                            </Form>
-                                        ))}
-                                    </div>
+                                    <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
                                 </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                            </button>
+                        ))}
+                    </div>
                     {!replies.data.length && (
-                        <Card>
-                            <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
-                                <Inbox className="size-8 text-muted-foreground" />
-                                <div>
-                                    <p className="font-medium">
-                                        No matched replies yet
-                                    </p>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Connect Gmail and synchronize to check
-                                        for messages from your lead email
-                                        addresses.
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
+                            <Inbox className="size-8 text-muted-foreground" />
+                            <div>
+                                <p className="font-medium">
+                                    No matched replies yet
+                                </p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Connect Gmail and synchronize to check for
+                                    messages from your lead email addresses.
+                                </p>
+                            </div>
+                        </CardContent>
                     )}
-                </div>
+                </Card>
                 <Pagination links={replies.links} />
             </div>
+
+            <Dialog
+                open={selectedReply !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setSelectedReplyId(null);
+                    }
+                }}
+            >
+                {selectedReply && (
+                    <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
+                        <DialogHeader className="pr-8">
+                            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/12 text-cyan-600 dark:text-cyan-300">
+                                        <MailOpen className="size-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <DialogTitle className="leading-snug">
+                                            {selectedReply.subject ||
+                                                '(No subject)'}
+                                        </DialogTitle>
+                                        <DialogDescription className="mt-1">
+                                            {selectedReply.sender_name
+                                                ? `${selectedReply.sender_name} · `
+                                                : ''}
+                                            {selectedReply.sender_email} ·{' '}
+                                            {formatManilaDateTime(
+                                                selectedReply.received_at,
+                                            )}
+                                        </DialogDescription>
+                                    </div>
+                                </div>
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">
+                                        Classification
+                                    </span>
+                                    <ClassificationBadge
+                                        value={selectedReply.classification}
+                                    />
+                                </div>
+                            </div>
+                        </DialogHeader>
+
+                        <div className="rounded-xl border bg-muted/20 p-5">
+                            <p className="text-sm leading-7 whitespace-pre-wrap">
+                                {selectedReply.actual_reply ||
+                                    selectedReply.body_preview ||
+                                    'No readable message body.'}
+                            </p>
+                        </div>
+
+                        <div className="grid gap-1 rounded-xl border p-4 text-sm">
+                            <p className="font-semibold">
+                                {selectedReply.lead
+                                    ? `${selectedReply.lead.company_name} · ${selectedReply.lead.lead_code}`
+                                    : 'Deleted lead · Reply retained'}
+                            </p>
+                            <p className="text-muted-foreground">
+                                Owner:{' '}
+                                {selectedReply.agent?.name || 'Unassigned'}
+                            </p>
+                            <p className="text-muted-foreground">
+                                {selectedReply.classification_reason}
+                            </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 border-t pt-4">
+                            {!selectedReply.is_read && (
+                                <Form {...update.form(selectedReply.id)}>
+                                    <input
+                                        type="hidden"
+                                        name="is_read"
+                                        value="1"
+                                    />
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant="outline"
+                                    >
+                                        <CheckCircle2 /> Mark read
+                                    </Button>
+                                </Form>
+                            )}
+                            {manualClassifications.map((classification) => (
+                                <Form
+                                    key={classification}
+                                    {...update.form(selectedReply.id)}
+                                >
+                                    <input
+                                        type="hidden"
+                                        name="classification"
+                                        value={classification}
+                                    />
+                                    <input
+                                        type="hidden"
+                                        name="is_read"
+                                        value="1"
+                                    />
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant={
+                                            selectedReply.classification ===
+                                            classification
+                                                ? 'secondary'
+                                                : 'outline'
+                                        }
+                                    >
+                                        {classification
+                                            .replaceAll('_', ' ')
+                                            .replace(/^./, (value) =>
+                                                value.toUpperCase(),
+                                            )}
+                                    </Button>
+                                </Form>
+                            ))}
+                        </div>
+                    </DialogContent>
+                )}
+            </Dialog>
         </>
     );
 }
