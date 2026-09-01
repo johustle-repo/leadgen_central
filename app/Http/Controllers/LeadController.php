@@ -148,11 +148,11 @@ class LeadController extends Controller
         $latestLead = Lead::query()
             ->whereBelongsTo($request->user(), 'creator')
             ->latest('id')
-            ->first(['id', 'agent_id', 'company_name', 'website', 'country_code', 'city', 'import_trades', 'data_source', 'source_url']);
+            ->first(['id', 'agent_id', 'lead_date', 'company_name', 'website', 'country_code', 'city', 'import_trades', 'data_source', 'source_url']);
 
         $defaults = [
             ...($latestLead?->only(['agent_id', 'company_name', 'website', 'country_code', 'city', 'import_trades', 'data_source', 'source_url']) ?? []),
-            'lead_date' => today()->toDateString(),
+            'lead_date' => $latestLead?->lead_date?->toDateString() ?? today()->toDateString(),
             'contact_person' => '',
             'email' => '',
             'linkedin_url' => '',

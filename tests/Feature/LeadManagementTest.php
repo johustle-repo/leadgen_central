@@ -20,6 +20,7 @@ it('prefills a new lead from the users latest entry while clearing contact detai
     $this->travelTo('2026-08-26 10:00:00');
     $agent = User::factory()->create();
     $latestLead = Lead::factory()->for($agent, 'agent')->create([
+        'lead_date' => '2026-08-24',
         'company_name' => 'Acme Ventures',
         'website' => 'https://acme.test',
         'contact_person' => 'Ada',
@@ -38,7 +39,7 @@ it('prefills a new lead from the users latest entry while clearing contact detai
     $response->assertInertia(fn (Assert $page) => $page
         ->component('leads/form')
         ->where('formVersion', $latestLead->id)
-        ->where('defaults.lead_date', '2026-08-26')
+        ->where('defaults.lead_date', '2026-08-24')
         ->where('defaults.company_name', 'Acme Ventures')
         ->where('defaults.website', 'https://acme.test')
         ->where('defaults.country_code', 'US')
@@ -49,6 +50,17 @@ it('prefills a new lead from the users latest entry while clearing contact detai
         ->where('defaults.contact_person', '')
         ->where('defaults.email', '')
         ->where('defaults.linkedin_url', ''));
+});
+
+it('prefills todays date when the user has no previous lead', function () {
+    $this->travelTo('2026-08-26 10:00:00');
+    $agent = User::factory()->create();
+
+    $response = $this->actingAs($agent)->get(route('leads.create'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('leads/form')
+        ->where('defaults.lead_date', '2026-08-26'));
 });
 
 it('rejects a lead without a company name', function () {
