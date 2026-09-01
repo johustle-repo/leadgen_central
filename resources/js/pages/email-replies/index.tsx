@@ -17,7 +17,15 @@ import { index, update } from '@/routes/email-replies';
 import { connect, disconnect, sync } from '@/routes/gmail';
 
 type Classification =
-    'possible_lead' | 'not_lead' | 'needs_review' | 'automatic_reply';
+    | 'bounce'
+    | 'interested'
+    | 'not_interested'
+    | 'not_now'
+    | 'do_not_contact'
+    | 'possible_lead'
+    | 'not_lead'
+    | 'needs_review'
+    | 'automatic_reply';
 
 type Reply = {
     id: number;
@@ -58,6 +66,13 @@ type Props = {
 };
 
 const classificationStyles: Record<Classification, string> = {
+    bounce: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300',
+    interested:
+        'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+    not_interested: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+    not_now: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
+    do_not_contact:
+        'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950 dark:text-fuchsia-300',
     possible_lead:
         'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
     not_lead: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
@@ -205,7 +220,7 @@ export default function EmailRepliesIndex({
                             color: 'text-cyan-600 dark:text-cyan-300',
                         },
                         {
-                            label: 'Possible leads',
+                            label: 'Interested replies',
                             value: summary.possible,
                             icon: Sparkles,
                             color: 'text-emerald-600 dark:text-emerald-300',
@@ -239,13 +254,19 @@ export default function EmailRepliesIndex({
 
                 <form
                     onSubmit={filter}
-                    className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-4"
+                    className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-5"
                 >
                     <Input
                         name="search"
                         defaultValue={filters.search}
                         placeholder="Search sender, subject, or company…"
                         className="md:col-span-2"
+                    />
+                    <Input
+                        name="date"
+                        type="date"
+                        defaultValue={filters.date}
+                        aria-label="Reply date"
                     />
                     <select
                         name="classification"
@@ -254,10 +275,17 @@ export default function EmailRepliesIndex({
                         aria-label="Reply classification"
                     >
                         <option value="">All classifications</option>
-                        <option value="possible_lead">Possible lead</option>
-                        <option value="not_lead">Not lead</option>
+                        <option value="interested">Interested</option>
+                        <option value="not_interested">Not interested</option>
+                        <option value="not_now">Not now</option>
+                        <option value="do_not_contact">Do not contact</option>
+                        <option value="bounce">Bounce</option>
                         <option value="needs_review">Needs review</option>
                         <option value="automatic_reply">Automatic reply</option>
+                        <option value="possible_lead">
+                            Possible lead (legacy)
+                        </option>
+                        <option value="not_lead">Not lead (legacy)</option>
                     </select>
                     <div className="flex gap-2">
                         <label className="flex flex-1 items-center gap-2 rounded-md border px-3 text-sm">
@@ -351,8 +379,11 @@ export default function EmailRepliesIndex({
                                         )}
                                         {(
                                             [
-                                                'possible_lead',
-                                                'not_lead',
+                                                'interested',
+                                                'not_interested',
+                                                'not_now',
+                                                'do_not_contact',
+                                                'bounce',
                                                 'needs_review',
                                             ] as Classification[]
                                         ).map((classification) => (

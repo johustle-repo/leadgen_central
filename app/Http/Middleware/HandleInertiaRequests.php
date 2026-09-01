@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\EmailReply;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -42,6 +43,21 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'flash' => ['toast' => fn () => $request->session()->get('toast')],
+            'notificationCounts' => [
+                'email_replies_today' => function () use ($request): int {
+                    $user = $request->user();
+                    if ($user === null) {
+                        return 0;
+                    }
+
+                    $start = now('Asia/Manila')->startOfDay();
+
+                    return EmailReply::query()
+                        ->when(! $user->canViewAllLeads(), fn ($query) => $query->whereBelongsTo($user, 'agent'))
+                        ->whereBetween('received_at', [$start->clone()->utc(), $start->clone()->endOfDay()->utc()])
+                        ->count();
+                },
+            ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

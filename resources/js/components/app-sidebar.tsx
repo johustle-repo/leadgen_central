@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { usePage } from '@inertiajs/react';
+import { usePage, usePoll } from '@inertiajs/react';
 import {
     CopyCheck,
     ClipboardList,
@@ -39,11 +39,21 @@ import type { NavItem } from '@/types';
 import type { Auth } from '@/types';
 
 export function AppSidebar() {
-    const { auth } = usePage<{ auth: Auth }>().props;
+    usePoll(60000, { only: ['notificationCounts'] });
+
+    const { auth, notificationCounts } = usePage<{
+        auth: Auth;
+        notificationCounts: { email_replies_today: number };
+    }>().props;
     const mainNavItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
         { title: 'Leads', href: leadIndex(), icon: Waypoints },
-        { title: 'Email Replies', href: emailReplyIndex(), icon: MailSearch },
+        {
+            title: 'Email Replies',
+            href: emailReplyIndex(),
+            icon: MailSearch,
+            badge: notificationCounts.email_replies_today,
+        },
         { title: 'Email Sequences', href: emailSequenceIndex(), icon: Mails },
         { title: 'Upload Leads', href: uploadCreate(), icon: Upload },
         { title: 'Upload History', href: uploadIndex(), icon: FileClock },

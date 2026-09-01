@@ -12,6 +12,7 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
+            notificationCounts: { email_replies_today: number };
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

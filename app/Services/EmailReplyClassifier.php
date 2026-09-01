@@ -11,16 +11,28 @@ class EmailReplyClassifier
     {
         $content = mb_strtolower("{$subject} {$body}");
 
+        if ($this->contains($content, ['delivery status notification', 'delivery failed', 'mail delivery failed', 'undeliverable', 'address not found', 'recipient address rejected', 'mailbox unavailable', 'user unknown', 'message blocked'])) {
+            return ['classification' => EmailReplyClassification::Bounce, 'reason' => 'Detected a delivery failure or bounced email response.'];
+        }
+
         if (($autoSubmitted !== null && mb_strtolower($autoSubmitted) !== 'no') || $this->contains($content, ['out of office', 'automatic reply', 'auto-reply', 'away from the office'])) {
             return ['classification' => EmailReplyClassification::AutomaticReply, 'reason' => 'Detected an automatic or out-of-office response.'];
         }
 
-        if ($this->contains($content, ['not interested', 'remove me', 'unsubscribe', 'do not contact', "don't contact", 'no thanks', 'wrong person', 'stop emailing'])) {
-            return ['classification' => EmailReplyClassification::NotLead, 'reason' => 'Detected a decline, opt-out, or wrong-contact response.'];
+        if ($this->contains($content, ['remove me', 'unsubscribe', 'do not contact', "don't contact", 'stop emailing', 'take me off your list', 'opt me out'])) {
+            return ['classification' => EmailReplyClassification::DoNotContact, 'reason' => 'Detected an explicit request to stop further contact.'];
+        }
+
+        if ($this->contains($content, ['not now', 'maybe later', 'reach out later', 'contact me later', 'check back later', 'next month', 'next quarter', 'not at this time', 'not right now'])) {
+            return ['classification' => EmailReplyClassification::NotNow, 'reason' => 'Detected interest deferred to a later time.'];
+        }
+
+        if ($this->contains($content, ['not interested', 'no thanks', 'no thank you', 'we will pass', 'not a fit', 'wrong person', 'no requirement', 'no need'])) {
+            return ['classification' => EmailReplyClassification::NotInterested, 'reason' => 'Detected a clear decline or lack of interest.'];
         }
 
         if ($this->contains($content, ['interested', 'tell me more', 'send more information', 'more details', 'pricing', 'price list', 'quotation', 'quote', 'schedule a call', 'book a call', 'set up a meeting', 'available for a call'])) {
-            return ['classification' => EmailReplyClassification::PossibleLead, 'reason' => 'Detected interest, pricing, or meeting intent.'];
+            return ['classification' => EmailReplyClassification::Interested, 'reason' => 'Detected interest, pricing, or meeting intent.'];
         }
 
         return ['classification' => EmailReplyClassification::NeedsReview, 'reason' => 'No clear positive or negative intent was detected.'];

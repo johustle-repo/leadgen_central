@@ -31,6 +31,11 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                     <item.icon className="size-4.5" />
                                 )}
                                 <span>{item.title}</span>
+                                {!!item.badge && (
+                                    <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-emerald-400 px-1.5 py-0.5 text-[10px] leading-none font-bold text-emerald-950 shadow-sm shadow-emerald-950/20">
+                                        {item.badge > 99 ? '99+' : item.badge}
+                                    </span>
+                                )}
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

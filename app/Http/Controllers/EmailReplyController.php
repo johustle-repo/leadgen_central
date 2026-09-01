@@ -9,6 +9,7 @@ use App\Models\GmailConnection;
 use App\Services\EmailReplyTextExtractor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,11 +22,24 @@ class EmailReplyController extends Controller
         $user = $request->user();
         $authorizedReplies = EmailReply::query()
             ->when(! $user->canViewAllLeads(), fn ($query) => $query->whereBelongsTo($user, 'agent'));
+        $date = $request->string('date')->toString();
+        $dateRange = null;
+        if ($date !== '') {
+            try {
+                $start = Date::createFromFormat('Y-m-d', $date, 'Asia/Manila')->startOfDay();
+                if ($start->format('Y-m-d') === $date) {
+                    $dateRange = [$start->clone()->utc(), $start->clone()->endOfDay()->utc()];
+                }
+            } catch (\Throwable) {
+                $dateRange = null;
+            }
+        }
         $query = (clone $authorizedReplies)
             ->select(['id', 'agent_id', 'lead_id', 'sender_name', 'sender_email', 'subject', 'body_preview', 'body_text', 'classification', 'classification_reason', 'is_read', 'received_at'])
             ->with(['agent:id,name', 'lead:id,lead_code,company_name,contact_person,email'])
             ->when($request->boolean('unread'), fn ($query) => $query->where('is_read', false))
             ->when($request->string('classification')->toString(), fn ($query, string $classification) => $query->where('classification', $classification))
+            ->when($dateRange, fn ($query, array $range) => $query->whereBetween('received_at', $range))
             ->when($request->string('search')->trim()->toString(), function ($query, string $search): void {
                 $query->where(fn ($query) => $query->where('sender_email', 'like', "%{$search}%")
                     ->orWhere('subject', 'like', "%{$search}%")
@@ -40,11 +54,11 @@ class EmailReplyController extends Controller
 
         return Inertia::render('email-replies/index', [
             'replies' => $replies,
-            'filters' => $request->only(['search', 'classification', 'unread']),
+            'filters' => $request->only(['search', 'classification', 'unread', 'date']),
             'connection' => GmailConnection::query()->whereBelongsTo($user)->first(['id', 'gmail_address', 'status', 'last_synced_at', 'last_error']),
             'summary' => [
                 'unread' => (clone $authorizedReplies)->where('is_read', false)->count(),
-                'possible' => (clone $authorizedReplies)->where('classification', 'possible_lead')->count(),
+                'possible' => (clone $authorizedReplies)->whereIn('classification', ['interested', 'possible_lead'])->count(),
                 'needs_review' => (clone $authorizedReplies)->where('classification', 'needs_review')->count(),
             ],
         ]);

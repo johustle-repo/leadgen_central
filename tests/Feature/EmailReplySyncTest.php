@@ -54,7 +54,7 @@ it('saves and classifies only Gmail messages sent by an agents lead', function (
         'lead_id' => $lead->id,
         'gmail_message_id' => 'msg-1',
         'sender_email' => 'prospect@example.com',
-        'classification' => 'possible_lead',
+        'classification' => 'interested',
         'is_read' => false,
     ]);
     $this->assertDatabaseHas('email_sequence_enrollments', [
@@ -92,12 +92,17 @@ it('does not save unrelated personal inbox messages', function () {
     $this->assertDatabaseCount('email_replies', 0);
 });
 
-it('classifies clear negative replies without a paid AI service', function () {
-    $result = app(EmailReplyClassifier::class)->classify('Re: Partnership', 'No thanks, please remove me from your list.');
+it('classifies reply intent without a paid AI service', function (string $subject, string $body, EmailReplyClassification $expected) {
+    $result = app(EmailReplyClassifier::class)->classify($subject, $body);
 
-    expect($result['classification'])->toBe(EmailReplyClassification::NotLead)
-        ->and($result['reason'])->toContain('decline');
-});
+    expect($result['classification'])->toBe($expected);
+})->with([
+    'bounce' => ['Delivery Status Notification', 'Recipient address rejected. Delivery failed.', EmailReplyClassification::Bounce],
+    'interested' => ['Re: Scaffolding', 'I am interested. Please send your pricing.', EmailReplyClassification::Interested],
+    'not interested' => ['Re: Scaffolding', 'No thanks, we are not interested.', EmailReplyClassification::NotInterested],
+    'not now' => ['Re: Scaffolding', 'Not right now. Please check back later.', EmailReplyClassification::NotNow],
+    'do not contact' => ['Re: Scaffolding', 'Please remove me and do not contact me again.', EmailReplyClassification::DoNotContact],
+]);
 
 it('stores the complete message but previews and classifies only the actual reply', function () {
     Http::preventStrayRequests();
@@ -131,6 +136,6 @@ it('stores the complete message but previews and classifies only the actual repl
         'lead_id' => $lead->id,
         'body_preview' => "Thanks for your email!\nPlease send your pricing.",
         'body_text' => $messageBody,
-        'classification' => 'possible_lead',
+        'classification' => 'interested',
     ]);
 });

@@ -25,6 +25,59 @@ it('shows agents only the replies matched to their own leads', function () {
         ->where('connection.gmail_address', $connection->gmail_address));
 });
 
+it('filters replies by classification date and search text', function () {
+    $this->travelTo('2026-09-01 12:00:00');
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Target Scaffolding']);
+    $connection = GmailConnection::factory()->for($agent)->create();
+    $matching = EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create([
+        'classification' => 'interested',
+        'subject' => 'Pricing request',
+        'received_at' => now(),
+    ]);
+    EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create([
+        'classification' => 'not_now',
+        'subject' => 'Pricing request',
+        'received_at' => now(),
+    ]);
+    EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create([
+        'classification' => 'interested',
+        'subject' => 'Pricing request',
+        'received_at' => now()->subDay(),
+    ]);
+
+    $response = $this->actingAs($agent)->get(route('email-replies.index', [
+        'classification' => 'interested',
+        'date' => '2026-09-01',
+        'search' => 'Target',
+    ]));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('email-replies/index')
+        ->has('replies.data', 1)
+        ->where('replies.data.0.id', $matching->id)
+        ->where('filters.classification', 'interested')
+        ->where('filters.date', '2026-09-01'));
+});
+
+it('shares todays owned reply count for the sidebar badge', function () {
+    $this->travelTo('2026-09-01 12:00:00');
+    $agent = User::factory()->create();
+    $otherAgent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create();
+    $otherLead = Lead::factory()->for($otherAgent, 'agent')->create();
+    $connection = GmailConnection::factory()->for($agent)->create();
+    $otherConnection = GmailConnection::factory()->for($otherAgent)->create();
+    EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create(['received_at' => now()]);
+    EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create(['received_at' => now()->subDay()]);
+    EmailReply::factory()->for($otherConnection, 'gmailConnection')->for($otherAgent, 'agent')->for($otherLead)->create(['received_at' => now()]);
+
+    $response = $this->actingAs($agent)->get(route('email-replies.index'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('notificationCounts.email_replies_today', 1));
+});
+
 it('allows an agent to confirm the classification of their own reply', function () {
     $agent = User::factory()->create();
     $lead = Lead::factory()->for($agent, 'agent')->create();
