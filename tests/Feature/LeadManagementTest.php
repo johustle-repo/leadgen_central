@@ -16,6 +16,24 @@ it('creates a manual lead owned by the authenticated agent', function () {
     expect(Lead::firstOrFail()->lead_code)->toStartWith('LD-');
 });
 
+it('normalizes manually entered contact names to title case', function (string $contactName) {
+    $agent = User::factory()->create();
+
+    $response = $this->actingAs($agent)->post(route('leads.store'), [
+        'company_name' => 'Acme Ventures',
+        'contact_person' => $contactName,
+    ]);
+
+    $response->assertRedirect(route('leads.create'));
+    $this->assertDatabaseHas('leads', [
+        'agent_id' => $agent->id,
+        'contact_person' => 'Jonathan Quiles',
+    ]);
+})->with([
+    'lowercase name' => 'jonathan quiles',
+    'uppercase name' => 'JONATHAN QUILES',
+]);
+
 it('prefills a new lead from the users latest entry while clearing contact details', function () {
     $this->travelTo('2026-08-26 10:00:00');
     $agent = User::factory()->create();

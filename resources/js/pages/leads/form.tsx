@@ -23,6 +23,12 @@ const fields = [
     { name: 'source_url', label: 'Link', type: 'url' },
 ];
 const dataSources = ['Tendata', 'Lusha', 'Tendata/Lusha', 'Email', 'Manual'];
+const titleCaseName = (value: string) =>
+    value
+        .trim()
+        .toLocaleLowerCase()
+        .replace(/(^|[\s'-])\p{L}/gu, (letter) => letter.toLocaleUpperCase());
+
 export default function LeadForm({
     lead,
     defaults,
@@ -156,6 +162,19 @@ export default function LeadForm({
                                                         }
                                                         maxLength={
                                                             field.maxLength
+                                                        }
+                                                        onBlur={
+                                                            field.name ===
+                                                            'contact_person'
+                                                                ? (event) => {
+                                                                      event.currentTarget.value =
+                                                                          titleCaseName(
+                                                                              event
+                                                                                  .currentTarget
+                                                                                  .value,
+                                                                          );
+                                                                  }
+                                                                : undefined
                                                         }
                                                         className="mt-2"
                                                     />

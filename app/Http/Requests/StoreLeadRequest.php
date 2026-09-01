@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Lead;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class StoreLeadRequest extends FormRequest
@@ -13,6 +14,12 @@ class StoreLeadRequest extends FormRequest
     {
         if ($this->filled('country_code')) {
             $this->merge(['country_code' => strtoupper(trim((string) $this->input('country_code')))]);
+        }
+
+        if ($this->filled('contact_person')) {
+            $this->merge([
+                'contact_person' => Str::title(Str::lower(Str::squish((string) $this->input('contact_person')))),
+            ]);
         }
     }
 
