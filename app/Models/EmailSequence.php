@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $name
+ * @property array<int, array{day: int, subject: string, body: string, attach_brochure: bool}> $steps
+ * @property bool $is_active
+ */
 class EmailSequence extends Model
 {
     /** @use HasFactory<EmailSequenceFactory> */

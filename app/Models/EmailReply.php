@@ -7,7 +7,15 @@ use Database\Factories\EmailReplyFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property EmailReplyClassification $classification
+ * @property string $body_text
+ * @property string|null $classification_reason
+ * @property bool $is_read
+ * @property Carbon $received_at
+ */
 class EmailReply extends Model
 {
     /** @use HasFactory<EmailReplyFactory> */

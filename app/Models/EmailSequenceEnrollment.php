@@ -7,7 +7,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $email_sequence_id
+ * @property int $lead_id
+ * @property int $agent_id
+ * @property string $status
+ * @property int $current_step
+ * @property Carbon $started_at
+ * @property Carbon|null $next_send_at
+ * @property Carbon|null $stopped_at
+ * @property-read EmailSequence $sequence
+ * @property-read Lead $lead
+ */
 class EmailSequenceEnrollment extends Model
 {
     /** @use HasFactory<EmailSequenceEnrollmentFactory> */

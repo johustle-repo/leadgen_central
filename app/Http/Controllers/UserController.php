@@ -39,7 +39,9 @@ class UserController extends Controller
             ...$user->only(['id', 'name', 'email', 'role', 'team', 'status', 'created_at']),
             'leads_count' => $user->leads_count,
             'email_replies_count' => $user->email_replies_count,
-            'email_sequence_enabled' => $user->emailSequences->first()?->is_active ?? true,
+            'email_sequence_enabled' => $user->emailSequences->isEmpty()
+                ? true
+                : $user->emailSequences->first()->is_active,
             'can_delete' => $request->user()->can('delete', $user),
         ]);
 

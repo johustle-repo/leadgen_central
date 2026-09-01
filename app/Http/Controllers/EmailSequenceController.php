@@ -23,7 +23,10 @@ class EmailSequenceController extends Controller
     {
         Gate::authorize('viewAny', Lead::class);
         $user = $request->user();
-        $sequence = EmailSequence::query()->whereBelongsTo($user)->first();
+        $sequence = EmailSequence::query()->firstOrNew(
+            ['user_id' => $user->id],
+            ['name' => 'DUSCAFF 7-Day Outreach', 'steps' => EmailSequence::defaultSteps(), 'is_active' => true],
+        );
         $enrollments = EmailSequenceEnrollment::query()
             ->whereBelongsTo($user, 'agent')
             ->with(['lead:id,contact_person,email,company_name', 'messages:id,email_sequence_enrollment_id,step_number,sent_at'])
@@ -32,9 +35,9 @@ class EmailSequenceController extends Controller
 
         return Inertia::render('email-sequences/index', [
             'sequence' => [
-                'name' => $sequence?->name ?? 'DUSCAFF 7-Day Outreach',
-                'is_active' => $sequence?->is_active ?? true,
-                'steps' => $sequence?->steps ?? EmailSequence::defaultSteps(),
+                'name' => $sequence->name,
+                'is_active' => $sequence->is_active,
+                'steps' => $sequence->steps,
             ],
             'enrollments' => $enrollments,
             'availableLeads' => Lead::query()

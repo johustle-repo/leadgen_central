@@ -22,7 +22,7 @@ class EmailSequenceEnrollmentFactory extends Factory
         return [
             'email_sequence_id' => EmailSequence::factory(),
             'lead_id' => Lead::factory(),
-            'agent_id' => fn (array $attributes) => Lead::query()->findOrFail($attributes['lead_id'])->agent_id,
+            'agent_id' => fn (array $attributes): int => (int) Lead::query()->whereKey($attributes['lead_id'])->value('agent_id'),
             'status' => 'active',
             'current_step' => 0,
             'started_at' => now(),

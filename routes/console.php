@@ -8,5 +8,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('gmail:sync')->everyMinute()->withoutOverlapping();
-Schedule::command('email-sequences:process')->everyMinute()->withoutOverlapping();
+Schedule::command('gmail:sync')->everyMinute()->onOneServer()->withoutOverlapping(5);
+Schedule::command('email-sequences:process')->everyMinute()->onOneServer()->withoutOverlapping(5);

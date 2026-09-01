@@ -18,6 +18,8 @@ class ProcessUploadBatch implements ShouldQueue
 
     public int $timeout = 300;
 
+    public bool $failOnTimeout = true;
+
     /**
      * Create a new job instance.
      */

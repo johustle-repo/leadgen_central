@@ -36,3 +36,11 @@ jobs:
 
       - name: Run CI Checks
         run: composer ci:check
+
+      - name: Audit dependencies
+        run: |
+          composer audit --locked
+          npm audit --audit-level=high
+
+      - name: Verify production optimization
+        run: php artisan optimize

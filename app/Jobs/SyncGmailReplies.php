@@ -15,6 +15,10 @@ class SyncGmailReplies implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 3;
 
+    public int $timeout = 300;
+
+    public bool $failOnTimeout = true;
+
     /** @var list<int> */
     public array $backoff = [60, 300, 900];
 

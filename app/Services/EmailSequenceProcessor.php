@@ -56,7 +56,7 @@ class EmailSequenceProcessor
         try {
             $subject = $this->personalize((string) $step['subject'], $enrollment);
             $body = $this->personalize((string) $step['body'], $enrollment);
-            $attachBrochure = (bool) ($step['attach_brochure'] ?? false);
+            $attachBrochure = $step['attach_brochure'];
             $sent = $this->gmail->sendMessage($connection, $this->messages->build(
                 $connection->gmail_address,
                 (string) $enrollment->lead->email,

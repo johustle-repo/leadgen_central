@@ -134,7 +134,7 @@ class UploadBatchProcessor
             foreach (['Y-m-d', 'm/d/Y', 'm-d-Y', 'd/m/Y', 'd-m-Y'] as $format) {
                 try {
                     $date = Date::createFromFormat($format, $dateValue);
-                    if ($date !== false && $date->format($format) === $dateValue) {
+                    if ($date !== null && $date->format($format) === $dateValue) {
                         return $date->toDateString();
                     }
                 } catch (Throwable) {
@@ -149,7 +149,7 @@ class UploadBatchProcessor
             try {
                 $date = Date::createFromFormat('m-d-Y', "{$matches[1]}-{$matches[2]}-{$matches[3]}");
 
-                return $date === false ? null : $date->toDateString();
+                return $date?->toDateString();
             } catch (Throwable) {
                 return null;
             }
@@ -159,7 +159,7 @@ class UploadBatchProcessor
             try {
                 $date = Date::createFromFormat('Y-m-d', "{$matches[1]}-{$matches[2]}-{$matches[3]}");
 
-                return $date === false ? null : $date->toDateString();
+                return $date?->toDateString();
             } catch (Throwable) {
                 return null;
             }

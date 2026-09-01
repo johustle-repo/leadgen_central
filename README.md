@@ -1,6 +1,6 @@
 # LeadGen Central
 
-LeadGen Central is a Laravel 13, Inertia 3, React 19, MySQL-compatible lead generation, validation, and intelligence management system. Phase 1 provides authenticated role-based dashboards, lead ownership, manual entry, CSV mapping and queued processing, row-level upload results, user administration, and basic settings.
+LeadGen Central is a Laravel 13, Inertia 3, React 19, MySQL-compatible lead operations system. It provides role-based lead ownership, manual and bulk lead intake, queued CSV cleaning, duplicate review, timezone normalization, verification workflows, Gmail reply synchronization and classification, email sequences, audit logs, and administration.
 
 ## Requirements
 
@@ -44,12 +44,4 @@ npm run build
 
 ## Production
 
-- Point the web root to `public/` and run `php artisan migrate --force` during deployment.
-- Use MySQL and supervise a persistent queue worker.
-- Set `APP_ENV=production`, `APP_DEBUG=false`, secure application/database/mail values, and unique seed credentials.
-- Run `php artisan optimize`; ensure `storage/` and `bootstrap/cache/` are writable.
-- Uploaded CSV files use Laravel's local disk. Configure durable storage if deployments replace local files.
-
-## Phase 1 boundaries
-
-Advanced duplicate intelligence, timezone matching, verification workflows, scraping, AI enrichment, and advanced analytics are intentionally reserved for later phases.
+Use [DEPLOYMENT.md](DEPLOYMENT.md) and `.env.production.example` for the complete production checklist. Before going live, run `php artisan app:deployment-check`; it fails when critical production settings are unsafe or incomplete.

@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Throwable;
 
 class UploadBatchCreator
@@ -76,10 +77,16 @@ class UploadBatchCreator
         return ['headers' => $stringHeaders, 'mapping' => $mapping];
     }
 
-    /** @param array{headers: list<string>, mapping: array<string, string|null>} $fileDetails */
+    /**
+     * @param  array{headers: list<string>, mapping: array<string, string|null>}  $fileDetails
+     * @param  Collection<int, string>|null  $storedFilenames
+     */
     private function createBatch(UploadedFile $file, array $fileDetails, User $owner, string $duplicateHandling, ?Collection $storedFilenames = null): UploadBatch
     {
         $storedFilename = $file->store('lead-imports');
+        if (! is_string($storedFilename)) {
+            throw new RuntimeException('The uploaded lead file could not be stored.');
+        }
         $storedFilenames?->push($storedFilename);
 
         return UploadBatch::query()->create([
