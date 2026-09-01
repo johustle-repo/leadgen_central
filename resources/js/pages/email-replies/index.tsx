@@ -192,23 +192,22 @@ export default function EmailRepliesIndex({
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                            <Form {...markAllRead.form()}>
+                                {({ processing }) => (
+                                    <Button
+                                        type="submit"
+                                        variant="outline"
+                                        disabled={
+                                            processing || summary.unread === 0
+                                        }
+                                    >
+                                        <CheckCheck />
+                                        Mark all as read
+                                    </Button>
+                                )}
+                            </Form>
                             {connection ? (
                                 <>
-                                    <Form {...markAllRead.form()}>
-                                        {({ processing }) => (
-                                            <Button
-                                                type="submit"
-                                                variant="outline"
-                                                disabled={
-                                                    processing ||
-                                                    summary.unread === 0
-                                                }
-                                            >
-                                                <CheckCheck />
-                                                Mark all as read
-                                            </Button>
-                                        )}
-                                    </Form>
                                     <Form {...sync.form()}>
                                         {({ processing }) => (
                                             <Button
