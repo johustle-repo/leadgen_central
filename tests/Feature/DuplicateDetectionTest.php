@@ -82,20 +82,20 @@ it('cleans an agents exported manual lead by updating the original instead of ma
     ]);
 });
 
-it('updates a missing date on an agents matching uploaded lead when requested', function () {
+it('updates the date on an agents matching uploaded lead when requested', function () {
     Storage::fake('local');
     $agent = User::factory()->create();
     $original = Lead::factory()->for($agent, 'agent')->create([
         'source' => 'csv',
-        'lead_date' => null,
+        'lead_date' => '2026-03-27',
         'company_name' => 'Acme Ventures',
         'contact_person' => 'Ada Lovelace',
         'email' => 'ada@acme.test',
         'created_by' => $agent->id,
     ]);
     $file = UploadedFile::fake()->createWithContent(
-        '08-25-2026-Lead-1-Raw.csv',
-        "Company,First Name,Email\nAcme Ventures,Ada Lovelace,ada@acme.test\n",
+        'leads.csv',
+        "Date,Company,First Name,Email\n03-28-2026,Acme Ventures,Ada Lovelace,ada@acme.test\n",
     );
 
     $this->actingAs($agent)->post(route('uploads.store'), [
@@ -104,13 +104,14 @@ it('updates a missing date on an agents matching uploaded lead when requested', 
     ]);
     $batch = UploadBatch::query()->whereBelongsTo($agent)->firstOrFail();
     $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        'Date' => 'lead_date',
         'Company' => 'company_name',
         'First Name' => 'contact_person',
         'Email' => 'email',
     ]]);
 
     expect(Lead::count())->toBe(1)
-        ->and($original->refresh()->lead_date?->toDateString())->toBe('2026-08-25')
+        ->and($original->refresh()->lead_date?->toDateString())->toBe('2026-03-28')
         ->and($batch->refresh()->duplicate_rows)->toBe(0)
         ->and($batch->accepted_rows)->toBe(1);
 });

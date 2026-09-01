@@ -133,10 +133,10 @@ export default function UploadCreate() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-                        Update missing information can repair leads that
-                        currently have no date. Existing information is never
-                        overwritten, and leads owned by another agent are not
-                        changed.
+                        Update missing information applies the CSV date and
+                        repairs other blank fields. Other existing information
+                        is not overwritten, and leads owned by another agent are
+                        not changed.
                     </div>
                     <DialogFooter>
                         <Button

@@ -207,7 +207,7 @@ class UploadBatchProcessor
     {
         $attributes = collect($normalized)
             ->only(['lead_date', 'website', 'original_website', 'website_domain', 'address', 'city', 'raw_city', 'state_province', 'country', 'raw_country', 'country_code', 'canonical_city_id', 'canonical_country_id', 'timezone', 'industry', 'business_type', 'contact_person', 'position', 'email', 'phone', 'linkedin_url', 'import_trades', 'data_source', 'source_url', 'notes'])
-            ->filter(fn (mixed $value, string $field): bool => filled($value) && blank($lead->getAttribute($field)))
+            ->filter(fn (mixed $value, string $field): bool => filled($value) && ($field === 'lead_date' || blank($lead->getAttribute($field))))
             ->all();
 
         $lead->update([...$attributes, 'updated_by' => $batch->user_id]);
