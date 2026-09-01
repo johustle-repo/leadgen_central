@@ -57,6 +57,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::put('system-settings', [SystemSettingController::class, 'update'])->middleware(['can:manage-settings', 'password.confirm'])->name('system-settings.update');
     Route::get('audit-logs', AuditLogController::class)->name('audit-logs.index');
     Route::get('email-replies', [EmailReplyController::class, 'index'])->name('email-replies.index');
+    Route::put('email-replies/read-all', [EmailReplyController::class, 'markAllRead'])->name('email-replies.mark-all-read');
     Route::put('email-replies/{emailReply}', [EmailReplyController::class, 'update'])->name('email-replies.update');
     Route::get('email-sequences', [EmailSequenceController::class, 'index'])->name('email-sequences.index');
     Route::put('email-sequences', [EmailSequenceController::class, 'update'])->name('email-sequences.update');

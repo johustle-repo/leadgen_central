@@ -84,4 +84,28 @@ class EmailReplyController extends Controller
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Reply updated successfully.']);
     }
+
+    public function markAllRead(Request $request): RedirectResponse
+    {
+        Gate::authorize('viewAny', EmailReply::class);
+        $user = $request->user();
+        $updated = EmailReply::query()
+            ->when(! $user->canViewAllLeads(), fn ($query) => $query->whereBelongsTo($user, 'agent'))
+            ->where('is_read', false)
+            ->update(['is_read' => true]);
+
+        AuditLog::query()->create([
+            'user_id' => $user->id,
+            'action' => 'email_reply.all_marked_read',
+            'auditable_type' => 'email_reply',
+            'description' => "Marked {$updated} email replies as read.",
+            'metadata' => ['updated_count' => $updated],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        $message = $updated === 0 ? 'No unread replies to update.' : "{$updated} replies marked as read.";
+
+        return back()->with('toast', ['type' => 'success', 'message' => $message]);
+    }
 }

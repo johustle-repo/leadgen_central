@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ProcessUploadBatch;
 use App\Models\Country;
 use App\Models\Lead;
 use App\Models\SystemSetting;
@@ -9,6 +10,13 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+
+it('allows upload processing to finish without a queue timeout', function () {
+    $job = new ProcessUploadBatch(123);
+
+    expect($job->timeout)->toBe(0)
+        ->and($job->failOnTimeout)->toBeTrue();
+});
 
 it('shows upload history for a soft deleted owner without crashing', function () {
     $administrator = User::factory()->create(['role' => 'administrator']);

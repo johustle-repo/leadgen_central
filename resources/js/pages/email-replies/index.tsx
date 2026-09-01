@@ -1,6 +1,7 @@
 import { Form, Head, router, usePoll } from '@inertiajs/react';
 import {
     AlertCircle,
+    CheckCheck,
     CheckCircle2,
     ChevronRight,
     Inbox,
@@ -23,7 +24,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { index, update } from '@/routes/email-replies';
+import { index, markAllRead, update } from '@/routes/email-replies';
 import { connect, disconnect, sync } from '@/routes/gmail';
 
 type Classification =
@@ -193,6 +194,21 @@ export default function EmailRepliesIndex({
                         <div className="flex flex-wrap gap-2">
                             {connection ? (
                                 <>
+                                    <Form {...markAllRead.form()}>
+                                        {({ processing }) => (
+                                            <Button
+                                                type="submit"
+                                                variant="outline"
+                                                disabled={
+                                                    processing ||
+                                                    summary.unread === 0
+                                                }
+                                            >
+                                                <CheckCheck />
+                                                Mark all as read
+                                            </Button>
+                                        )}
+                                    </Form>
                                     <Form {...sync.form()}>
                                         {({ processing }) => (
                                             <Button

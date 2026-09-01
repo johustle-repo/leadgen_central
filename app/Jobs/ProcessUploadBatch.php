@@ -16,7 +16,8 @@ class ProcessUploadBatch implements ShouldQueue
 
     public int $tries = 3;
 
-    public int $timeout = 300;
+    /** CSV imports may contain many files and must be allowed to finish. */
+    public int $timeout = 0;
 
     public bool $failOnTimeout = true;
 

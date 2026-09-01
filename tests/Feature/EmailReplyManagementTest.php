@@ -94,6 +94,46 @@ it('allows an agent to confirm the classification of their own reply', function 
     $this->assertDatabaseHas('audit_logs', ['user_id' => $agent->id, 'action' => 'email_reply.updated', 'auditable_id' => $reply->id]);
 });
 
+it('allows an agent to mark only their own unread replies as read', function () {
+    $agent = User::factory()->create();
+    $otherAgent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create();
+    $otherLead = Lead::factory()->for($otherAgent, 'agent')->create();
+    $connection = GmailConnection::factory()->for($agent)->create();
+    $otherConnection = GmailConnection::factory()->for($otherAgent)->create();
+    $ownUnreadReply = EmailReply::factory()->for($connection, 'gmailConnection')->for($agent, 'agent')->for($lead)->create(['is_read' => false]);
+    $otherUnreadReply = EmailReply::factory()->for($otherConnection, 'gmailConnection')->for($otherAgent, 'agent')->for($otherLead)->create(['is_read' => false]);
+
+    $response = $this->actingAs($agent)->put(route('email-replies.mark-all-read'));
+
+    $response->assertRedirect()->assertSessionHas('toast.message', '1 replies marked as read.');
+    expect($ownUnreadReply->fresh()->is_read)->toBeTrue()
+        ->and($otherUnreadReply->fresh()->is_read)->toBeFalse();
+    $this->assertDatabaseHas('audit_logs', [
+        'user_id' => $agent->id,
+        'action' => 'email_reply.all_marked_read',
+        'metadata' => json_encode(['updated_count' => 1]),
+    ]);
+});
+
+it('allows an administrator to mark all unread replies as read', function () {
+    $administrator = User::factory()->administrator()->create();
+    $firstAgent = User::factory()->create();
+    $secondAgent = User::factory()->create();
+    $firstLead = Lead::factory()->for($firstAgent, 'agent')->create();
+    $secondLead = Lead::factory()->for($secondAgent, 'agent')->create();
+    $firstConnection = GmailConnection::factory()->for($firstAgent)->create();
+    $secondConnection = GmailConnection::factory()->for($secondAgent)->create();
+    $firstReply = EmailReply::factory()->for($firstConnection, 'gmailConnection')->for($firstAgent, 'agent')->for($firstLead)->create(['is_read' => false]);
+    $secondReply = EmailReply::factory()->for($secondConnection, 'gmailConnection')->for($secondAgent, 'agent')->for($secondLead)->create(['is_read' => false]);
+
+    $response = $this->actingAs($administrator)->put(route('email-replies.mark-all-read'));
+
+    $response->assertRedirect()->assertSessionHas('toast.message', '2 replies marked as read.');
+    expect($firstReply->fresh()->is_read)->toBeTrue()
+        ->and($secondReply->fresh()->is_read)->toBeTrue();
+});
+
 it('shows only the actual reply without the quoted outreach message', function () {
     $agent = User::factory()->create();
     $lead = Lead::factory()->for($agent, 'agent')->create();
