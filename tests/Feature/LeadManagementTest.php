@@ -128,6 +128,28 @@ it('supports a safe lead quantity filter', function () {
         ->where('filters.per_page', '10'));
 });
 
+it('filters leads by one lead date', function () {
+    $agent = User::factory()->create();
+    $matching = Lead::factory()->for($agent, 'agent')->create([
+        'lead_date' => '2026-08-25',
+        'company_name' => 'Matching Date Company',
+        'created_by' => $agent->id,
+    ]);
+    Lead::factory()->for($agent, 'agent')->create([
+        'lead_date' => '2026-08-24',
+        'company_name' => 'Other Date Company',
+        'created_by' => $agent->id,
+    ]);
+
+    $response = $this->actingAs($agent)->get(route('leads.index', ['date' => '2026-08-25']));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('leads/index')
+        ->where('filters.date', '2026-08-25')
+        ->has('leads.data', 1)
+        ->where('leads.data.0.id', $matching->id));
+});
+
 it('prevents agents from viewing another agents lead', function () {
     $agent = User::factory()->create();
     $otherLead = Lead::factory()->create();

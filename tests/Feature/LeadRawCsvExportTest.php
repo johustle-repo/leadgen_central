@@ -6,7 +6,7 @@ use App\Models\Lead;
 use App\Models\TimezoneReference;
 use App\Models\User;
 
-it('downloads only the agents leads created within the selected date range as a raw CSV', function () {
+it('downloads only the agents leads within the selected lead date range as a raw CSV', function () {
     $agent = User::factory()->create();
     $otherAgent = User::factory()->create();
     Lead::factory()->for($agent, 'agent')->create([
@@ -19,11 +19,13 @@ it('downloads only the agents leads created within the selected date range as a 
         'created_at' => '2026-08-25 10:00:00',
     ]);
     Lead::factory()->for($agent, 'agent')->create([
+        'lead_date' => '2026-08-24',
         'company_name' => 'Outside Date Company',
         'created_by' => $agent->id,
         'created_at' => '2026-08-24 10:00:00',
     ]);
     Lead::factory()->for($otherAgent, 'agent')->create([
+        'lead_date' => '2026-08-25',
         'company_name' => 'Another Agents Company',
         'created_by' => $otherAgent->id,
         'created_at' => '2026-08-25 11:00:00',
@@ -78,18 +80,21 @@ it('downloads the agents cleaned leads including records that need location revi
         'created_at' => '2026-08-25 10:00:00',
     ]);
     Lead::factory()->for($agent, 'agent')->create([
+        'lead_date' => '2026-08-25',
         'company_name' => 'Needs Review Company',
         'validation_status' => 'needs_review',
         'created_by' => $agent->id,
         'created_at' => '2026-08-25 11:00:00',
     ]);
     Lead::factory()->for($agent, 'agent')->create([
+        'lead_date' => '2026-08-25',
         'company_name' => 'Confirmed Duplicate Company',
         'status' => 'duplicate',
         'created_by' => $agent->id,
         'created_at' => '2026-08-25 11:30:00',
     ]);
     Lead::factory()->for($otherAgent, 'agent')->create([
+        'lead_date' => '2026-08-25',
         'company_name' => 'Other Agents Clean Company',
         'validation_status' => 'validated',
         'status' => 'validated',

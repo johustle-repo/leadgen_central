@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Str;
+
 class CsvHeaderMapper
 {
     /** @var array<string, list<string>> */
     private const ALIASES = [
-        'lead_date' => ['date', 'lead date'],
+        'lead_date' => ['date', 'lead date', 'lead created date', 'created date', 'date created', 'date added'],
         'company_name' => ['company', 'company name', 'business name'],
         'website' => ['website', 'url', 'company website'],
         'address' => ['address', 'street address'], 'city' => ['city'],
@@ -31,7 +33,12 @@ class CsvHeaderMapper
     {
         $mapping = [];
         foreach ($headers as $header) {
-            $normalized = strtolower(trim(preg_replace('/\s+/', ' ', $header) ?? $header));
+            $normalized = Str::of($header)
+                ->replace("\xEF\xBB\xBF", '')
+                ->lower()
+                ->replace(['_', '-'], ' ')
+                ->squish()
+                ->toString();
             $mapping[$header] = null;
             foreach (self::ALIASES as $field => $aliases) {
                 if (in_array($normalized, $aliases, true)) {

@@ -11,6 +11,7 @@ use App\Models\UploadBatch;
 use App\Models\UploadRow;
 use App\UploadBatchStatus;
 use App\UploadRowStatus;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -75,6 +76,11 @@ class UploadBatchProcessor
 
                         continue;
                     }
+                    if ($batch->duplicate_handling === 'update_missing' && $match['lead']->agent_id === $batch->user_id) {
+                        $this->updateMissingLeadValues($batch, $row, $processed, $normalized, $match['lead']);
+
+                        continue;
+                    }
 
                     $this->recordExactDuplicate($batch, $row, $processed, $match);
 
@@ -116,8 +122,50 @@ class UploadBatchProcessor
             $processed['country_code'] = strtoupper((string) $processed['country']);
             unset($processed['country']);
         }
+        $processed['lead_date'] = $this->resolveLeadDate($processed['lead_date'] ?? null, $batch->original_filename);
 
         return $processed;
+    }
+
+    private function resolveLeadDate(mixed $value, string $filename): ?string
+    {
+        $dateValue = trim((string) $value);
+        if ($dateValue !== '') {
+            foreach (['Y-m-d', 'm/d/Y', 'm-d-Y', 'd/m/Y', 'd-m-Y'] as $format) {
+                try {
+                    $date = Date::createFromFormat($format, $dateValue);
+                    if ($date !== false && $date->format($format) === $dateValue) {
+                        return $date->toDateString();
+                    }
+                } catch (Throwable) {
+                    continue;
+                }
+            }
+
+            return $dateValue;
+        }
+
+        if (preg_match('/(?<!\d)(\d{2})[-_](\d{2})[-_](\d{4})(?!\d)/', $filename, $matches) === 1) {
+            try {
+                $date = Date::createFromFormat('m-d-Y', "{$matches[1]}-{$matches[2]}-{$matches[3]}");
+
+                return $date === false ? null : $date->toDateString();
+            } catch (Throwable) {
+                return null;
+            }
+        }
+
+        if (preg_match('/(?<!\d)(\d{4})[-_](\d{2})[-_](\d{2})(?!\d)/', $filename, $matches) === 1) {
+            try {
+                $date = Date::createFromFormat('Y-m-d', "{$matches[1]}-{$matches[2]}-{$matches[3]}");
+
+                return $date === false ? null : $date->toDateString();
+            } catch (Throwable) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed> $processed
@@ -147,6 +195,27 @@ class UploadBatchProcessor
             'processing_status' => $needsLocationReview ? UploadRowStatus::NeedsReview : UploadRowStatus::Accepted,
             'error_category' => $needsLocationReview ? 'location' : null,
             'error_message' => $needsLocationReview ? 'Location could not be matched exactly.' : null,
+            'lead_id' => $lead->id,
+            'duplicate_match_id' => null,
+        ]);
+    }
+
+    /** @param array<string, mixed> $processed
+     * @param  array<string, mixed>  $normalized
+     */
+    private function updateMissingLeadValues(UploadBatch $batch, UploadRow $row, array $processed, array $normalized, Lead $lead): void
+    {
+        $attributes = collect($normalized)
+            ->only(['lead_date', 'website', 'original_website', 'website_domain', 'address', 'city', 'raw_city', 'state_province', 'country', 'raw_country', 'country_code', 'canonical_city_id', 'canonical_country_id', 'timezone', 'industry', 'business_type', 'contact_person', 'position', 'email', 'phone', 'linkedin_url', 'import_trades', 'data_source', 'source_url', 'notes'])
+            ->filter(fn (mixed $value, string $field): bool => filled($value) && blank($lead->getAttribute($field)))
+            ->all();
+
+        $lead->update([...$attributes, 'updated_by' => $batch->user_id]);
+        $row->update([
+            'processed_data' => $processed,
+            'processing_status' => UploadRowStatus::Accepted,
+            'error_category' => null,
+            'error_message' => null,
             'lead_id' => $lead->id,
             'duplicate_match_id' => null,
         ]);

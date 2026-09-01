@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** @property UploadBatchStatus $processing_status
  * @property array<string, string|null>|null $column_mapping
  * @property list<string>|null $headers
+ * @property string $duplicate_handling
  * @property User $user
  */
 class UploadBatch extends Model
@@ -19,7 +20,7 @@ class UploadBatch extends Model
     /** @use HasFactory<UploadBatchFactory> */
     use HasFactory;
 
-    protected $fillable = ['batch_code', 'user_id', 'original_filename', 'stored_filename', 'file_size', 'total_rows', 'new_leads', 'valid_leads', 'accepted_rows', 'rejected_rows', 'invalid_rows', 'location_error_rows', 'duplicate_rows', 'exact_duplicate_rows', 'possible_duplicate_rows', 'error_rows', 'processing_status', 'headers', 'column_mapping', 'failure_message', 'started_at', 'completed_at'];
+    protected $fillable = ['batch_code', 'user_id', 'original_filename', 'stored_filename', 'file_size', 'total_rows', 'new_leads', 'valid_leads', 'accepted_rows', 'rejected_rows', 'invalid_rows', 'location_error_rows', 'duplicate_rows', 'exact_duplicate_rows', 'possible_duplicate_rows', 'error_rows', 'processing_status', 'headers', 'column_mapping', 'duplicate_handling', 'failure_message', 'started_at', 'completed_at'];
 
     protected $attributes = ['processing_status' => 'pending', 'total_rows' => 0, 'new_leads' => 0, 'valid_leads' => 0, 'accepted_rows' => 0, 'rejected_rows' => 0, 'invalid_rows' => 0, 'location_error_rows' => 0, 'duplicate_rows' => 0, 'exact_duplicate_rows' => 0, 'possible_duplicate_rows' => 0, 'error_rows' => 0];
 

@@ -57,12 +57,12 @@ class UploadBatchController extends Controller
         $files = array_values(array_filter($files));
 
         if (count($files) > 1) {
-            $batches = $creator->createAndQueueMany($files, $request->user());
+            $batches = $creator->createAndQueueMany($files, $request->user(), $request->validated('duplicate_handling'));
 
             return redirect()->route('uploads.index')->with('toast', ['type' => 'success', 'message' => "{$batches->count()} raw files uploaded and queued for cleaning."]);
         }
 
-        $batch = $creator->createForMapping($files[0], $request->user());
+        $batch = $creator->createForMapping($files[0], $request->user(), $request->validated('duplicate_handling'));
 
         return redirect()->route('uploads.mapping', $batch);
     }

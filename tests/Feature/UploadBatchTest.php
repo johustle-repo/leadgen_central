@@ -76,8 +76,8 @@ it('uploads and processes multiple compatible raw files together', function () {
     $this->assertDatabaseCount('upload_batches', 2);
     $this->assertDatabaseHas('upload_batches', ['user_id' => $agent->id, 'original_filename' => '03-23-2026-Lead-1-Raw.csv', 'processing_status' => 'completed']);
     $this->assertDatabaseHas('upload_batches', ['user_id' => $agent->id, 'original_filename' => '03-24-2026-Lead-2-Raw.csv', 'processing_status' => 'completed']);
-    $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Acme One', 'email' => 'one@acme.test']);
-    $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Acme Two', 'email' => 'two@acme.test']);
+    $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Acme One', 'email' => 'one@acme.test', 'lead_date' => '2026-03-23 00:00:00']);
+    $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Acme Two', 'email' => 'two@acme.test', 'lead_date' => '2026-03-24 00:00:00']);
     expect(Storage::disk('local')->allFiles('lead-imports'))->toHaveCount(2);
 });
 
@@ -108,6 +108,8 @@ it('preserves the raw sample lead columns during import', function () {
     $file = UploadedFile::fake()->createWithContent('raw-leads.csv', "Date,Company,Website,First Name,Email,Country,City,Import Trades,LinkedIn,Sources of Data,Link\n08/25/2026,Acme,acme.test,Ada,ada@acme.test,US,Austin,Machinery,https://linkedin.com/company/acme,Apollo,https://example.com/acme\n");
     $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
     $batch = UploadBatch::firstOrFail();
+
+    expect($batch->column_mapping['Date'])->toBe('lead_date');
 
     $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => ['Date' => 'lead_date', 'Company' => 'company_name', 'Website' => 'website', 'First Name' => 'contact_person', 'Email' => 'email', 'Country' => 'country', 'City' => 'city', 'Import Trades' => 'import_trades', 'LinkedIn' => 'linkedin_url', 'Sources of Data' => 'data_source', 'Link' => 'source_url']])->assertRedirect(route('uploads.show', $batch));
 

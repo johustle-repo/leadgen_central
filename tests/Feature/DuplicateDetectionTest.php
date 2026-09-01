@@ -82,6 +82,68 @@ it('cleans an agents exported manual lead by updating the original instead of ma
     ]);
 });
 
+it('updates a missing date on an agents matching uploaded lead when requested', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $original = Lead::factory()->for($agent, 'agent')->create([
+        'source' => 'csv',
+        'lead_date' => null,
+        'company_name' => 'Acme Ventures',
+        'contact_person' => 'Ada Lovelace',
+        'email' => 'ada@acme.test',
+        'created_by' => $agent->id,
+    ]);
+    $file = UploadedFile::fake()->createWithContent(
+        '08-25-2026-Lead-1-Raw.csv',
+        "Company,First Name,Email\nAcme Ventures,Ada Lovelace,ada@acme.test\n",
+    );
+
+    $this->actingAs($agent)->post(route('uploads.store'), [
+        'file' => $file,
+        'duplicate_handling' => 'update_missing',
+    ]);
+    $batch = UploadBatch::query()->whereBelongsTo($agent)->firstOrFail();
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        'Company' => 'company_name',
+        'First Name' => 'contact_person',
+        'Email' => 'email',
+    ]]);
+
+    expect(Lead::count())->toBe(1)
+        ->and($original->refresh()->lead_date?->toDateString())->toBe('2026-08-25')
+        ->and($batch->refresh()->duplicate_rows)->toBe(0)
+        ->and($batch->accepted_rows)->toBe(1);
+});
+
+it('does not update another agents matching lead when requested', function () {
+    Storage::fake('local');
+    $owner = User::factory()->create();
+    $original = Lead::factory()->for($owner, 'agent')->create([
+        'source' => 'csv',
+        'lead_date' => null,
+        'email' => 'shared@acme.test',
+        'created_by' => $owner->id,
+    ]);
+    $uploadingAgent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        '08-25-2026-Lead-1-Raw.csv',
+        "Company,Email\nAcme Ventures,shared@acme.test\n",
+    );
+
+    $this->actingAs($uploadingAgent)->post(route('uploads.store'), [
+        'file' => $file,
+        'duplicate_handling' => 'update_missing',
+    ]);
+    $batch = UploadBatch::query()->whereBelongsTo($uploadingAgent)->firstOrFail();
+    $this->actingAs($uploadingAgent)->post(route('uploads.process', $batch), ['mapping' => [
+        'Company' => 'company_name',
+        'Email' => 'email',
+    ]]);
+
+    expect($original->refresh()->lead_date)->toBeNull()
+        ->and($batch->refresh()->exact_duplicate_rows)->toBe(1);
+});
+
 it('allows different people from the same company and website', function () {
     Lead::factory()->create(['company_name' => 'Acme Industrial Supply', 'normalized_company_name' => 'acme industrial supply', 'website' => 'https://acme.example', 'website_domain' => 'acme.example', 'contact_person' => 'Jane Smith', 'email' => 'jane@acme.example']);
 

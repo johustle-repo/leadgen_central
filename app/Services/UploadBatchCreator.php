@@ -16,18 +16,18 @@ class UploadBatchCreator
 {
     public function __construct(private CsvHeaderMapper $mapper) {}
 
-    public function createForMapping(UploadedFile $file, User $owner): UploadBatch
+    public function createForMapping(UploadedFile $file, User $owner, string $duplicateHandling): UploadBatch
     {
         $fileDetails = $this->inspect($file, 'file', false);
 
-        return $this->createBatch($file, $fileDetails, $owner);
+        return $this->createBatch($file, $fileDetails, $owner, $duplicateHandling);
     }
 
     /**
      * @param  list<UploadedFile>  $files
      * @return Collection<int, UploadBatch>
      */
-    public function createAndQueueMany(array $files, User $owner): Collection
+    public function createAndQueueMany(array $files, User $owner, string $duplicateHandling): Collection
     {
         $inspectedFiles = collect($files)->map(
             fn (UploadedFile $file, int $index): array => $this->inspect($file, "files.{$index}", true),
@@ -35,9 +35,9 @@ class UploadBatchCreator
         $storedFilenames = collect();
 
         try {
-            $batches = DB::transaction(function () use ($files, $inspectedFiles, $owner, $storedFilenames): Collection {
-                return collect($files)->map(function (UploadedFile $file, int $index) use ($inspectedFiles, $owner, $storedFilenames): UploadBatch {
-                    return $this->createBatch($file, $inspectedFiles->get($index), $owner, $storedFilenames);
+            $batches = DB::transaction(function () use ($files, $inspectedFiles, $owner, $duplicateHandling, $storedFilenames): Collection {
+                return collect($files)->map(function (UploadedFile $file, int $index) use ($inspectedFiles, $owner, $duplicateHandling, $storedFilenames): UploadBatch {
+                    return $this->createBatch($file, $inspectedFiles->get($index), $owner, $duplicateHandling, $storedFilenames);
                 });
             });
         } catch (Throwable $exception) {
@@ -77,7 +77,7 @@ class UploadBatchCreator
     }
 
     /** @param array{headers: list<string>, mapping: array<string, string|null>} $fileDetails */
-    private function createBatch(UploadedFile $file, array $fileDetails, User $owner, ?Collection $storedFilenames = null): UploadBatch
+    private function createBatch(UploadedFile $file, array $fileDetails, User $owner, string $duplicateHandling, ?Collection $storedFilenames = null): UploadBatch
     {
         $storedFilename = $file->store('lead-imports');
         $storedFilenames?->push($storedFilename);
@@ -89,6 +89,7 @@ class UploadBatchCreator
             'file_size' => $file->getSize(),
             'headers' => $fileDetails['headers'],
             'column_mapping' => $fileDetails['mapping'],
+            'duplicate_handling' => $duplicateHandling,
         ]);
     }
 }

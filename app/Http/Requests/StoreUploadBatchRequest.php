@@ -6,9 +6,17 @@ use App\Models\SystemSetting;
 use App\Models\UploadBatch;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreUploadBatchRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'duplicate_handling' => $this->input('duplicate_handling', 'flag'),
+        ]);
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -31,6 +39,7 @@ class StoreUploadBatchRequest extends FormRequest
             'file' => ['required_without:files', ...$fileRules],
             'files' => ['required_without:file', 'array', 'min:1', 'max:50'],
             'files.*' => ['required', ...$fileRules],
+            'duplicate_handling' => ['required', Rule::in(['flag', 'update_missing'])],
         ];
     }
 }

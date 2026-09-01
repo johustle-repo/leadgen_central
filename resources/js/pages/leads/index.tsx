@@ -217,30 +217,20 @@ Regards,`;
                         <option value="100">100 per page</option>
                     </select>
                     <Input
-                        name="date_from"
+                        name="date"
                         type="date"
-                        defaultValue={filters.date_from}
-                        aria-label="Date from"
+                        defaultValue={filters.date}
+                        aria-label="Lead date"
                     />
-                    <Input
-                        name="date_to"
-                        type="date"
-                        defaultValue={filters.date_to}
-                        aria-label="Date to"
-                    />
-                    <Button
-                        type="submit"
-                        variant="secondary"
-                        className="lg:col-span-2"
-                    >
+                    <Button type="submit" variant="secondary">
                         Apply filters
                     </Button>
                     <Button asChild variant="outline" className="lg:col-span-2">
                         <a
                             href={downloadRaw.url({
                                 query: {
-                                    date_from: filters.date_from || undefined,
-                                    date_to: filters.date_to || undefined,
+                                    date_from: filters.date || undefined,
+                                    date_to: filters.date || undefined,
                                 },
                             })}
                             download
@@ -253,8 +243,8 @@ Regards,`;
                         <a
                             href={downloadCleaned.url({
                                 query: {
-                                    date_from: filters.date_from || undefined,
-                                    date_to: filters.date_to || undefined,
+                                    date_from: filters.date || undefined,
+                                    date_to: filters.date || undefined,
                                 },
                             })}
                             download
