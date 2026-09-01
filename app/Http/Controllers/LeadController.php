@@ -6,9 +6,11 @@ use App\Http\Requests\BulkDeleteLeadsRequest;
 use App\Http\Requests\DownloadRawLeadsRequest;
 use App\Http\Requests\StoreLeadRequest;
 use App\Http\Requests\UpdateLeadRequest;
+use App\Models\AuditLog;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\User;
+use App\Services\CsvCellSanitizer;
 use App\Services\LeadBulkDeletion;
 use App\Services\LeadCreator;
 use App\Services\LocationMatchingService;
@@ -59,7 +61,19 @@ class LeadController extends Controller
             ->when($dates['date_to'] ?? null, fn ($query, string $date) => $query->whereDate('lead_date', '<=', $date))
             ->orderBy('id');
 
-        return response()->streamDownload(function () use ($query, $cleaned, $locations, $timezoneReferences): void {
+        AuditLog::query()->create([
+            'user_id' => $user->id,
+            'action' => $cleaned ? 'leads.cleaned_exported' : 'leads.raw_exported',
+            'auditable_type' => 'lead',
+            'description' => $cleaned ? 'Downloaded a cleaned lead export.' : 'Downloaded a raw lead export.',
+            'metadata' => $dates,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        $csv = app(CsvCellSanitizer::class);
+
+        return response()->streamDownload(function () use ($query, $cleaned, $locations, $timezoneReferences, $csv): void {
             $stream = fopen('php://output', 'wb');
             if (! is_resource($stream)) {
                 return;
@@ -85,7 +99,7 @@ class LeadController extends Controller
                 }
 
                 $values = [$lead->lead_date?->format('m/d/Y'), $lead->company_name, $lead->website, $lead->contact_person, $lead->email, $country, $city, $lead->import_trades, $lead->linkedin_url, $lead->data_source, $lead->source_url];
-                fputcsv($stream, $values, escape: '');
+                fputcsv($stream, $csv->sanitizeRow($values), escape: '');
             }
             fclose($stream);
         }, $this->downloadFilename($dates, $cleaned ? 'Cleaned' : 'Raw'), ['Content-Type' => 'text/csv']);

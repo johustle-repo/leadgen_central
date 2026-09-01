@@ -6,7 +6,9 @@ use App\Http\Requests\BulkDeleteUploadBatchesRequest;
 use App\Http\Requests\ConfirmUploadMappingRequest;
 use App\Http\Requests\StoreUploadBatchRequest;
 use App\Jobs\ProcessUploadBatch;
+use App\Models\AuditLog;
 use App\Models\UploadBatch;
+use App\Services\CsvCellSanitizer;
 use App\Services\CsvHeaderMapper;
 use App\Services\UploadBatchCreator;
 use App\Services\UploadBatchDeletion;
@@ -108,11 +110,13 @@ class UploadBatchController extends Controller
         return Inertia::render('uploads/show', ['batch' => $uploadBatch->load('user:id,name'), 'rows' => $rows, 'filter' => $status]);
     }
 
-    public function errors(UploadBatch $uploadBatch): StreamedResponse
+    public function errors(Request $request, UploadBatch $uploadBatch, CsvCellSanitizer $csv): StreamedResponse
     {
         Gate::authorize('view', $uploadBatch);
 
-        return response()->streamDownload(function () use ($uploadBatch): void {
+        $this->recordExport($request, $uploadBatch, 'problems');
+
+        return response()->streamDownload(function () use ($uploadBatch, $csv): void {
             $stream = fopen('php://output', 'wb');
             if (! is_resource($stream)) {
                 return;
@@ -120,17 +124,19 @@ class UploadBatchController extends Controller
             $headers = array_map('strval', $uploadBatch->headers ?? []);
             fputcsv($stream, ['Row Number', 'Error Category', 'Error Message', ...$headers], escape: '');
             foreach ($uploadBatch->rows()->whereNotNull('error_category')->orderBy('row_number')->cursor() as $row) {
-                fputcsv($stream, [$row->row_number, $row->error_category, $row->error_message, ...array_map(fn (string $header): mixed => $row->raw_data[$header] ?? null, $headers)], escape: '');
+                fputcsv($stream, $csv->sanitizeRow([$row->row_number, $row->error_category, $row->error_message, ...array_map(fn (string $header): mixed => $row->raw_data[$header] ?? null, $headers)]), escape: '');
             }
             fclose($stream);
         }, $uploadBatch->batch_code.'-problems.csv', ['Content-Type' => 'text/csv']);
     }
 
-    public function cleaned(UploadBatch $uploadBatch): StreamedResponse
+    public function cleaned(Request $request, UploadBatch $uploadBatch, CsvCellSanitizer $csv): StreamedResponse
     {
         Gate::authorize('view', $uploadBatch);
 
-        return response()->streamDownload(function () use ($uploadBatch): void {
+        $this->recordExport($request, $uploadBatch, 'cleaned');
+
+        return response()->streamDownload(function () use ($uploadBatch, $csv): void {
             $stream = fopen('php://output', 'wb');
             if (! is_resource($stream)) {
                 return;
@@ -143,7 +149,7 @@ class UploadBatchController extends Controller
                     continue;
                 }
 
-                fputcsv($stream, [$lead->lead_date?->format('m/d/Y'), $lead->company_name, $lead->website, $lead->contact_person, $lead->email, $lead->country_code ?: $lead->country, $lead->city, $lead->import_trades, $lead->linkedin_url, $lead->data_source, $lead->source_url], escape: '');
+                fputcsv($stream, $csv->sanitizeRow([$lead->lead_date?->format('m/d/Y'), $lead->company_name, $lead->website, $lead->contact_person, $lead->email, $lead->country_code ?: $lead->country, $lead->city, $lead->import_trades, $lead->linkedin_url, $lead->data_source, $lead->source_url]), escape: '');
             }
             fclose($stream);
         }, $uploadBatch->batch_code.'-cleaned.csv', ['Content-Type' => 'text/csv']);
@@ -166,6 +172,19 @@ class UploadBatchController extends Controller
         return redirect()->route('uploads.index')->with('toast', [
             'type' => 'success',
             'message' => "{$batches->count()} upload histories deleted successfully.",
+        ]);
+    }
+
+    private function recordExport(Request $request, UploadBatch $uploadBatch, string $type): void
+    {
+        AuditLog::query()->create([
+            'user_id' => $request->user()->id,
+            'action' => "upload_batch.{$type}_exported",
+            'auditable_type' => 'upload_batch',
+            'auditable_id' => $uploadBatch->id,
+            'description' => "Downloaded the {$type} CSV for {$uploadBatch->batch_code}.",
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
         ]);
     }
 }

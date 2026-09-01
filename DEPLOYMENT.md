@@ -16,6 +16,8 @@ Do not deploy SQLite, `APP_DEBUG=true`, the log mailer, or the synchronous queue
 
 Copy `.env.production.example` to the platform's secret/environment manager and replace every placeholder. Generate the application key once with `php artisan key:generate --show`; keep that key stable across releases because Gmail tokens and other encrypted values depend on it.
 
+Back up `APP_KEY` in a restricted secret manager. When rotating it, place the former key in `APP_PREVIOUS_KEYS` until all encrypted Gmail credentials have been rewritten with the new key. Losing every applicable key permanently makes encrypted integration tokens unreadable.
+
 The Google OAuth redirect URI must exactly match the production callback:
 
 ```text
@@ -85,6 +87,8 @@ Use atomic releases when the hosting platform supports them. Back up the databas
 - Monitor `storage/logs`, disk usage, queue age, scheduler execution, SMTP delivery, and Gmail OAuth errors.
 - Confirm email verification, password reset, Gmail connect/sync, CSV upload, raw/cleaned downloads, and outbound brochure email after deployment.
 - Verify secure cookies and HTTPS redirects in the browser.
+- Review audit logs for unusual CSV export volume and repeated access attempts. Authenticated screens and exports are marked `no-store`, and export endpoints are rate limited per user.
+- Restrict production database, upload storage, backups, logs, and the brochure to the application service account. Encrypt database and backup volumes at the hosting-provider layer.
 
 ## Pre-deployment verification
 

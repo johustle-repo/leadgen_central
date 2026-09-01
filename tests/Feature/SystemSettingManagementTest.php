@@ -17,9 +17,11 @@ it('shows the configured upload limit to administrators', function () {
 it('updates the upload limit', function () {
     $administrator = User::factory()->administrator()->create();
 
-    $response = $this->actingAs($administrator)->put(route('system-settings.update'), [
-        'csv_max_kilobytes' => 8192,
-    ]);
+    $response = $this->actingAs($administrator)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->put(route('system-settings.update'), [
+            'csv_max_kilobytes' => 8192,
+        ]);
 
     $response->assertRedirect()->assertSessionHas('toast.message', 'Settings updated.');
     $this->assertDatabaseHas('system_settings', ['key' => 'csv_max_kilobytes', 'value' => '8192']);
