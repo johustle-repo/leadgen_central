@@ -67,6 +67,7 @@ export default function LeadsIndex({ leads, filters, canBulkDelete }: Props) {
     const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(filters.date || '');
     const emailForm = useForm({ subject: '', body: '' });
     const visibleLeadIds = leads.data.map((lead) => lead.id);
     const selectedVisibleLeadIds = selectedLeadIds.filter((id) =>
@@ -216,12 +217,21 @@ Regards,`;
                         <option value="50">50 per page</option>
                         <option value="100">100 per page</option>
                     </select>
-                    <Input
-                        name="date"
-                        type="date"
-                        defaultValue={filters.date}
-                        aria-label="Lead date"
-                    />
+                    <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center border-r pr-3 text-xs font-medium text-muted-foreground">
+                            Lead date
+                        </span>
+                        <Input
+                            name="date"
+                            type="date"
+                            value={selectedDate}
+                            onChange={(event) =>
+                                setSelectedDate(event.target.value)
+                            }
+                            aria-label="Lead date"
+                            className="pl-24"
+                        />
+                    </div>
                     <Button type="submit" variant="secondary">
                         Apply filters
                     </Button>
@@ -229,8 +239,8 @@ Regards,`;
                         <a
                             href={downloadRaw.url({
                                 query: {
-                                    date_from: filters.date || undefined,
-                                    date_to: filters.date || undefined,
+                                    date_from: selectedDate || undefined,
+                                    date_to: selectedDate || undefined,
                                 },
                             })}
                             download
@@ -243,8 +253,8 @@ Regards,`;
                         <a
                             href={downloadCleaned.url({
                                 query: {
-                                    date_from: filters.date || undefined,
-                                    date_to: filters.date || undefined,
+                                    date_from: selectedDate || undefined,
+                                    date_to: selectedDate || undefined,
                                 },
                             })}
                             download
