@@ -1,6 +1,7 @@
 <?php
 
 use App\EmailReplyClassification;
+use App\Models\EmailReply;
 use App\Models\EmailSequence;
 use App\Models\EmailSequenceEnrollment;
 use App\Models\GmailConnection;
@@ -138,4 +139,40 @@ it('stores the complete message but previews and classifies only the actual repl
         'body_text' => $messageBody,
         'classification' => 'interested',
     ]);
+});
+
+it('reclassifies legacy replies during sync while preserving manual classifications', function () {
+    Http::preventStrayRequests();
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create();
+    $connection = GmailConnection::factory()->for($agent)->create([
+        'gmail_address' => 'agent@gmail.com',
+        'token_expires_at' => now()->addHour(),
+    ]);
+    $legacyReply = EmailReply::factory()
+        ->for($connection, 'gmailConnection')
+        ->for($agent, 'agent')
+        ->for($lead)
+        ->create([
+            'subject' => 'Re: Scaffolding',
+            'body_text' => 'Not right now. Please check back next quarter.',
+            'classification' => EmailReplyClassification::PossibleLead,
+            'classification_reason' => 'Legacy automatic classification.',
+        ]);
+    $manualReply = EmailReply::factory()
+        ->for($connection, 'gmailConnection')
+        ->for($agent, 'agent')
+        ->for($lead)
+        ->create([
+            'subject' => 'Re: Scaffolding',
+            'body_text' => 'Please unsubscribe me and do not contact me again.',
+            'classification' => EmailReplyClassification::PossibleLead,
+            'classification_reason' => "Updated manually by {$agent->name}.",
+        ]);
+    Http::fake(fn () => Http::response(['messages' => []]));
+
+    app(GmailReplySynchronizer::class)->sync($connection);
+
+    expect($legacyReply->refresh()->classification)->toBe(EmailReplyClassification::NotNow)
+        ->and($manualReply->refresh()->classification)->toBe(EmailReplyClassification::PossibleLead);
 });
