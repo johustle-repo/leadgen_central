@@ -63,6 +63,7 @@ class GmailReplySynchronizer
                 EmailReplyClassification::NotLead->value,
                 EmailReplyClassification::NeedsReview->value,
                 EmailReplyClassification::AutomaticReply->value,
+                EmailReplyClassification::Interested->value,
             ])
             ->where(function ($query): void {
                 $query

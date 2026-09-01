@@ -104,7 +104,17 @@ it('classifies reply intent without a paid AI service', function (string $subjec
     'not now' => ['Re: Scaffolding', 'Not right now. Please check back later.', EmailReplyClassification::NotNow],
     'do not contact' => ['Re: Scaffolding', 'Please remove me and do not contact me again.', EmailReplyClassification::DoNotContact],
     'out of office' => ['Automatic Reply', 'I am currently out of office and will return on Monday.', EmailReplyClassification::OutOfOffice],
+    'retired contact despite sales subject' => ['RETIREMENT Re: Global Quality Now at China Pricing', 'Brian White has recently retired and is no longer monitoring this email account. Please contact our main office.', EmailReplyClassification::Retired],
 ]);
+
+it('does not infer interest from the original sales subject', function () {
+    $result = app(EmailReplyClassifier::class)->classify(
+        'Re: Competitive scaffolding pricing',
+        'Thank you for your message. I have forwarded this to the appropriate person.',
+    );
+
+    expect($result['classification'])->toBe(EmailReplyClassification::NeedsReview);
+});
 
 it('keeps generic automated responses separate from out-of-office replies', function () {
     $result = app(EmailReplyClassifier::class)->classify(
@@ -180,10 +190,21 @@ it('reclassifies legacy replies during sync while preserving manual classificati
             'classification' => EmailReplyClassification::PossibleLead,
             'classification_reason' => "Updated manually by {$agent->name}.",
         ]);
+    $retiredReply = EmailReply::factory()
+        ->for($connection, 'gmailConnection')
+        ->for($agent, 'agent')
+        ->for($lead)
+        ->create([
+            'subject' => 'RETIREMENT Re: Scaffolding pricing',
+            'body_text' => 'This contact has recently retired and is no longer monitoring this email account.',
+            'classification' => EmailReplyClassification::Interested,
+            'classification_reason' => 'Detected interest, pricing, or meeting intent.',
+        ]);
     Http::fake(fn () => Http::response(['messages' => []]));
 
     app(GmailReplySynchronizer::class)->sync($connection);
 
     expect($legacyReply->refresh()->classification)->toBe(EmailReplyClassification::NotNow)
-        ->and($manualReply->refresh()->classification)->toBe(EmailReplyClassification::PossibleLead);
+        ->and($manualReply->refresh()->classification)->toBe(EmailReplyClassification::PossibleLead)
+        ->and($retiredReply->refresh()->classification)->toBe(EmailReplyClassification::Retired);
 });
