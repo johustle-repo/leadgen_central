@@ -22,6 +22,9 @@ class UpdateSystemSettingsRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['csv_max_kilobytes' => ['required', 'integer', 'min:128', 'max:51200']];
+        return [
+            'csv_max_kilobytes' => ['required', 'integer', 'min:128', 'max:51200'],
+            'csv_max_files' => ['required', 'integer', 'min:1', 'max:50'],
+        ];
     }
 }

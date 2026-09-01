@@ -13,7 +13,11 @@ import {
 } from '@/components/ui/dialog';
 import { index, store } from '@/routes/uploads';
 
-export default function UploadCreate() {
+export default function UploadCreate({
+    maximumFiles,
+}: {
+    maximumFiles: number;
+}) {
     const [confirmationOpen, setConfirmationOpen] = useState(false);
     const upload = useForm<{
         files: File[];
@@ -52,7 +56,7 @@ export default function UploadCreate() {
                                 Choose raw CSV files
                             </span>
                             <span className="text-sm text-muted-foreground">
-                                Select up to 50 CSV or TXT files
+                                Select up to {maximumFiles} CSV or TXT files
                             </span>
                             <input
                                 type="file"
@@ -60,12 +64,24 @@ export default function UploadCreate() {
                                 multiple
                                 required
                                 className="sr-only"
-                                onChange={(event) =>
+                                onChange={(event) => {
+                                    const files = Array.from(
+                                        event.target.files ?? [],
+                                    );
+
                                     upload.setData(
                                         'files',
-                                        Array.from(event.target.files ?? []),
-                                    )
-                                }
+                                        files.slice(0, maximumFiles),
+                                    );
+                                    if (files.length > maximumFiles) {
+                                        upload.setError(
+                                            'files',
+                                            `Select no more than ${maximumFiles} files.`,
+                                        );
+                                    } else {
+                                        upload.clearErrors('files');
+                                    }
+                                }}
                             />
                             <span className="inline-flex min-w-36 items-center justify-center rounded-md border bg-background px-4 py-2 text-sm font-medium shadow-xs hover:bg-muted">
                                 Choose files

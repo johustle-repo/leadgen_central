@@ -32,10 +32,13 @@ const formatMegabytes = (kilobytes: number) => {
 export default function SettingsEdit({
     settings,
 }: {
-    settings: { csv_max_kilobytes: number };
+    settings: { csv_max_kilobytes: number; csv_max_files: number };
 }) {
     const [currentLimit, setCurrentLimit] = useState(
         settings.csv_max_kilobytes,
+    );
+    const [currentFileLimit, setCurrentFileLimit] = useState(
+        settings.csv_max_files,
     );
 
     return (
@@ -70,10 +73,10 @@ export default function SettingsEdit({
                             </div>
                             <div>
                                 <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                                    Accepted files
+                                    Files per upload
                                 </p>
-                                <p className="text-2xl font-semibold">
-                                    CSV & TXT
+                                <p className="text-2xl font-semibold tabular-nums">
+                                    {currentFileLimit}
                                 </p>
                             </div>
                         </CardContent>
@@ -169,6 +172,51 @@ export default function SettingsEdit({
                                                 Larger limits support bigger
                                                 imports but increase processing
                                                 time and memory use.
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-center">
+                                            <Label htmlFor="csv_max_files">
+                                                Maximum files per upload
+                                            </Label>
+                                            <span className="text-xs text-muted-foreground">
+                                                Allowed range: 1–50 files
+                                            </span>
+                                        </div>
+                                        <Input
+                                            id="csv_max_files"
+                                            name="csv_max_files"
+                                            type="number"
+                                            min="1"
+                                            max="50"
+                                            step="1"
+                                            defaultValue={
+                                                settings.csv_max_files
+                                            }
+                                            onChange={(event) =>
+                                                setCurrentFileLimit(
+                                                    Number(
+                                                        event.target.value,
+                                                    ) || 0,
+                                                )
+                                            }
+                                            aria-invalid={
+                                                errors.csv_max_files
+                                                    ? true
+                                                    : undefined
+                                            }
+                                            className="h-11 tabular-nums"
+                                        />
+                                        {errors.csv_max_files ? (
+                                            <p className="text-sm text-destructive">
+                                                {errors.csv_max_files}
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm leading-6 text-muted-foreground">
+                                                Agents cannot select or submit
+                                                more files than this limit in
+                                                one upload.
                                             </p>
                                         )}
                                     </div>

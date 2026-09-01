@@ -33,11 +33,12 @@ class StoreUploadBatchRequest extends FormRequest
     public function rules(): array
     {
         $maximumKilobytes = SystemSetting::where('key', 'csv_max_kilobytes')->value('value') ?? config('leadgen.csv_max_kilobytes', 5120);
+        $maximumFiles = SystemSetting::where('key', 'csv_max_files')->value('value') ?? config('leadgen.csv_max_files', 50);
         $fileRules = ['file', 'mimes:csv,txt', 'max:'.$maximumKilobytes];
 
         return [
             'file' => ['required_without:files', ...$fileRules],
-            'files' => ['required_without:file', 'array', 'min:1', 'max:50'],
+            'files' => ['required_without:file', 'array', 'min:1', 'max:'.$maximumFiles],
             'files.*' => ['required', ...$fileRules],
             'duplicate_handling' => ['required', Rule::in(['flag', 'update_missing'])],
         ];

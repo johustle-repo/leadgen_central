@@ -7,6 +7,7 @@ use App\Http\Requests\ConfirmUploadMappingRequest;
 use App\Http\Requests\StoreUploadBatchRequest;
 use App\Jobs\ProcessUploadBatch;
 use App\Models\AuditLog;
+use App\Models\SystemSetting;
 use App\Models\UploadBatch;
 use App\Services\CsvCellSanitizer;
 use App\Services\CsvHeaderMapper;
@@ -49,7 +50,9 @@ class UploadBatchController extends Controller
     {
         Gate::authorize('create', UploadBatch::class);
 
-        return Inertia::render('uploads/create');
+        return Inertia::render('uploads/create', [
+            'maximumFiles' => (int) (SystemSetting::where('key', 'csv_max_files')->value('value') ?? config('leadgen.csv_max_files', 50)),
+        ]);
     }
 
     public function store(StoreUploadBatchRequest $request, UploadBatchCreator $creator): RedirectResponse

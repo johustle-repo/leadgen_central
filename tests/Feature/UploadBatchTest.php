@@ -2,6 +2,7 @@
 
 use App\Models\Country;
 use App\Models\Lead;
+use App\Models\SystemSetting;
 use App\Models\UploadBatch;
 use App\Models\UploadRow;
 use App\Models\User;
@@ -79,6 +80,27 @@ it('uploads and processes multiple compatible raw files together', function () {
     $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Acme One', 'email' => 'one@acme.test', 'lead_date' => '2026-03-23 00:00:00']);
     $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Acme Two', 'email' => 'two@acme.test', 'lead_date' => '2026-03-24 00:00:00']);
     expect(Storage::disk('local')->allFiles('lead-imports'))->toHaveCount(2);
+});
+
+it('shows and enforces the administrator file count limit', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    SystemSetting::factory()->create(['key' => 'csv_max_files', 'value' => '2']);
+
+    $this->actingAs($agent)->get(route('uploads.create'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('uploads/create')
+            ->where('maximumFiles', 2));
+
+    $files = collect(range(1, 3))
+        ->map(fn (int $number): UploadedFile => UploadedFile::fake()->createWithContent("leads-{$number}.csv", "Company,Email\nAcme {$number},lead{$number}@acme.test\n"))
+        ->all();
+
+    $this->actingAs($agent)->post(route('uploads.store'), ['files' => $files])
+        ->assertSessionHasErrors('files');
+
+    $this->assertDatabaseCount('upload_batches', 0);
+    expect(Storage::disk('local')->allFiles('lead-imports'))->toBeEmpty();
 });
 
 it('rejects all selected files when one cannot map a company column', function () {
