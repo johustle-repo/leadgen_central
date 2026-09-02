@@ -30,6 +30,17 @@ class LeadCreator
 
         return DB::transaction(function () use ($normalized, $location, $data, $owner, $actor, $batch): Lead {
             User::query()->whereKey($owner->id)->lockForUpdate()->firstOrFail();
+
+            if ($batch === null && $normalized['email'] !== null) {
+                $existing = Lead::query()->where('email', $normalized['email'])->first(['id', 'lead_code', 'agent_id']);
+
+                if ($existing !== null) {
+                    throw ValidationException::withMessages([
+                        'email' => "This email is already saved as lead {$existing->lead_code}.",
+                    ]);
+                }
+            }
+
             $companyContactCount = Lead::query()
                 ->whereBelongsTo($owner, 'agent')
                 ->where('normalized_company_name', $normalized['normalized_company_name'])

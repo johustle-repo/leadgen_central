@@ -115,6 +115,23 @@ it('limits an agent to ten contacts from the same company', function () {
     expect(Lead::query()->whereBelongsTo($agent, 'agent')->count())->toBe(10);
 });
 
+it('rejects a manually added lead whose email already exists for another agent', function () {
+    $existingOwner = User::factory()->create();
+    Lead::factory()->for($existingOwner, 'agent')->create([
+        'email' => 'shared@acme.test',
+        'created_by' => $existingOwner->id,
+    ]);
+    $agent = User::factory()->create();
+
+    $response = $this->actingAs($agent)->post(route('leads.store'), [
+        'company_name' => 'Duplicate Contact Co',
+        'email' => 'Shared@Acme.test',
+    ]);
+
+    $response->assertSessionHasErrors('email');
+    expect(Lead::query()->whereBelongsTo($agent, 'agent')->count())->toBe(0);
+});
+
 it('supports a safe lead quantity filter', function () {
     $agent = User::factory()->create();
     Lead::factory()->count(12)->for($agent, 'agent')->create(['created_by' => $agent->id]);

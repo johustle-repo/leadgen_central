@@ -63,6 +63,15 @@ export default function LeadForm({
                         ) {
                             toast.error(companyError);
                         }
+
+                        const emailError = errors.email;
+
+                        if (
+                            typeof emailError === 'string' &&
+                            emailError.includes('already saved')
+                        ) {
+                            toast.error(emailError);
+                        }
                     }}
                     className="flex flex-col gap-6"
                 >
