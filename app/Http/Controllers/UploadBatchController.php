@@ -104,6 +104,14 @@ class UploadBatchController extends Controller
         return back()->with('toast', ['type' => 'success', 'message' => "{$rowCount} duplicate rows queued for re-analysis."]);
     }
 
+    public function retry(UploadBatch $uploadBatch): RedirectResponse
+    {
+        Gate::authorize('retry', $uploadBatch);
+        ProcessUploadBatch::dispatch($uploadBatch->id);
+
+        return back()->with('toast', ['type' => 'success', 'message' => 'Upload queued for processing again.']);
+    }
+
     public function show(Request $request, UploadBatch $uploadBatch): Response
     {
         Gate::authorize('view', $uploadBatch);

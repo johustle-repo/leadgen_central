@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import { RotateCcw, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
@@ -12,6 +12,7 @@ import {
     destroy,
     index,
     reanalyze,
+    retry,
     show,
 } from '@/routes/uploads';
 import type { Auth } from '@/types';
@@ -47,6 +48,7 @@ export default function UploadIndex({
     sort: string;
 }) {
     const { auth } = usePage<{ auth: Auth }>().props;
+    usePoll(5000, { only: ['batches'] });
     const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
     const isAdministrator = auth.user.role === 'administrator';
     const deletableBatchIds = batches.data
@@ -244,6 +246,19 @@ export default function UploadIndex({
                                         </td>
                                         <td className="p-3">
                                             <div className="flex items-center gap-2">
+                                                {batch.processing_status ===
+                                                    'pending' && (
+                                                    <Link
+                                                        href={retry(batch.id)}
+                                                        method="post"
+                                                        as="button"
+                                                        preserveScroll
+                                                        className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium whitespace-nowrap hover:bg-muted"
+                                                    >
+                                                        <RotateCcw className="size-3.5" />
+                                                        Retry processing
+                                                    </Link>
+                                                )}
                                                 {batch.processing_status ===
                                                     'completed' && (
                                                     <Link

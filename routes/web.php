@@ -40,6 +40,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::get('uploads/{uploadBatch}/mapping', [UploadBatchController::class, 'mapping'])->name('uploads.mapping');
     Route::post('uploads/{uploadBatch}/process', [UploadBatchController::class, 'process'])->name('uploads.process');
     Route::post('uploads/{uploadBatch}/reanalyze', [UploadBatchController::class, 'reanalyze'])->name('uploads.reanalyze');
+    Route::post('uploads/{uploadBatch}/retry', [UploadBatchController::class, 'retry'])->name('uploads.retry');
     Route::delete('uploads/{uploadBatch}', [UploadBatchController::class, 'destroy'])->name('uploads.destroy');
     Route::get('uploads/{uploadBatch}', [UploadBatchController::class, 'show'])->name('uploads.show');
     Route::get('uploads/{uploadBatch}/errors.csv', [UploadBatchController::class, 'errors'])->middleware('throttle:data-exports')->name('uploads.errors');

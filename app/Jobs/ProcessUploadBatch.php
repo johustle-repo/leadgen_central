@@ -5,16 +5,19 @@ namespace App\Jobs;
 use App\Models\UploadBatch;
 use App\Services\UploadBatchProcessor;
 use App\UploadBatchStatus;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class ProcessUploadBatch implements ShouldQueue
+class ProcessUploadBatch implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Queueable;
 
     public int $tries = 3;
+
+    public int $uniqueFor = 600;
 
     /** CSV imports may contain many files and must be allowed to finish. */
     public int $timeout = 0;
@@ -34,6 +37,11 @@ class ProcessUploadBatch implements ShouldQueue
      */
     /** @var list<int> */
     public array $backoff = [1, 5, 15];
+
+    public function uniqueId(): string
+    {
+        return (string) $this->uploadBatchId;
+    }
 
     public function handle(UploadBatchProcessor $processor): void
     {

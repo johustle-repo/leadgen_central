@@ -46,6 +46,12 @@ class UploadBatchPolicy
             && in_array($uploadBatch->processing_status, [UploadBatchStatus::Completed, UploadBatchStatus::Failed], true);
     }
 
+    public function retry(User $user, UploadBatch $uploadBatch): bool
+    {
+        return ($user->canViewAllLeads() || $uploadBatch->user_id === $user->id)
+            && $uploadBatch->processing_status === UploadBatchStatus::Pending;
+    }
+
     /**
      * Determine whether the user can delete the model.
      */

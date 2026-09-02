@@ -7,7 +7,9 @@ use App\Models\SystemSetting;
 use App\Models\UploadBatch;
 use App\Models\UploadRow;
 use App\Models\User;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -15,7 +17,45 @@ it('allows upload processing to finish without a queue timeout', function () {
     $job = new ProcessUploadBatch(123);
 
     expect($job->timeout)->toBe(0)
-        ->and($job->failOnTimeout)->toBeTrue();
+        ->and($job->failOnTimeout)->toBeTrue()
+        ->and($job)->toBeInstanceOf(ShouldBeUniqueUntilProcessing::class)
+        ->and($job->uniqueId())->toBe('123');
+});
+
+it('allows an upload owner to retry a pending batch', function () {
+    Queue::fake();
+    $owner = User::factory()->create();
+    $batch = UploadBatch::factory()->for($owner)->create(['processing_status' => 'pending']);
+
+    $this->actingAs($owner)->post(route('uploads.retry', $batch))
+        ->assertRedirect()
+        ->assertSessionHas('toast', [
+            'type' => 'success',
+            'message' => 'Upload queued for processing again.',
+        ]);
+
+    Queue::assertPushed(ProcessUploadBatch::class, fn (ProcessUploadBatch $job): bool => $job->uploadBatchId === $batch->id);
+});
+
+it('prevents an agent from retrying another agents pending batch', function () {
+    Queue::fake();
+    $owner = User::factory()->create();
+    $otherAgent = User::factory()->create();
+    $batch = UploadBatch::factory()->for($owner)->create(['processing_status' => 'pending']);
+
+    $this->actingAs($otherAgent)->post(route('uploads.retry', $batch))->assertForbidden();
+
+    Queue::assertNothingPushed();
+});
+
+it('prevents retrying a batch that is no longer pending', function () {
+    Queue::fake();
+    $owner = User::factory()->create();
+    $batch = UploadBatch::factory()->for($owner)->create(['processing_status' => 'completed']);
+
+    $this->actingAs($owner)->post(route('uploads.retry', $batch))->assertForbidden();
+
+    Queue::assertNothingPushed();
 });
 
 it('shows upload history for a soft deleted owner without crashing', function () {
