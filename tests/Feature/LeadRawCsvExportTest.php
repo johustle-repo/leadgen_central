@@ -61,9 +61,8 @@ it('downloads the agents cleaned leads including records that need location revi
     $otherAgent = User::factory()->create();
     $country = Country::factory()->create(['name' => 'United States', 'normalized_name' => 'united states', 'iso2' => 'US', 'default_timezone' => 'America/New_York']);
     City::factory()->for($country)->create(['name' => 'Austin', 'normalized_name' => 'austin', 'timezone' => 'America/Chicago']);
-    TimezoneReference::factory()->create([
+    TimezoneReference::query()->updateOrCreate(['original_country_code' => 'CA'], [
         'country' => 'Canada',
-        'original_country_code' => 'CA',
         'reference_country_code' => 'US',
         'reference_capital' => 'Austin',
     ]);
@@ -118,4 +117,28 @@ it('downloads the agents cleaned leads including records that need location revi
         ->toContain('Needs Review Company')
         ->not->toContain('Confirmed Duplicate Company')
         ->not->toContain('Other Agents Clean Company');
+});
+
+it('uses the bundled cleaning reference instead of retaining a raw state as the city', function () {
+    $agent = User::factory()->create();
+    Lead::factory()->for($agent, 'agent')->create([
+        'lead_date' => '2026-08-25',
+        'company_name' => 'California Company',
+        'country_code' => 'US',
+        'raw_country' => 'US',
+        'city' => 'California',
+        'raw_city' => 'California',
+        'created_by' => $agent->id,
+    ]);
+
+    $response = $this->actingAs($agent)->get(route('leads.download-cleaned', [
+        'date_from' => '2026-08-25',
+        'date_to' => '2026-08-25',
+    ]));
+
+    $response->assertOk();
+    expect($response->streamedContent())
+        ->toContain('California Company')
+        ->toContain(',US,"New York",')
+        ->not->toContain(',US,California,');
 });

@@ -4,9 +4,8 @@ use App\Models\TimezoneReference;
 use App\Services\TimezoneReferenceResolver;
 
 it('resolves a cleaning reference case insensitively by country code', function () {
-    $reference = TimezoneReference::factory()->create([
+    $reference = TimezoneReference::query()->updateOrCreate(['original_country_code' => 'DZ'], [
         'country' => 'Algeria',
-        'original_country_code' => 'DZ',
         'reference_country_code' => 'FR',
         'reference_capital' => 'Paris',
     ]);

@@ -13,7 +13,6 @@ use App\Models\User;
 use App\Services\CsvCellSanitizer;
 use App\Services\LeadBulkDeletion;
 use App\Services\LeadCreator;
-use App\Services\LocationMatchingService;
 use App\Services\TimezoneReferenceResolver;
 use App\UserRole;
 use Illuminate\Http\RedirectResponse;
@@ -39,16 +38,14 @@ class LeadController extends Controller
      */
     public function downloadCleaned(
         DownloadRawLeadsRequest $request,
-        LocationMatchingService $locations,
         TimezoneReferenceResolver $timezoneReferences,
     ): StreamedResponse {
-        return $this->downloadCsv($request, true, $locations, $timezoneReferences);
+        return $this->downloadCsv($request, true, $timezoneReferences);
     }
 
     private function downloadCsv(
         DownloadRawLeadsRequest $request,
         bool $cleaned,
-        ?LocationMatchingService $locations = null,
         ?TimezoneReferenceResolver $timezoneReferences = null,
     ): StreamedResponse {
         $dates = $request->validated();
@@ -73,7 +70,7 @@ class LeadController extends Controller
 
         $csv = app(CsvCellSanitizer::class);
 
-        return response()->streamDownload(function () use ($query, $cleaned, $locations, $timezoneReferences, $csv): void {
+        return response()->streamDownload(function () use ($query, $cleaned, $timezoneReferences, $csv): void {
             $stream = fopen('php://output', 'wb');
             if (! is_resource($stream)) {
                 return;
@@ -81,21 +78,15 @@ class LeadController extends Controller
 
             $headers = ['Date', 'Company', 'Website', 'First Name', 'Email', 'Country', 'City', 'Import Trades', 'LinkedIn', 'Sources of Data', 'Link'];
             fputcsv($stream, $headers, escape: '');
-            $locationCache = [];
             foreach ($query->cursor() as $lead) {
                 $country = $lead->country_code ?: $lead->country;
                 $city = $lead->city;
 
-                if ($cleaned && $locations !== null && $timezoneReferences !== null) {
+                if ($cleaned && $timezoneReferences !== null) {
                     $rawCountry = $lead->raw_country ?: $country;
-                    $rawCity = $lead->raw_city ?: $city;
                     $reference = $timezoneReferences->resolveByCountryCode($lead->country_code ?: $rawCountry);
-                    $cleanCountry = $reference?->reference_country_code ?: $rawCountry;
-                    $cleanCity = $reference?->reference_capital ?: $rawCity;
-                    $cacheKey = "{$cleanCountry}|{$cleanCity}";
-                    $locationCache[$cacheKey] ??= $locations->match($cleanCountry, $cleanCity)->leadAttributes($cleanCity, $cleanCountry);
-                    $country = $locationCache[$cacheKey]['country_code'] ?: $locationCache[$cacheKey]['country'];
-                    $city = $locationCache[$cacheKey]['city'];
+                    $country = $reference?->reference_country_code ?: $rawCountry;
+                    $city = $reference?->reference_capital ?: ($lead->raw_city ?: $city);
                 }
 
                 $values = [$lead->lead_date?->format('m/d/Y'), $lead->company_name, $lead->website, $lead->contact_person, $lead->email, $country, $city, $lead->import_trades, $lead->linkedin_url, $lead->data_source, $lead->source_url];
