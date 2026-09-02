@@ -33,8 +33,16 @@ class GmailConnectionController extends Controller
         }
 
         $request->validate(['code' => ['required', 'string']]);
-        $tokens = $gmail->exchangeCode($request->string('code')->toString());
-        $profile = $gmail->profile((string) $tokens['access_token']);
+
+        try {
+            $tokens = $gmail->exchangeCode($request->string('code')->toString());
+            $profile = $gmail->profile((string) $tokens['access_token']);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return redirect()->route('email-replies.index')->with('toast', ['type' => 'error', 'message' => 'Gmail connection failed. Please try again or contact an administrator.']);
+        }
+
         $existing = GmailConnection::query()->whereBelongsTo($request->user())->first();
         $refreshToken = (string) ($tokens['refresh_token'] ?? $existing->refresh_token ?? '');
         if ($refreshToken === '') {

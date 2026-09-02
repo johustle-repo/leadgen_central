@@ -56,6 +56,30 @@ it('stores encrypted OAuth credentials and queues the initial synchronization', 
     $this->assertDatabaseHas('audit_logs', ['user_id' => $agent->id, 'action' => 'gmail.connected']);
 });
 
+it('shows a friendly error instead of crashing when Google token exchange fails', function () {
+    config()->set('services.google', [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'redirect_uri' => 'http://localhost/integrations/gmail/callback',
+    ]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://oauth2.googleapis.com/token' => Http::response([], 500),
+    ]);
+    $agent = User::factory()->create();
+
+    $response = $this->actingAs($agent)->withSession(['gmail_oauth_state' => 'valid-state'])->get(route('gmail.callback', [
+        'state' => 'valid-state',
+        'code' => 'authorization-code',
+    ]));
+
+    $response->assertRedirectToRoute('email-replies.index')->assertSessionHas('toast', [
+        'type' => 'error',
+        'message' => 'Gmail connection failed. Please try again or contact an administrator.',
+    ]);
+    $this->assertDatabaseCount('gmail_connections', 0);
+});
+
 it('rejects a callback whose OAuth state does not match the session', function () {
     $agent = User::factory()->create();
 
