@@ -17,7 +17,7 @@ class ProcessUploadBatch implements ShouldBeUniqueUntilProcessing, ShouldQueue
 
     public int $tries = 3;
 
-    public int $uniqueFor = 600;
+    public int $uniqueFor = 120;
 
     /** CSV imports may contain many files and must be allowed to finish. */
     public int $timeout = 0;

@@ -10,6 +10,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command('gmail:sync')->everyMinute()->onOneServer()->withoutOverlapping(5);
 Schedule::command('email-sequences:process')->everyMinute()->onOneServer()->withoutOverlapping(5);
+Schedule::command('uploads:dispatch-pending')->everyMinute()->onOneServer()->withoutOverlapping(5);
 Schedule::command('queue:work database --queue=default --stop-when-empty --max-time=50 --timeout=0 --tries=3')
     ->everyMinute()
     ->onOneServer()
