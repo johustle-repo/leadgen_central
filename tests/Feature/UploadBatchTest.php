@@ -169,7 +169,7 @@ it('uploads maps and processes valid and invalid CSV rows', function () {
     $upload = $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
     $batch = UploadBatch::firstOrFail();
     $upload->assertRedirect(route('uploads.mapping', $batch));
-    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => ['Company Name' => 'company_name', 'Email' => 'email', 'Website' => 'website']])->assertRedirect(route('uploads.show', $batch));
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [0 => 'company_name', 1 => 'email', 2 => 'website']])->assertRedirect(route('uploads.show', $batch));
     $batch->refresh();
     expect($batch->total_rows)->toBe(2)->and($batch->accepted_rows)->toBe(1)->and($batch->rejected_rows)->toBe(1);
     $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Acme', 'source' => 'csv']);
@@ -247,9 +247,37 @@ it('preserves the raw sample lead columns during import', function () {
 
     expect($batch->column_mapping['Date'])->toBe('lead_date');
 
-    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => ['Date' => 'lead_date', 'Company' => 'company_name', 'Website' => 'website', 'First Name' => 'contact_person', 'Email' => 'email', 'Country' => 'country', 'City' => 'city', 'Import Trades' => 'import_trades', 'LinkedIn' => 'linkedin_url', 'Sources of Data' => 'data_source', 'Link' => 'source_url']])->assertRedirect(route('uploads.show', $batch));
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [0 => 'lead_date', 1 => 'company_name', 2 => 'website', 3 => 'contact_person', 4 => 'email', 5 => 'country', 6 => 'city', 7 => 'import_trades', 8 => 'linkedin_url', 9 => 'data_source', 10 => 'source_url']])->assertRedirect(route('uploads.show', $batch));
 
     $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'lead_date' => '2026-08-25 00:00:00', 'company_name' => 'Acme', 'contact_person' => 'Ada', 'country_code' => 'US', 'city' => 'Austin', 'import_trades' => 'Machinery', 'data_source' => 'Apollo', 'source_url' => 'https://example.com/acme']);
+});
+
+it('imports the lead date when a blank row-number column pushes Date out of the first column', function () {
+    // Regression test: the mapping confirmation form used to submit fields keyed by raw
+    // header text, so a blank header (a common leading "row number" column with no name)
+    // serialized as mapping[] over HTML forms - which PHP parses as an auto-incrementing
+    // array index, not an empty-string key - silently detaching that column's selection
+    // from the rest of the mapping and confusing which column was actually "Date".
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'numbered.csv',
+        ",Date,Company,Email\n1,08/06/2026,Leatherwood,vic@example.test\n",
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    expect($batch->headers)->toBe(['', 'Date', 'Company', 'Email'])
+        ->and($batch->column_mapping['Date'])->toBe('lead_date');
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => null,
+        1 => 'lead_date',
+        2 => 'company_name',
+        3 => 'email',
+    ]])->assertRedirect(route('uploads.show', $batch));
+
+    $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'Leatherwood', 'lead_date' => '2026-08-06 00:00:00']);
 });
 
 it('accepts a row and assigns the country timezone when the city value is a state', function () {
@@ -260,7 +288,7 @@ it('accepts a row and assigns the country timezone when the city value is a stat
     $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
     $batch = UploadBatch::firstOrFail();
 
-    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => ['Company' => 'company_name', 'Country' => 'country', 'City' => 'city']]);
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [0 => 'company_name', 1 => 'country', 2 => 'city']]);
 
     $this->assertDatabaseHas('leads', ['company_name' => 'CF Evans Construction', 'country_code' => 'US', 'city' => 'South Carolina', 'timezone' => 'America/New_York', 'validation_status' => 'validated']);
     $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 2, 'processing_status' => 'accepted', 'error_category' => null, 'error_message' => null]);
@@ -282,7 +310,7 @@ it('rejects uploaded contacts beyond an agents company limit', function () {
     $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
     $batch = UploadBatch::firstOrFail();
 
-    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => ['Company' => 'company_name', 'Name' => 'contact_person', 'Email' => 'email']]);
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [0 => 'company_name', 1 => 'contact_person', 2 => 'email']]);
 
     expect(Lead::query()->whereBelongsTo($agent, 'agent')->count())->toBe(10);
     $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 12, 'processing_status' => 'rejected', 'error_category' => 'company_contact_limit', 'error_message' => 'An agent can have a maximum of 10 contacts for the same company.']);

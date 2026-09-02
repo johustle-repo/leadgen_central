@@ -107,10 +107,23 @@ class UploadBatchController extends Controller
 
     public function process(ConfirmUploadMappingRequest $request, UploadBatch $uploadBatch): RedirectResponse
     {
-        if (! in_array('company_name', array_values(array_filter($request->validated('mapping'))), true)) {
+        // The mapping form submits fields keyed by column index (mapping[0], mapping[1], ...)
+        // rather than by header text, because a header of "" serializes as mapping[] over
+        // HTML forms, which PHP parses as an auto-incrementing array index instead of an
+        // empty-string key - silently detaching that column from its selection. Headers are
+        // guaranteed unique at upload time, so reconstructing a header-keyed map here is safe.
+        $headers = $uploadBatch->headers ?? [];
+        $mapping = [];
+        foreach ($request->validated('mapping') as $index => $field) {
+            if (($header = $headers[(int) $index] ?? null) !== null) {
+                $mapping[$header] = $field;
+            }
+        }
+
+        if (! in_array('company_name', array_values(array_filter($mapping)), true)) {
             throw ValidationException::withMessages(['mapping' => 'Map one CSV column to Company Name.']);
         }
-        $uploadBatch->update(['column_mapping' => $request->validated('mapping')]);
+        $uploadBatch->update(['column_mapping' => $mapping]);
         ProcessUploadBatch::dispatch($uploadBatch->id);
 
         return redirect()->route('uploads.show', $uploadBatch)->with('toast', ['type' => 'success', 'message' => 'CSV queued for processing.']);

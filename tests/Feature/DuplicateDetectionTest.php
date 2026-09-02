@@ -21,7 +21,7 @@ it('retains original ownership and logs a second agents exact duplicate upload',
     $this->actingAs($uploadingAgent)->post(route('uploads.store'), ['file' => $file]);
     $batch = UploadBatch::query()->whereBelongsTo($uploadingAgent)->firstOrFail();
 
-    $this->actingAs($uploadingAgent)->post(route('uploads.process', $batch), ['mapping' => ['Company' => 'company_name', 'Website' => 'website', 'Name' => 'contact_person', 'Email' => 'email']])->assertRedirect(route('uploads.show', $batch));
+    $this->actingAs($uploadingAgent)->post(route('uploads.process', $batch), ['mapping' => [0 => 'company_name', 1 => 'website', 2 => 'contact_person', 3 => 'email']])->assertRedirect(route('uploads.show', $batch));
 
     expect(Lead::count())->toBe(1)->and($original->refresh()->agent_id)->toBe($owner->id)->and($batch->refresh()->exact_duplicate_rows)->toBe(1);
     $this->assertDatabaseHas((new DuplicateLog)->getTable(), ['uploading_agent_id' => $uploadingAgent->id, 'original_lead_id' => $original->id, 'original_owner_id' => $owner->id, 'upload_batch_id' => $batch->id]);
@@ -47,17 +47,17 @@ it('cleans an agents exported manual lead by updating the original instead of ma
     $batch = UploadBatch::query()->whereBelongsTo($agent)->firstOrFail();
 
     $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
-        'Date' => 'lead_date',
-        'Company' => 'company_name',
-        'Website' => 'website',
-        'First Name' => 'contact_person',
-        'Email' => 'email',
-        'Country' => 'country',
-        'City' => 'city',
-        'Import Trades' => 'import_trades',
-        'LinkedIn' => 'linkedin_url',
-        'Sources of Data' => 'data_source',
-        'Link' => 'source_url',
+        0 => 'lead_date',
+        1 => 'company_name',
+        2 => 'website',
+        3 => 'contact_person',
+        4 => 'email',
+        5 => 'country',
+        6 => 'city',
+        7 => 'import_trades',
+        8 => 'linkedin_url',
+        9 => 'data_source',
+        10 => 'source_url',
     ]]);
 
     expect(Lead::count())->toBe(1)
@@ -104,10 +104,10 @@ it('updates the date on an agents matching uploaded lead when requested', functi
     ]);
     $batch = UploadBatch::query()->whereBelongsTo($agent)->firstOrFail();
     $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
-        'Date' => 'lead_date',
-        'Company' => 'company_name',
-        'First Name' => 'contact_person',
-        'Email' => 'email',
+        0 => 'lead_date',
+        1 => 'company_name',
+        2 => 'contact_person',
+        3 => 'email',
     ]]);
 
     expect(Lead::count())->toBe(1)
@@ -137,8 +137,8 @@ it('does not update another agents matching lead when requested', function () {
     ]);
     $batch = UploadBatch::query()->whereBelongsTo($uploadingAgent)->firstOrFail();
     $this->actingAs($uploadingAgent)->post(route('uploads.process', $batch), ['mapping' => [
-        'Company' => 'company_name',
-        'Email' => 'email',
+        0 => 'company_name',
+        1 => 'email',
     ]]);
 
     expect($original->refresh()->lead_date)->toBeNull()

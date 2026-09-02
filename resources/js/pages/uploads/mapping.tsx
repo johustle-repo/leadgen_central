@@ -38,16 +38,18 @@ export default function UploadMapping({
                                 <span>CSV heading</span>
                                 <span>Lead field</span>
                             </div>
-                            {batch.headers.map((header) => (
+                            {batch.headers.map((header, index) => (
                                 <div
-                                    key={header}
+                                    key={`${index}-${header}`}
                                     className="grid grid-cols-2 items-center gap-4"
                                 >
                                     <span className="truncate text-sm">
-                                        {header}
+                                        {header.trim() !== ''
+                                            ? header
+                                            : `Column ${index + 1} (no header — likely a row number; leave as "Do not import")`}
                                     </span>
                                     <select
-                                        name={`mapping[${header}]`}
+                                        name={`mapping[${index}]`}
                                         defaultValue={
                                             batch.column_mapping[header] ?? ''
                                         }
