@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Console\Scheduling\Schedule;
+
 it('fails deployment checks when production configuration is unsafe', function () {
     config([
         'app.debug' => true,
@@ -43,4 +45,14 @@ it('passes deployment checks with complete production configuration', function (
 
     config(['database.default' => $originalDatabase]);
     app()->detectEnvironment(fn (): string => 'testing');
+});
+
+it('schedules a queue worker for shared hosting deployments', function () {
+    $commands = collect(app(Schedule::class)->events())->pluck('command');
+
+    expect($commands->contains(
+        fn (?string $command): bool => str_contains((string) $command, 'queue:work database')
+            && str_contains((string) $command, '--stop-when-empty')
+            && str_contains((string) $command, '--timeout=0'),
+    ))->toBeTrue();
 });
