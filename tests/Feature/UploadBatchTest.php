@@ -73,6 +73,23 @@ it('shows upload history for a soft deleted owner without crashing', function ()
         ->where('batches.data.0.user.name', 'Former Agent'));
 });
 
+it('paginates upload history by the requested per_page size', function () {
+    $administrator = User::factory()->administrator()->create();
+    UploadBatch::factory()->count(30)->create();
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['per_page' => 25]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('uploads/index')
+            ->where('filters.per_page', '25')
+            ->has('batches.data', 25));
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['per_page' => 999]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('uploads/index')
+            ->where('filters.per_page', '10')
+            ->has('batches.data', 10));
+});
+
 it('sorts upload history by filename', function () {
     $administrator = User::factory()->administrator()->create();
     $zuluBatch = UploadBatch::factory()->create(['original_filename' => 'zulu.csv']);

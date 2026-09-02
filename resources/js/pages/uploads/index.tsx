@@ -50,7 +50,7 @@ export default function UploadIndex({
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     sort: string;
-    filters: { agent_id: string };
+    filters: { agent_id: string; per_page: string };
     deletableTotal: number;
     agents: Agent[];
 }) {
@@ -92,6 +92,25 @@ export default function UploadIndex({
                       batchId,
                   ]
                 : current.filter((id) => id !== batchId),
+        );
+    };
+
+    const updateQuery = (
+        changes: Partial<{
+            sort: string;
+            agent_id: string;
+            per_page: string;
+        }>,
+    ) => {
+        router.get(
+            index.url(),
+            {
+                sort,
+                agent_id: filters.agent_id || undefined,
+                per_page: filters.per_page,
+                ...changes,
+            },
+            { preserveState: true, replace: true },
         );
     };
 
@@ -145,21 +164,31 @@ export default function UploadIndex({
                     }
                 />
                 <div className="flex flex-wrap items-center justify-end gap-3">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Show</span>
+                        <select
+                            value={filters.per_page}
+                            onChange={(event) =>
+                                updateQuery({ per_page: event.target.value })
+                            }
+                            className="h-9 rounded-md border bg-background px-3 text-sm text-foreground"
+                            aria-label="Uploads per page"
+                        >
+                            <option value="10">10 per page</option>
+                            <option value="25">25 per page</option>
+                            <option value="50">50 per page</option>
+                            <option value="100">100 per page</option>
+                        </select>
+                    </label>
                     {agents.length > 0 && (
                         <label className="flex items-center gap-2 text-sm text-muted-foreground">
                             <span>Agent</span>
                             <select
                                 value={filters.agent_id}
                                 onChange={(event) =>
-                                    router.get(
-                                        index.url(),
-                                        {
-                                            sort,
-                                            agent_id:
-                                                event.target.value || undefined,
-                                        },
-                                        { preserveState: true, replace: true },
-                                    )
+                                    updateQuery({
+                                        agent_id: event.target.value,
+                                    })
                                 }
                                 className="h-9 rounded-md border bg-background px-3 text-sm text-foreground"
                                 aria-label="Filter by agent"
@@ -178,14 +207,7 @@ export default function UploadIndex({
                         <select
                             value={sort}
                             onChange={(event) =>
-                                router.get(
-                                    index.url(),
-                                    {
-                                        sort: event.target.value,
-                                        agent_id: filters.agent_id || undefined,
-                                    },
-                                    { preserveState: true, replace: true },
-                                )
+                                updateQuery({ sort: event.target.value })
                             }
                             className="h-9 rounded-md border bg-background px-3 text-sm text-foreground"
                             aria-label="Sort upload history"

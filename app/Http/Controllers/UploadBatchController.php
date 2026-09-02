@@ -60,10 +60,13 @@ class UploadBatchController extends Controller
             ? UploadBatch::query()->whereIn('processing_status', [UploadBatchStatus::Completed, UploadBatchStatus::Failed])->count()
             : 0;
 
+        $requestedPerPage = $request->integer('per_page', 10);
+        $perPage = in_array($requestedPerPage, [10, 25, 50, 100], true) ? $requestedPerPage : 10;
+
         return Inertia::render('uploads/index', [
-            'batches' => $query->paginate(15)->withQueryString(),
+            'batches' => $query->paginate($perPage)->withQueryString(),
             'sort' => $sort,
-            'filters' => ['agent_id' => $request->string('agent_id')->toString()],
+            'filters' => ['agent_id' => $request->string('agent_id')->toString(), 'per_page' => (string) $perPage],
             'deletableTotal' => $deletableTotal,
             'agents' => $request->user()->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [],
         ]);
