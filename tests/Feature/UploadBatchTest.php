@@ -85,6 +85,26 @@ it('sorts upload history by filename', function () {
         ->where('batches.data.1.id', $zuluBatch->id));
 });
 
+it('sorts upload history by agent name', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agentA = User::factory()->create(['name' => 'Aaron Agent']);
+    $agentZ = User::factory()->create(['name' => 'Zack Agent']);
+    $zuluOwnerBatch = UploadBatch::factory()->for($agentZ)->create();
+    $alphaOwnerBatch = UploadBatch::factory()->for($agentA)->create();
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['sort' => 'agent_asc']))->assertInertia(fn (Assert $page) => $page
+        ->component('uploads/index')
+        ->where('sort', 'agent_asc')
+        ->where('batches.data.0.id', $alphaOwnerBatch->id)
+        ->where('batches.data.1.id', $zuluOwnerBatch->id));
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['sort' => 'agent_desc']))->assertInertia(fn (Assert $page) => $page
+        ->component('uploads/index')
+        ->where('sort', 'agent_desc')
+        ->where('batches.data.0.id', $zuluOwnerBatch->id)
+        ->where('batches.data.1.id', $alphaOwnerBatch->id));
+});
+
 it('falls back to newest sorting for unsupported input', function () {
     $administrator = User::factory()->administrator()->create();
     $olderBatch = UploadBatch::factory()->create(['created_at' => '2026-08-01 09:00:00']);

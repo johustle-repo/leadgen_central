@@ -14,6 +14,7 @@ use App\Services\CsvHeaderMapper;
 use App\Services\UploadBatchCreator;
 use App\Services\UploadBatchDeletion;
 use App\Services\UploadBatchReanalyzer;
+use App\UploadBatchStatus;
 use App\UploadRowStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,16 +35,33 @@ class UploadBatchController extends Controller
             'filename_asc' => ['original_filename', 'asc'],
             'filename_desc' => ['original_filename', 'desc'],
             'status' => ['processing_status', 'asc'],
+            'agent_asc' => ['agent', 'asc'],
+            'agent_desc' => ['agent', 'desc'],
             'newest' => ['created_at', 'desc'],
         ];
         $sort = array_key_exists($sort, $sortOptions) ? $sort : 'newest';
-        $sorting = $sortOptions[$sort];
-        $query = UploadBatch::with('user:id,name')->orderBy($sorting[0], $sorting[1])->orderByDesc('id');
+        [$column, $direction] = $sortOptions[$sort];
+        $query = UploadBatch::query()->select('upload_batches.*')->with('user:id,name');
         if (! $request->user()->canViewAllLeads()) {
             $query->whereBelongsTo($request->user());
         }
+        if ($column === 'agent') {
+            $query->leftJoin('users as sort_agents', 'sort_agents.id', '=', 'upload_batches.user_id')
+                ->orderBy('sort_agents.name', $direction);
+        } else {
+            $query->orderBy("upload_batches.{$column}", $direction);
+        }
+        $query->orderByDesc('upload_batches.id');
 
-        return Inertia::render('uploads/index', ['batches' => $query->paginate(15)->withQueryString(), 'sort' => $sort]);
+        $deletableTotal = $request->user()->isAdministrator()
+            ? UploadBatch::query()->whereIn('processing_status', [UploadBatchStatus::Completed, UploadBatchStatus::Failed])->count()
+            : 0;
+
+        return Inertia::render('uploads/index', [
+            'batches' => $query->paginate(15)->withQueryString(),
+            'sort' => $sort,
+            'deletableTotal' => $deletableTotal,
+        ]);
     }
 
     public function create(): Response
@@ -176,7 +194,9 @@ class UploadBatchController extends Controller
 
     public function bulkDestroy(BulkDeleteUploadBatchesRequest $request, UploadBatchDeletion $deletion): RedirectResponse
     {
-        $batches = UploadBatch::query()->whereKey($request->validated('upload_batch_ids'))->get();
+        $batches = $request->boolean('select_all')
+            ? UploadBatch::query()->whereIn('processing_status', [UploadBatchStatus::Completed, UploadBatchStatus::Failed])->get()
+            : UploadBatch::query()->whereKey($request->validated('upload_batch_ids'))->get();
         $batches->each(fn (UploadBatch $batch) => Gate::authorize('delete', $batch));
         $batches->each(fn (UploadBatch $batch) => $deletion->delete($batch, $request->user(), $request->ip(), $request->userAgent()));
 

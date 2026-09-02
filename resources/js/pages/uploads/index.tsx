@@ -40,16 +40,19 @@ const formatUploadedDate = (value: string) =>
 export default function UploadIndex({
     batches,
     sort,
+    deletableTotal,
 }: {
     batches: {
         data: Batch[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     sort: string;
+    deletableTotal: number;
 }) {
     const { auth } = usePage<{ auth: Auth }>().props;
     usePoll(5000, { only: ['batches'] });
     const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
+    const [selectAllMatching, setSelectAllMatching] = useState(false);
     const isAdministrator = auth.user.role === 'administrator';
     const deletableBatchIds = batches.data
         .filter((batch) =>
@@ -62,12 +65,21 @@ export default function UploadIndex({
     const allDeletableBatchesSelected =
         deletableBatchIds.length > 0 &&
         deletableBatchIds.every((id) => selectedVisibleBatchIds.includes(id));
+    const canSelectAllMatching =
+        allDeletableBatchesSelected &&
+        !selectAllMatching &&
+        deletableTotal > selectedVisibleBatchIds.length;
+    const selectedCount = selectAllMatching
+        ? deletableTotal
+        : selectedVisibleBatchIds.length;
 
     const toggleAllBatches = (checked: boolean) => {
         setSelectedBatchIds(checked ? deletableBatchIds : []);
+        setSelectAllMatching(false);
     };
 
     const toggleBatch = (batchId: number, checked: boolean) => {
+        setSelectAllMatching(false);
         setSelectedBatchIds((current) =>
             checked
                 ? [
@@ -81,16 +93,21 @@ export default function UploadIndex({
     const deleteSelectedBatches = () => {
         if (
             !window.confirm(
-                `Delete ${selectedVisibleBatchIds.length} selected upload histories? Imported leads will be preserved, but the raw files and row history will be removed.`,
+                `Delete ${selectedCount} selected upload histories? Imported leads will be preserved, but the raw files and row history will be removed.`,
             )
         ) {
             return;
         }
 
         router.delete(bulkDestroy.url(), {
-            data: { upload_batch_ids: selectedVisibleBatchIds },
+            data: selectAllMatching
+                ? { select_all: true }
+                : { upload_batch_ids: selectedVisibleBatchIds },
             preserveScroll: true,
-            onSuccess: () => setSelectedBatchIds([]),
+            onSuccess: () => {
+                setSelectedBatchIds([]);
+                setSelectAllMatching(false);
+            },
         });
     };
 
@@ -103,18 +120,16 @@ export default function UploadIndex({
                     description="Track every CSV batch and its row-level results."
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
-                            {isAdministrator &&
-                                selectedVisibleBatchIds.length > 0 && (
-                                    <Button
-                                        type="button"
-                                        variant="destructive"
-                                        onClick={deleteSelectedBatches}
-                                    >
-                                        <Trash2 />
-                                        Delete selected (
-                                        {selectedVisibleBatchIds.length})
-                                    </Button>
-                                )}
+                            {isAdministrator && selectedCount > 0 && (
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    onClick={deleteSelectedBatches}
+                                >
+                                    <Trash2 />
+                                    Delete selected ({selectedCount})
+                                </Button>
+                            )}
                             <Button asChild>
                                 <Link href={create()}>
                                     <Upload />
@@ -143,10 +158,41 @@ export default function UploadIndex({
                             <option value="oldest">Oldest first</option>
                             <option value="filename_asc">Filename A–Z</option>
                             <option value="filename_desc">Filename Z–A</option>
+                            <option value="agent_asc">Agent A–Z</option>
+                            <option value="agent_desc">Agent Z–A</option>
                             <option value="status">Status</option>
                         </select>
                     </label>
                 </div>
+                {isAdministrator && canSelectAllMatching && (
+                    <div className="flex items-center justify-between rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-4 py-2.5 text-sm">
+                        <span>
+                            All {selectedVisibleBatchIds.length} deletable
+                            uploads on this page are selected.
+                        </span>
+                        <button
+                            type="button"
+                            className="font-medium text-cyan-600 hover:underline dark:text-cyan-400"
+                            onClick={() => setSelectAllMatching(true)}
+                        >
+                            Select all {deletableTotal} matching uploads
+                        </button>
+                    </div>
+                )}
+                {isAdministrator && selectAllMatching && (
+                    <div className="flex items-center justify-between rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-4 py-2.5 text-sm">
+                        <span>
+                            All {deletableTotal} deletable uploads are selected.
+                        </span>
+                        <button
+                            type="button"
+                            className="font-medium text-cyan-600 hover:underline dark:text-cyan-400"
+                            onClick={() => setSelectAllMatching(false)}
+                        >
+                            Select just this page instead
+                        </button>
+                    </div>
+                )}
                 <div className="overflow-hidden rounded-xl border bg-card">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
@@ -156,7 +202,8 @@ export default function UploadIndex({
                                         <th className="w-12 p-3">
                                             <Checkbox
                                                 checked={
-                                                    allDeletableBatchesSelected
+                                                    allDeletableBatchesSelected ||
+                                                    selectAllMatching
                                                 }
                                                 onCheckedChange={(checked) =>
                                                     toggleAllBatches(
@@ -188,9 +235,12 @@ export default function UploadIndex({
                                         {isAdministrator && (
                                             <td className="p-3">
                                                 <Checkbox
-                                                    checked={selectedVisibleBatchIds.includes(
-                                                        batch.id,
-                                                    )}
+                                                    checked={
+                                                        selectAllMatching ||
+                                                        selectedVisibleBatchIds.includes(
+                                                            batch.id,
+                                                        )
+                                                    }
                                                     onCheckedChange={(
                                                         checked,
                                                     ) =>
