@@ -2,6 +2,7 @@
 
 use Illuminate\Console\Scheduling\CallbackEvent;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\DB;
 
 it('fails deployment checks when production configuration is unsafe', function () {
     config([
@@ -79,6 +80,24 @@ it('fails deployment checks when the Google redirect URI does not match the appl
 
     config(['database.default' => $originalDatabase]);
     app()->detectEnvironment(fn (): string => 'testing');
+});
+
+it('fails deployment checks when a migration has not been run', function () {
+    // Regression coverage: a release that skips `migrate --force` leaves the schema
+    // for whatever the newest migration added (e.g. the lead_attachments table)
+    // missing entirely, which crashes any feature depending on it - the Verification
+    // screen among them - instead of failing loudly at deploy time. Deliberately
+    // keeps the real (working) test database connection here, unlike the other
+    // cases in this file, so the check runs against actual migration bookkeeping
+    // instead of a config value.
+    $latestMigration = DB::table('migrations')->orderByDesc('id')->value('migration');
+    DB::table('migrations')->where('migration', $latestMigration)->delete();
+
+    $this->artisan('app:deployment-check')
+        ->expectsOutputToContain('Deployment readiness checks failed')
+        ->assertFailed();
+
+    DB::table('migrations')->insert(['migration' => $latestMigration, 'batch' => 1]);
 });
 
 it('schedules recurring tasks as in-process callbacks instead of shelling out', function () {

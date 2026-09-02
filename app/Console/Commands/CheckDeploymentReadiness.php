@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Database\Migrations\Migrator;
+use Throwable;
 
 #[Signature('app:deployment-check')]
 #[Description('Validate required production configuration before deployment')]
@@ -18,6 +20,7 @@ class CheckDeploymentReadiness extends Command
             'Application key configured' => filled(config('app.key')),
             'HTTPS application URL' => str_starts_with((string) config('app.url'), 'https://'),
             'Production database configured' => config('database.default') !== 'sqlite',
+            'No pending database migrations' => $this->hasNoPendingMigrations(),
             'Asynchronous queue configured' => ! in_array(config('queue.default'), ['sync', 'null'], true),
             'Queue retry window exceeds job timeout' => (int) config('queue.connections.database.retry_after') > 300,
             'Production mail transport configured' => ! in_array(config('mail.default'), ['log', 'array'], true),
@@ -47,5 +50,32 @@ class CheckDeploymentReadiness extends Command
         $this->info('LeadGen Central is configured for production deployment.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * A migration file present on disk but missing from the migrations table means
+     * `migrate --force` was never run for the current release. The schema it would
+     * have created (e.g. lead_attachments) is then simply absent, which crashes any
+     * feature that depends on it instead of failing loudly at deploy time.
+     */
+    private function hasNoPendingMigrations(): bool
+    {
+        try {
+            $migrator = app(Migrator::class);
+
+            if (! $migrator->repositoryExists()) {
+                return false;
+            }
+
+            $ran = $migrator->getRepository()->getRan();
+            $files = $migrator->getMigrationFiles(database_path('migrations'));
+
+            return array_diff(array_keys($files), $ran) === [];
+        } catch (Throwable) {
+            // Database connectivity is out of scope for this check; an unreachable
+            // database surfaces through the other checks and the /up health route
+            // instead of failing this one with a misleading migrations message.
+            return true;
+        }
     }
 }
