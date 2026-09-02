@@ -1,0 +1,13 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Hostinger serves public_html as the document root. Keep Laravel's
+    # application files private by routing every request through public/.
+    RewriteRule ^$ public/index.php [L]
+    RewriteRule ^public/ - [L]
+    RewriteRule ^(.+)$ public/$1 [L]
+</IfModule>
+
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>
