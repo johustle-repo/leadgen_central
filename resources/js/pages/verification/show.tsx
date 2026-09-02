@@ -13,13 +13,13 @@ import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { store as storeForwarding } from '@/routes/leads/forwardings';
-import { store as storeNote } from '@/routes/leads/notes';
 import {
     destroy as destroyAttachment,
     download as downloadAttachment,
     store as storeAttachment,
 } from '@/routes/leads/attachments';
+import { store as storeForwarding } from '@/routes/leads/forwardings';
+import { store as storeNote } from '@/routes/leads/notes';
 import { index, show, update } from '@/routes/verification';
 
 type User = { id: number; name: string };

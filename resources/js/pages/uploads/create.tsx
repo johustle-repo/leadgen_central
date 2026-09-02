@@ -73,6 +73,7 @@ export default function UploadCreate({
                                         'files',
                                         files.slice(0, maximumFiles),
                                     );
+
                                     if (files.length > maximumFiles) {
                                         upload.setError(
                                             'files',
