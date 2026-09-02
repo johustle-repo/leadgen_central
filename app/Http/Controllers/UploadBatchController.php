@@ -9,6 +9,7 @@ use App\Jobs\ProcessUploadBatch;
 use App\Models\AuditLog;
 use App\Models\SystemSetting;
 use App\Models\UploadBatch;
+use App\Models\User;
 use App\Services\CsvCellSanitizer;
 use App\Services\CsvHeaderMapper;
 use App\Services\UploadBatchCreator;
@@ -44,6 +45,8 @@ class UploadBatchController extends Controller
         $query = UploadBatch::query()->select('upload_batches.*')->with('user:id,name');
         if (! $request->user()->canViewAllLeads()) {
             $query->whereBelongsTo($request->user());
+        } elseif ($agentId = $request->string('agent_id')->toString()) {
+            $query->where('upload_batches.user_id', $agentId);
         }
         if ($column === 'agent') {
             $query->leftJoin('users as sort_agents', 'sort_agents.id', '=', 'upload_batches.user_id')
@@ -60,7 +63,9 @@ class UploadBatchController extends Controller
         return Inertia::render('uploads/index', [
             'batches' => $query->paginate(15)->withQueryString(),
             'sort' => $sort,
+            'filters' => ['agent_id' => $request->string('agent_id')->toString()],
             'deletableTotal' => $deletableTotal,
+            'agents' => $request->user()->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [],
         ]);
     }
 

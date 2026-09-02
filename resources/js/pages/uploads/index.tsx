@@ -28,6 +28,7 @@ type Batch = {
     created_at: string;
     user: { name: string } | null;
 };
+type Agent = { id: number; name: string };
 
 const formatUploadedDate = (value: string) =>
     new Intl.DateTimeFormat('en-US', {
@@ -40,14 +41,18 @@ const formatUploadedDate = (value: string) =>
 export default function UploadIndex({
     batches,
     sort,
+    filters,
     deletableTotal,
+    agents,
 }: {
     batches: {
         data: Batch[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     sort: string;
+    filters: { agent_id: string };
     deletableTotal: number;
+    agents: Agent[];
 }) {
     const { auth } = usePage<{ auth: Auth }>().props;
     usePoll(5000, { only: ['batches'] });
@@ -139,7 +144,35 @@ export default function UploadIndex({
                         </div>
                     }
                 />
-                <div className="flex justify-end">
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                    {agents.length > 0 && (
+                        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>Agent</span>
+                            <select
+                                value={filters.agent_id}
+                                onChange={(event) =>
+                                    router.get(
+                                        index.url(),
+                                        {
+                                            sort,
+                                            agent_id:
+                                                event.target.value || undefined,
+                                        },
+                                        { preserveState: true, replace: true },
+                                    )
+                                }
+                                className="h-9 rounded-md border bg-background px-3 text-sm text-foreground"
+                                aria-label="Filter by agent"
+                            >
+                                <option value="">All agents</option>
+                                {agents.map((agent) => (
+                                    <option key={agent.id} value={agent.id}>
+                                        {agent.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    )}
                     <label className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span>Sort by</span>
                         <select
@@ -147,7 +180,10 @@ export default function UploadIndex({
                             onChange={(event) =>
                                 router.get(
                                     index.url(),
-                                    { sort: event.target.value },
+                                    {
+                                        sort: event.target.value,
+                                        agent_id: filters.agent_id || undefined,
+                                    },
                                     { preserveState: true, replace: true },
                                 )
                             }

@@ -85,6 +85,34 @@ it('sorts upload history by filename', function () {
         ->where('batches.data.1.id', $zuluBatch->id));
 });
 
+it('lets an administrator filter upload history by agent', function () {
+    $administrator = User::factory()->administrator()->create();
+    $firstAgent = User::factory()->create();
+    $secondAgent = User::factory()->create();
+    $wanted = UploadBatch::factory()->for($firstAgent)->create(['original_filename' => 'wanted.csv']);
+    UploadBatch::factory()->for($secondAgent)->create(['original_filename' => 'other-agent.csv']);
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['agent_id' => $firstAgent->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('uploads/index')
+            ->where('filters.agent_id', (string) $firstAgent->id)
+            ->has('batches.data', 1)
+            ->where('batches.data.0.id', $wanted->id));
+});
+
+it('ignores an agent filter submitted by a non-privileged agent', function () {
+    $agent = User::factory()->create();
+    $otherAgent = User::factory()->create();
+    $own = UploadBatch::factory()->for($agent)->create();
+    UploadBatch::factory()->for($otherAgent)->create();
+
+    $this->actingAs($agent)->get(route('uploads.index', ['agent_id' => $otherAgent->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('uploads/index')
+            ->has('batches.data', 1)
+            ->where('batches.data.0.id', $own->id));
+});
+
 it('sorts upload history by agent name', function () {
     $administrator = User::factory()->administrator()->create();
     $agentA = User::factory()->create(['name' => 'Aaron Agent']);
