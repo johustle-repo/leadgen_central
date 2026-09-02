@@ -48,11 +48,13 @@ Point the web server document root to `public/`, not the repository root. Grant 
 
 ## Required long-running processes
 
-Run one or more supervised queue workers:
+**On a VPS or dedicated host with a process supervisor** (systemd, Supervisor, etc.), run one or more supervised queue workers:
 
 ```bash
 php artisan queue:work database --sleep=3 --tries=3 --timeout=300 --max-time=3600
 ```
+
+**On shared hosting without supervisor access (e.g. Hostinger)**, there is no way to keep a `queue:work` process alive, so the app instead drains the queue from the scheduler itself every minute (see `routes/console.php`). No separate worker process is required in this mode — only the cron entry below.
 
 Configure one cron entry on every scheduler host; the application uses single-server locks to prevent duplicate execution:
 
@@ -60,7 +62,15 @@ Configure one cron entry on every scheduler host; the application uses single-se
 * * * * * cd /var/www/leadgen-central/current && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-The scheduler queues Gmail reply synchronization and processes email sequence steps every minute. A running queue worker is therefore required for uploads and Gmail synchronization.
+The scheduler queues Gmail reply synchronization, processes email sequence steps, re-dispatches any lead upload that lost its queue job, and (on shared hosting) drains the database queue itself — all every minute. A supervised worker satisfies the same purpose on hosts that can run one.
+
+Every scheduled task registers via `Schedule::call()`/`Artisan::call()`, not `Schedule::command()`/`Schedule::exec()`. The latter shell out through Symfony `Process` (`proc_open`), which many shared hosts (including Hostinger) disable outright — the task would silently never run even though `schedule:run` fires correctly every minute, which is why lead uploads could get stuck at "Pending" indefinitely. Running everything in-process via `Artisan::call()` avoids that dependency entirely. Verify the schedule is registered correctly on a fresh deployment with:
+
+```bash
+php artisan schedule:list
+```
+
+If a batch is still stuck "Pending" after deploying this fix, confirm the cron entry above is actually installed in the host's control panel (e.g. Hostinger's hPanel &rarr; Advanced &rarr; Cron Jobs) and that it points at the correct PHP binary and release path.
 
 ## Every release
 

@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Console\Scheduling\CallbackEvent;
 use Illuminate\Console\Scheduling\Schedule;
 
 it('fails deployment checks when production configuration is unsafe', function () {
@@ -47,12 +48,23 @@ it('passes deployment checks with complete production configuration', function (
     app()->detectEnvironment(fn (): string => 'testing');
 });
 
-it('schedules a queue worker for shared hosting deployments', function () {
-    $commands = collect(app(Schedule::class)->events())->pluck('command');
+it('schedules recurring tasks as in-process callbacks instead of shelling out', function () {
+    // Schedule::command()/exec() shell out via Symfony Process (proc_open), which
+    // shared hosts such as Hostinger disable. Every recurring task must run through
+    // Schedule::call()/Artisan::call() so it still executes when proc_open is unavailable.
+    $events = collect(app(Schedule::class)->events());
 
-    expect($commands->contains(
-        fn (?string $command): bool => str_contains((string) $command, 'queue:work database')
-            && str_contains((string) $command, '--stop-when-empty')
-            && str_contains((string) $command, '--timeout=0'),
-    ))->toBeTrue();
+    expect($events)->not->toBeEmpty();
+
+    foreach ($events as $event) {
+        expect($event)->toBeInstanceOf(CallbackEvent::class);
+    }
+
+    $names = $events->pluck('description');
+
+    expect($names)
+        ->toContain('queue-work-database')
+        ->toContain('uploads-dispatch-pending')
+        ->toContain('gmail-sync')
+        ->toContain('email-sequences-process');
 });
