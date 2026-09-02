@@ -28,6 +28,7 @@ class CheckDeploymentReadiness extends Command
             'Google client ID configured' => filled(config('services.google.client_id')),
             'Google client secret configured' => filled(config('services.google.client_secret')),
             'HTTPS Google redirect URI' => str_starts_with((string) config('services.google.redirect_uri'), 'https://'),
+            'Google redirect URI matches the application URL' => parse_url((string) config('services.google.redirect_uri'), PHP_URL_HOST) === parse_url((string) config('app.url'), PHP_URL_HOST),
             'Brochure file is readable' => is_readable((string) config('services.google.brochure_path')),
         ];
 

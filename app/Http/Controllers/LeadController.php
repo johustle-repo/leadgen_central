@@ -103,7 +103,8 @@ class LeadController extends Controller
     {
         Gate::authorize('viewAny', Lead::class);
         $user = $request->user();
-        $query = Lead::query()->select(['id', 'lead_code', 'agent_id', 'upload_batch_id', 'company_name', 'website', 'website_domain', 'city', 'country', 'country_code', 'contact_person', 'position', 'email', 'phone', 'industry', 'status', 'validation_status', 'source', 'created_at'])->with(['agent:id,name', 'uploadBatch:id,batch_code'])->withCount(['emailReplies', 'emailReplies as unread_email_replies_count' => fn ($query) => $query->where('is_read', false)]);
+        $columns = ['id', 'lead_code', 'agent_id', 'upload_batch_id', 'company_name', 'website', 'website_domain', 'city', 'country', 'country_code', 'contact_person', 'position', 'email', 'phone', 'industry', 'status', 'validation_status', 'source', 'created_at'];
+        $query = Lead::query()->select(array_map(fn (string $column): string => "leads.{$column}", $columns))->with(['agent:id,name', 'uploadBatch:id,batch_code'])->withCount(['emailReplies', 'emailReplies as unread_email_replies_count' => fn ($query) => $query->where('is_read', false)]);
         if (! $user->canViewAllLeads()) {
             $query->whereBelongsTo($user, 'agent');
         }
@@ -126,12 +127,19 @@ class LeadController extends Controller
         if ($date = $request->string('date')->toString()) {
             $query->whereDate('lead_date', $date);
         }
-        $sort = in_array($request->string('sort')->toString(), ['company_name', 'city', 'country', 'status', 'source', 'created_at'], true) ? $request->string('sort')->toString() : 'created_at';
+        $sort = in_array($request->string('sort')->toString(), ['company_name', 'city', 'country', 'status', 'source', 'agent', 'created_at'], true) ? $request->string('sort')->toString() : 'created_at';
         $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
         $requestedPerPage = $request->integer('per_page', 10);
         $perPage = in_array($requestedPerPage, [10, 25, 50, 100], true) ? $requestedPerPage : 10;
 
-        $leads = $query->orderBy($sort, $direction)->paginate($perPage)->withQueryString();
+        if ($sort === 'agent') {
+            $query->leftJoin('users as lead_sort_agents', 'lead_sort_agents.id', '=', 'leads.agent_id')
+                ->orderBy('lead_sort_agents.name', $direction);
+        } else {
+            $query->orderBy("leads.{$sort}", $direction);
+        }
+
+        $leads = $query->paginate($perPage)->withQueryString();
         $leads->through(fn (Lead $lead): array => [
             ...$lead->toArray(),
             'can_update' => $user->can('update', $lead),

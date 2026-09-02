@@ -215,6 +215,50 @@ it('renders leads without an assigned owner', function () {
         ->where('leads.data.0.agent', null));
 });
 
+it('exposes the agent roster to administrators and sub-administrators only', function () {
+    $administrator = User::factory()->administrator()->create();
+    $subAdministrator = User::factory()->subAdministrator()->create();
+    $agent = User::factory()->create();
+    User::factory()->create(['name' => 'Zoe Agent']);
+
+    $this->actingAs($administrator)->get(route('leads.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('leads/index')
+        ->has('agents', 4));
+    $this->actingAs($subAdministrator)->get(route('leads.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('leads/index')
+        ->has('agents', 4));
+    $this->actingAs($agent)->get(route('leads.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('leads/index')
+        ->has('agents', 0));
+});
+
+it('lets an administrator filter leads by agent', function () {
+    $administrator = User::factory()->administrator()->create();
+    $firstAgent = User::factory()->create();
+    $secondAgent = User::factory()->create();
+    $wanted = Lead::factory()->for($firstAgent, 'agent')->create(['company_name' => 'Wanted Company']);
+    Lead::factory()->for($secondAgent, 'agent')->create(['company_name' => 'Other Agent Company']);
+
+    $this->actingAs($administrator)->get(route('leads.index', ['agent_id' => $firstAgent->id]))
+        ->assertOk()
+        ->assertSee($wanted->company_name)
+        ->assertDontSee('Other Agent Company');
+});
+
+it('lets an administrator sort leads by agent name', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agentA = User::factory()->create(['name' => 'Aaron Agent']);
+    $agentZ = User::factory()->create(['name' => 'Zack Agent']);
+    Lead::factory()->for($agentZ, 'agent')->create();
+    Lead::factory()->for($agentA, 'agent')->create();
+
+    $this->actingAs($administrator)->get(route('leads.index', ['sort' => 'agent', 'direction' => 'asc']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('leads/index')
+            ->where('leads.data.0.agent.name', 'Aaron Agent')
+            ->where('leads.data.1.agent.name', 'Zack Agent'));
+});
+
 it('exposes bulk lead deletion only to administrators', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create();

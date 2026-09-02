@@ -54,6 +54,7 @@ type Lead = {
     email_replies_count: number;
     unread_email_replies_count: number;
 };
+type Agent = { id: number; name: string };
 type Props = {
     leads: {
         data: Lead[];
@@ -61,8 +62,14 @@ type Props = {
     };
     filters: Record<string, string>;
     canBulkDelete: boolean;
+    agents: Agent[];
 };
-export default function LeadsIndex({ leads, filters, canBulkDelete }: Props) {
+export default function LeadsIndex({
+    leads,
+    filters,
+    canBulkDelete,
+    agents,
+}: Props) {
     const [composeLead, setComposeLead] = useState<Lead | null>(null);
     const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -217,6 +224,48 @@ Regards,`;
                         <option value="50">50 per page</option>
                         <option value="100">100 per page</option>
                     </select>
+                    {agents.length > 0 && (
+                        <select
+                            name="agent_id"
+                            defaultValue={filters.agent_id || ''}
+                            className="h-9 rounded-md border bg-background px-3 text-sm"
+                            aria-label="Filter by agent"
+                        >
+                            <option value="">All agents</option>
+                            {agents.map((agent) => (
+                                <option key={agent.id} value={agent.id}>
+                                    {agent.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                    {agents.length > 0 && (
+                        <select
+                            name="sort"
+                            defaultValue={filters.sort || 'created_at'}
+                            className="h-9 rounded-md border bg-background px-3 text-sm"
+                            aria-label="Sort leads by"
+                        >
+                            <option value="created_at">Sort: Date added</option>
+                            <option value="agent">Sort: Agent</option>
+                            <option value="company_name">Sort: Company</option>
+                            <option value="status">Sort: Status</option>
+                            <option value="source">Sort: Source</option>
+                            <option value="country">Sort: Country</option>
+                            <option value="city">Sort: City</option>
+                        </select>
+                    )}
+                    {agents.length > 0 && (
+                        <select
+                            name="direction"
+                            defaultValue={filters.direction || 'desc'}
+                            className="h-9 rounded-md border bg-background px-3 text-sm"
+                            aria-label="Sort direction"
+                        >
+                            <option value="desc">Descending</option>
+                            <option value="asc">Ascending</option>
+                        </select>
+                    )}
                     <div className="relative">
                         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center border-r pr-3 text-xs font-medium text-muted-foreground">
                             Lead date
