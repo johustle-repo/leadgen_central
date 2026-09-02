@@ -20,3 +20,13 @@ it('returns null when the country code has no cleaning reference', function () {
 
     expect($resolved)->toBeNull();
 });
+
+it('uses the bundled reference when production data migrations have not run', function () {
+    TimezoneReference::query()->delete();
+
+    $resolved = app(TimezoneReferenceResolver::class)->resolveByCountryCode('US');
+
+    expect($resolved?->original_country_code)->toBe('US')
+        ->and($resolved?->reference_country_code)->toBe('US')
+        ->and($resolved?->reference_capital)->toBe('New York');
+});
