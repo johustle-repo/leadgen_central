@@ -112,10 +112,13 @@ class UploadBatchController extends Controller
         // HTML forms, which PHP parses as an auto-incrementing array index instead of an
         // empty-string key - silently detaching that column from its selection. Headers are
         // guaranteed unique at upload time, so reconstructing a header-keyed map here is safe.
+        // Blank headers are skipped rather than keyed as "": a padded export can carry many of
+        // them, and they would otherwise all overwrite one another under that single key.
         $headers = $uploadBatch->headers ?? [];
         $mapping = [];
         foreach ($request->validated('mapping') as $index => $field) {
-            if (($header = $headers[(int) $index] ?? null) !== null) {
+            $header = $headers[(int) $index] ?? null;
+            if ($header !== null && trim((string) $header) !== '') {
                 $mapping[$header] = $field;
             }
         }

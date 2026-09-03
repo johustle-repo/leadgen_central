@@ -86,25 +86,36 @@ export default function UploadMapping({
                                 <span>CSV heading</span>
                                 <span>Lead field</span>
                             </div>
-                            {batch.headers.map((header, index) => (
-                                <div
-                                    key={`${index}-${header}`}
-                                    className="grid grid-cols-2 items-center gap-4"
-                                >
-                                    <span className="truncate text-sm">
-                                        {header.trim() !== ''
-                                            ? header
-                                            : `Column ${index + 1} (no header — likely a row number; leave as "Do not import")`}
-                                    </span>
-                                    <MappingRowSelect
-                                        name={`mapping[${index}]`}
-                                        defaultValue={
-                                            batch.column_mapping[header] ?? ''
-                                        }
-                                        fields={fields}
-                                    />
-                                </div>
-                            ))}
+                            {batch.headers.map((header, index) =>
+                                header.trim() !== '' ? (
+                                    <div
+                                        key={`${index}-${header}`}
+                                        className="grid grid-cols-2 items-center gap-4"
+                                    >
+                                        <span className="truncate text-sm">
+                                            {header}
+                                        </span>
+                                        <MappingRowSelect
+                                            name={`mapping[${index}]`}
+                                            defaultValue={
+                                                batch.column_mapping[header] ??
+                                                ''
+                                            }
+                                            fields={fields}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div
+                                        key={`${index}-blank`}
+                                        className="grid grid-cols-2 items-center gap-4 text-sm text-muted-foreground"
+                                    >
+                                        <span className="truncate">
+                                            Column {index + 1} (no heading)
+                                        </span>
+                                        <span>Not imported</span>
+                                    </div>
+                                ),
+                            )}
                             {errors.mapping && (
                                 <p className="text-sm text-destructive">
                                     {errors.mapping}

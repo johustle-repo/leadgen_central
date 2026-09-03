@@ -352,3 +352,37 @@ it('prevents an agent from re-analyzing another agents upload', function () {
 
     $this->actingAs($otherAgent)->post(route('uploads.reanalyze', $batch))->assertForbidden();
 });
+
+it('accepts a file whose rows are padded with trailing blank columns', function () {
+    // Regression test: spreadsheet exports pad every row with empty trailing columns, and
+    // each of those headers is "". Comparing the full header count against array_unique()
+    // saw them as one entry and rejected the file for "duplicate column headers" even
+    // though every real heading was distinct.
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'padded.csv',
+        "Date,Company,Email,,,,\n09/03/2026,VFive Group,aerian@vfive.test,,,,\n",
+    );
+
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file])->assertSessionHasNoErrors();
+
+    $batch = UploadBatch::firstOrFail();
+    expect($batch->headers)->toBe(['Date', 'Company', 'Email', '', '', '', '']);
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'lead_date', 1 => 'company_name', 2 => 'email',
+    ]])->assertRedirect(route('uploads.show', $batch));
+
+    expect($batch->fresh()->column_mapping)->toBe(['Date' => 'lead_date', 'Company' => 'company_name', 'Email' => 'email']);
+    $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'VFive Group', 'email' => 'aerian@vfive.test', 'lead_date' => '2026-09-03 00:00:00']);
+});
+
+it('still rejects a file whose named columns repeat', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent('dupes.csv', "Company,Email,Company\nAcme,ada@example.test,Acme\n");
+
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file])
+        ->assertSessionHasErrors(['file' => 'dupes.csv contains duplicate column headers.']);
+});

@@ -61,10 +61,19 @@ class UploadBatchCreator
             fclose($stream);
         }
 
-        if (! is_array($headers) || count(array_filter($headers, fn ($header) => trim((string) $header) !== '')) === 0) {
+        $namedHeaders = is_array($headers)
+            ? array_values(array_filter(array_map('strval', $headers), fn (string $header): bool => trim($header) !== ''))
+            : [];
+
+        if (! is_array($headers) || $namedHeaders === []) {
             throw ValidationException::withMessages([$errorKey => "{$file->getClientOriginalName()} must contain a readable header row."]);
         }
-        if (count($headers) !== count(array_unique($headers))) {
+        // Only named columns are compared. Spreadsheet exports routinely pad every row with
+        // trailing empty columns, and those all collapse into the same "" entry - so checking
+        // the full header count against array_unique() reported a duplicate on files whose
+        // real headings were distinct. Blank columns are never mapped (see the mapping form
+        // and UploadBatchController::process), so they cannot collide downstream either.
+        if (count($namedHeaders) !== count(array_unique($namedHeaders))) {
             throw ValidationException::withMessages([$errorKey => "{$file->getClientOriginalName()} contains duplicate column headers."]);
         }
 
