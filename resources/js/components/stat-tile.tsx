@@ -21,8 +21,9 @@ export function StatTile({
     detail?: ReactNode;
 }) {
     return (
-        <Card>
-            <CardContent className="flex items-center justify-between gap-4 p-5">
+        <Card className="relative overflow-hidden py-0 transition-shadow hover:shadow-md">
+            <div className={`absolute inset-x-0 top-0 h-1 bg-current ${tone}`} />
+            <CardContent className="flex items-center justify-between gap-4 px-5 pt-6 pb-5">
                 <div className="min-w-0">
                     <p className="text-sm text-muted-foreground">{label}</p>
                     <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums">

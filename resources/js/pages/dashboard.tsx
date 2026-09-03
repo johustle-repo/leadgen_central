@@ -1,6 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    CheckCircle2,
+    ArrowRight,
+    Building2,
+    CalendarRange,
     Database,
     FileWarning,
     MailCheck,
@@ -9,6 +11,7 @@ import {
     Target,
     TrendingUp,
 } from 'lucide-react';
+import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
@@ -23,8 +26,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { dashboard } from '@/routes';
-import { edit as leadEdit } from '@/routes/leads';
-import { show as uploadShow } from '@/routes/uploads';
+import { edit as leadEdit, index as leadsIndex } from '@/routes/leads';
+import { index as uploadsIndex, show as uploadShow } from '@/routes/uploads';
 
 type Props = {
     stats: Record<string, number>;
@@ -34,7 +37,7 @@ type Props = {
         id: number;
         name: string;
         uploaded: number | null;
-        unique_leads: number | null;
+        accepted: number | null;
         duplicates: number | null;
         errors: number | null;
         possible: number;
@@ -56,6 +59,14 @@ type Props = {
         agent: { name: string } | null;
     }>;
 };
+
+const PERIOD_HINTS: Record<string, string> = {
+    today: 'Activity recorded today.',
+    week: 'From the start of this week through today.',
+    month: 'From the start of this month through today.',
+    custom: 'Pick an exact start and end date below.',
+};
+
 export default function Dashboard({
     stats,
     recentBatches,
@@ -64,6 +75,9 @@ export default function Dashboard({
     filters,
     productivity,
 }: Props) {
+    const [selectedPeriod, setSelectedPeriod] = useState(period);
+    const isCustomPeriod = selectedPeriod === 'custom';
+
     const applyPeriod = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         router.get(
@@ -72,40 +86,54 @@ export default function Dashboard({
             { preserveState: true, replace: true },
         );
     };
-    const criticalMetrics = [
+
+    const totalLeads = stats.total_leads ?? 0;
+    const uniqueCompanies = stats.unique_leads ?? 0;
+    const qualifiedLeads = stats.qualified_leads ?? 0;
+
+    const pipelineMetrics = [
         {
             label: 'Total leads',
-            value: stats.total_leads ?? 0,
+            value: totalLeads,
             icon: Database,
             tone: 'text-info',
         },
         {
-            label: 'Unique leads',
-            value: stats.unique_leads ?? 0,
-            icon: CheckCircle2,
-            tone: 'text-success',
+            label: 'Unique companies',
+            value: uniqueCompanies,
+            detail: totalLeads
+                ? `${Math.round((uniqueCompanies / totalLeads) * 100)}% of total leads`
+                : undefined,
+            icon: Building2,
+            tone: 'text-chart-1',
         },
         {
             label: 'Qualified leads',
-            value: stats.qualified_leads ?? 0,
+            value: qualifiedLeads,
             icon: Target,
-            tone: 'text-chart-1',
+            tone: 'text-success',
         },
         {
             label: 'Qualification rate',
             value: `${stats.qualification_rate ?? 0}%`,
+            detail: `${qualifiedLeads.toLocaleString()} of ${totalLeads.toLocaleString()} leads`,
             icon: TrendingUp,
             tone: 'text-chart-2',
         },
+    ];
+
+    const healthMetrics = [
         {
             label: 'Duplicates flagged',
             value: stats.duplicates_flagged ?? 0,
+            detail: 'Exact + possible matches caught on import',
             icon: ShieldAlert,
             tone: 'text-warning',
         },
         {
             label: 'Data issues',
             value: stats.data_issues ?? 0,
+            detail: 'Rejected, location, or processing errors',
             icon: FileWarning,
             tone: 'text-destructive',
         },
@@ -113,13 +141,13 @@ export default function Dashboard({
             label: 'Unread replies',
             value: stats.unread_replies ?? 0,
             icon: MailCheck,
-            tone: 'text-info',
+            tone: 'text-chart-4',
         },
         {
             label: 'Possible leads from replies',
             value: stats.possible_reply_leads ?? 0,
             icon: Sparkles,
-            tone: 'text-success',
+            tone: 'text-chart-5',
         },
     ];
 
@@ -131,50 +159,130 @@ export default function Dashboard({
                     title="Dashboard"
                     description="A live view of lead generation activity."
                 />
+
                 <form
                     onSubmit={applyPeriod}
-                    className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-4"
+                    className="rounded-xl border bg-card p-4"
                 >
-                    <Select name="period" defaultValue={period}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="today">Today</SelectItem>
-                            <SelectItem value="week">This Week</SelectItem>
-                            <SelectItem value="month">This Month</SelectItem>
-                            <SelectItem value="custom">
-                                Custom Date
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Input
-                        type="date"
-                        name="date_from"
-                        defaultValue={filters.date_from}
-                        aria-label="Date from"
-                    />
-                    <Input
-                        type="date"
-                        name="date_to"
-                        defaultValue={filters.date_to}
-                        aria-label="Date to"
-                    />
-                    <Button type="submit" variant="secondary">
-                        Apply period
-                    </Button>
+                    <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        <CalendarRange className="size-3.5" />
+                        Reporting period
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-4">
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="dashboard-period"
+                                className="text-xs text-muted-foreground"
+                            >
+                                Period
+                            </label>
+                            <Select
+                                name="period"
+                                defaultValue={period}
+                                onValueChange={setSelectedPeriod}
+                            >
+                                <SelectTrigger
+                                    id="dashboard-period"
+                                    className="w-full"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="today">
+                                        Today
+                                    </SelectItem>
+                                    <SelectItem value="week">
+                                        This Week
+                                    </SelectItem>
+                                    <SelectItem value="month">
+                                        This Month
+                                    </SelectItem>
+                                    <SelectItem value="custom">
+                                        Custom Date
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="dashboard-date-from"
+                                className="text-xs text-muted-foreground"
+                            >
+                                From
+                            </label>
+                            <Input
+                                id="dashboard-date-from"
+                                type="date"
+                                name="date_from"
+                                defaultValue={filters.date_from}
+                                disabled={!isCustomPeriod}
+                                aria-label="Date from"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="dashboard-date-to"
+                                className="text-xs text-muted-foreground"
+                            >
+                                To
+                            </label>
+                            <Input
+                                id="dashboard-date-to"
+                                type="date"
+                                name="date_to"
+                                defaultValue={filters.date_to}
+                                disabled={!isCustomPeriod}
+                                aria-label="Date to"
+                            />
+                        </div>
+                        <div className="flex flex-col justify-end">
+                            <Button type="submit" variant="secondary">
+                                Apply period
+                            </Button>
+                        </div>
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                        {PERIOD_HINTS[selectedPeriod] ??
+                            PERIOD_HINTS.custom}
+                    </p>
                 </form>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {criticalMetrics.map((metric) => (
-                        <StatTile
-                            key={metric.label}
-                            label={metric.label}
-                            value={metric.value}
-                            icon={metric.icon}
-                            tone={metric.tone}
-                        />
-                    ))}
-                </div>
+
+                <section className="flex flex-col gap-3">
+                    <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        Pipeline
+                    </h2>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {pipelineMetrics.map((metric) => (
+                            <StatTile
+                                key={metric.label}
+                                label={metric.label}
+                                value={metric.value}
+                                detail={metric.detail}
+                                icon={metric.icon}
+                                tone={metric.tone}
+                            />
+                        ))}
+                    </div>
+                </section>
+
+                <section className="flex flex-col gap-3">
+                    <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        Data health &amp; inbox
+                    </h2>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {healthMetrics.map((metric) => (
+                            <StatTile
+                                key={metric.label}
+                                label={metric.label}
+                                value={metric.value}
+                                detail={metric.detail}
+                                icon={metric.icon}
+                                tone={metric.tone}
+                            />
+                        ))}
+                    </div>
+                </section>
+
                 {productivity.length > 0 && (
                     <Card>
                         <CardHeader>
@@ -184,17 +292,20 @@ export default function Dashboard({
                             <table className="w-full text-sm">
                                 <thead className="bg-muted/60 text-left">
                                     <tr>
+                                        <th className="p-3">Agent</th>
                                         {[
-                                            'Agent',
                                             'Uploaded',
-                                            'Unique',
+                                            'Accepted',
                                             'Duplicate',
                                             'Error',
                                             'Possible',
                                             'Qualified',
                                             'Forwarded',
                                         ].map((label) => (
-                                            <th key={label} className="p-3">
+                                            <th
+                                                key={label}
+                                                className="p-3 text-right"
+                                            >
                                                 {label}
                                             </th>
                                         ))}
@@ -202,29 +313,32 @@ export default function Dashboard({
                                 </thead>
                                 <tbody className="divide-y">
                                     {productivity.map((agent) => (
-                                        <tr key={agent.id}>
+                                        <tr
+                                            key={agent.id}
+                                            className="hover:bg-muted/40"
+                                        >
                                             <td className="p-3 font-medium">
                                                 {agent.name}
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-3 text-right tabular-nums">
                                                 {agent.uploaded ?? 0}
                                             </td>
-                                            <td className="p-3">
-                                                {agent.unique_leads ?? 0}
+                                            <td className="p-3 text-right tabular-nums">
+                                                {agent.accepted ?? 0}
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-3 text-right tabular-nums">
                                                 {agent.duplicates ?? 0}
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-3 text-right tabular-nums">
                                                 {agent.errors ?? 0}
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-3 text-right tabular-nums">
                                                 {agent.possible}
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-3 text-right tabular-nums">
                                                 {agent.qualified}
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-3 text-right tabular-nums">
                                                 {agent.forwarded}
                                             </td>
                                         </tr>
@@ -234,10 +348,18 @@ export default function Dashboard({
                         </CardContent>
                     </Card>
                 )}
+
                 <div className="grid gap-6 xl:grid-cols-2">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex-row items-center justify-between">
                             <CardTitle>Recent leads</CardTitle>
+                            <Link
+                                href={leadsIndex()}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                            >
+                                View all
+                                <ArrowRight className="size-3.5" />
+                            </Link>
                         </CardHeader>
                         <CardContent className="divide-y">
                             {recentLeads.length ? (
@@ -245,10 +367,10 @@ export default function Dashboard({
                                     <Link
                                         key={lead.id}
                                         href={leadEdit(lead.id)}
-                                        className="flex items-center justify-between gap-3 py-3"
+                                        className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-muted/40"
                                     >
-                                        <div>
-                                            <p className="font-medium">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-medium">
                                                 {lead.company_name}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
@@ -268,8 +390,15 @@ export default function Dashboard({
                         </CardContent>
                     </Card>
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex-row items-center justify-between">
                             <CardTitle>Recent uploads</CardTitle>
+                            <Link
+                                href={uploadsIndex()}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                            >
+                                View all
+                                <ArrowRight className="size-3.5" />
+                            </Link>
                         </CardHeader>
                         <CardContent className="divide-y">
                             {recentBatches.length ? (
@@ -277,10 +406,10 @@ export default function Dashboard({
                                     <Link
                                         key={batch.id}
                                         href={uploadShow(batch.id)}
-                                        className="flex items-center justify-between gap-3 py-3"
+                                        className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-muted/40"
                                     >
-                                        <div>
-                                            <p className="font-medium">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-medium">
                                                 {batch.original_filename}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
