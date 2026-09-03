@@ -8,10 +8,28 @@ import {
     TrendingUp,
     UsersRound,
 } from 'lucide-react';
+import {
+    CartesianGrid,
+    Cell,
+    Funnel,
+    FunnelChart,
+    LabelList,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip as RechartsTooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import {
+    Tooltip as UiTooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { index as analyticsIndex } from '@/routes/analytics';
 
 type Distribution = { label: string; value: number };
@@ -41,7 +59,25 @@ type AgentPerformance = {
     replies: number;
     interested: number;
     qualification_rate: number;
+    uploads: number;
+    avg_batch_size: number;
+    duplicate_rate: number;
+    error_rate: number;
 };
+type FunnelStage = {
+    stage: string;
+    count: number;
+    percent_of_total: number;
+    conversion_from_previous: number;
+};
+type QualityTrendPoint = {
+    date: string;
+    label: string;
+    duplicate_rate: number;
+    error_rate: number;
+    location_error_rate: number;
+};
+type HeatmapRow = { day: string; hours: number[] };
 type Props = {
     period: string;
     filters: { date_from: string; date_to: string };
@@ -52,12 +88,27 @@ type Props = {
     countries: Distribution[];
     replyClassifications: Distribution[];
     agentPerformance: AgentPerformance[];
+    funnel: FunnelStage[];
+    funnelExcluded: Distribution[];
+    dataQualityTrend: QualityTrendPoint[];
+    uploadTimingHeatmap: HeatmapRow[];
+    industries: Distribution[];
 };
 
 const prettyLabel = (value: string) =>
     value
         .replaceAll('_', ' ')
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+// Ordinal ramp (single hue, light -> dark) for the funnel's ordered stages.
+// --funnel-1..5 in app.css already swap per theme, same as --color-chart-*.
+const FUNNEL_COLORS = [
+    'var(--color-funnel-1)',
+    'var(--color-funnel-2)',
+    'var(--color-funnel-3)',
+    'var(--color-funnel-4)',
+    'var(--color-funnel-5)',
+];
 
 function Change({ value }: { value: number }) {
     const positive = value >= 0;
@@ -70,6 +121,46 @@ function Change({ value }: { value: number }) {
             <Icon className="size-3.5" />
             {Math.abs(value)}% vs previous period
         </span>
+    );
+}
+
+function ChartTooltip({
+    active,
+    payload,
+    label,
+    formatter,
+}: {
+    active?: boolean;
+    payload?: { name: string; value: number; color: string }[];
+    label?: string;
+    formatter?: (name: string, value: number) => string;
+}) {
+    if (!active || !payload?.length) {
+return null;
+}
+
+    return (
+        <div className="rounded-md border bg-card p-2.5 text-xs shadow-md">
+            <p className="mb-1.5 font-medium">{label}</p>
+            <div className="flex flex-col gap-1">
+                {payload.map((entry) => (
+                    <div key={entry.name} className="flex items-center gap-2">
+                        <i
+                            className="size-2 shrink-0 rounded-full"
+                            style={{ backgroundColor: entry.color }}
+                        />
+                        <span className="text-muted-foreground">
+                            {entry.name}
+                        </span>
+                        <span className="ml-auto font-medium tabular-nums">
+                            {formatter
+                                ? formatter(entry.name, entry.value)
+                                : entry.value}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 
@@ -107,9 +198,10 @@ function Breakdown({
                             </div>
                             <div className="h-2 overflow-hidden rounded-full bg-muted">
                                 <div
-                                    className={`h-full rounded-full ${color}`}
+                                    className="h-full rounded-full"
                                     style={{
                                         width: `${Math.max((item.value / maximum) * 100, 3)}%`,
+                                        backgroundColor: color,
                                     }}
                                 />
                             </div>
@@ -125,6 +217,210 @@ function Breakdown({
     );
 }
 
+function LeadFunnel({
+    stages,
+    excluded,
+}: {
+    stages: FunnelStage[];
+    excluded: Distribution[];
+}) {
+    const data = stages.map((stage, index) => ({
+        name: stage.stage,
+        value: stage.count,
+        label: `${stage.stage} (${stage.count.toLocaleString()})`,
+        percent: stage.percent_of_total,
+        conversion: stage.conversion_from_previous,
+        fill: FUNNEL_COLORS[index] ?? FUNNEL_COLORS.at(-1),
+    }));
+    const excludedTotal = excluded.reduce((sum, item) => sum + item.value, 0);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Lead lifecycle funnel</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                    Leads created in the period, by furthest stage reached.
+                    Snapshot of current status, not a step-by-step timeline.
+                </p>
+            </CardHeader>
+            <CardContent>
+                {data.length ? (
+                    <>
+                        <div className="h-72">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <FunnelChart>
+                                    <RechartsTooltip
+                                        content={({ active, payload }) => {
+                                            if (!active || !payload?.length) {
+return null;
+}
+
+                                            const item = payload[0]
+                                                .payload as (typeof data)[number];
+
+                                            return (
+                                                <div className="rounded-md border bg-card p-2.5 text-xs shadow-md">
+                                                    <p className="font-medium">
+                                                        {item.name}
+                                                    </p>
+                                                    <p className="text-muted-foreground">
+                                                        {item.value.toLocaleString()}{' '}
+                                                        leads ({item.percent}%
+                                                        of total)
+                                                    </p>
+                                                </div>
+                                            );
+                                        }}
+                                    />
+                                    <Funnel dataKey="value" data={data} isAnimationActive={false}>
+                                        {data.map((entry) => (
+                                            <Cell key={entry.name} fill={entry.fill} />
+                                        ))}
+                                        <LabelList
+                                            dataKey="label"
+                                            position="right"
+                                            fill="var(--color-foreground)"
+                                            stroke="none"
+                                            fontSize={12}
+                                        />
+                                    </Funnel>
+                                </FunnelChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-3 border-t pt-4 sm:grid-cols-4">
+                            {stages.slice(1).map((stage) => (
+                                <div key={stage.stage} className="text-xs">
+                                    <p className="text-muted-foreground">
+                                        {stage.stage}
+                                    </p>
+                                    <p className="font-semibold tabular-nums">
+                                        {stage.conversion_from_previous}%{' '}
+                                        <span className="font-normal text-muted-foreground">
+                                            conversion
+                                        </span>
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                        {excludedTotal > 0 && (
+                            <p className="mt-4 text-xs text-muted-foreground">
+                                {excludedTotal.toLocaleString()} leads left the
+                                funnel this period (
+                                {excluded
+                                    .map(
+                                        (item) =>
+                                            `${prettyLabel(item.label)}: ${item.value}`,
+                                    )
+                                    .join(', ')}
+                                ).
+                            </p>
+                        )}
+                    </>
+                ) : (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                        No data for this period.
+                    </p>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+function UploadTimingHeatmap({ data }: { data: HeatmapRow[] }) {
+    const maximum = Math.max(...data.flatMap((row) => row.hours), 1);
+    const bucket = (value: number) => {
+        if (value === 0) {
+return 'var(--color-heat-0)';
+}
+
+        const ratio = value / maximum;
+
+        if (ratio > 0.75) {
+return 'var(--color-heat-4)';
+}
+
+        if (ratio > 0.5) {
+return 'var(--color-heat-3)';
+}
+
+        if (ratio > 0.25) {
+return 'var(--color-heat-2)';
+}
+
+        return 'var(--color-heat-1)';
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Upload timing</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                    When agents submit upload batches, by day and hour
+                    (server time).
+                </p>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+                <div className="min-w-2xl">
+                    <div
+                        className="grid gap-1"
+                        style={{
+                            gridTemplateColumns: '3rem repeat(24, minmax(0, 1fr))',
+                        }}
+                    >
+                        <span />
+                        {Array.from({ length: 24 }, (_, hour) => (
+                            <span
+                                key={hour}
+                                className="text-center text-[10px] text-muted-foreground"
+                            >
+                                {hour % 3 === 0 ? hour : ''}
+                            </span>
+                        ))}
+                        {data.map((row) => (
+                            <div key={row.day} className="contents">
+                                <span className="text-xs text-muted-foreground">
+                                    {row.day}
+                                </span>
+                                {row.hours.map((value, hour) => (
+                                    <UiTooltip key={hour}>
+                                        <TooltipTrigger asChild>
+                                            <div
+                                                className="aspect-square rounded-sm"
+                                                style={{
+                                                    backgroundColor:
+                                                        bucket(value),
+                                                }}
+                                            />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            {row.day} {hour}:00 &mdash;{' '}
+                                            {value} upload
+                                            {value === 1 ? '' : 's'}
+                                        </TooltipContent>
+                                    </UiTooltip>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        Fewer
+                        {['var(--color-heat-0)', 'var(--color-heat-1)', 'var(--color-heat-2)', 'var(--color-heat-3)', 'var(--color-heat-4)'].map(
+                            (color) => (
+                                <span
+                                    key={color}
+                                    className="size-3 rounded-sm border"
+                                    style={{ backgroundColor: color }}
+                                />
+                            ),
+                        )}
+                        More
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function Analytics({
     period,
     filters,
@@ -135,11 +431,12 @@ export default function Analytics({
     countries,
     replyClassifications,
     agentPerformance,
+    funnel,
+    funnelExcluded,
+    dataQualityTrend,
+    uploadTimingHeatmap,
+    industries,
 }: Props) {
-    const maxActivity = Math.max(
-        ...dailyActivity.flatMap((day) => [day.leads, day.replies]),
-        1,
-    );
     const applyFilters = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         router.get(
@@ -154,44 +451,45 @@ export default function Analytics({
             value: summary.total_leads,
             detail: <Change value={summary.lead_change} />,
             icon: UsersRound,
-            color: 'text-cyan-500',
+            color: 'var(--color-chart-1)',
         },
         {
             label: 'Qualified leads',
             value: summary.qualified_leads,
             detail: `${summary.qualification_rate}% qualification rate`,
             icon: Target,
-            color: 'text-emerald-500',
+            color: 'var(--color-chart-3)',
         },
         {
             label: 'Email replies',
             value: summary.replies,
             detail: <Change value={summary.reply_change} />,
             icon: MailCheck,
-            color: 'text-indigo-500',
+            color: 'var(--color-chart-2)',
         },
         {
             label: 'Reply rate',
             value: `${summary.reply_rate}%`,
             detail: `${summary.replied_leads} unique leads replied`,
             icon: BarChart3,
-            color: 'text-sky-500',
+            color: 'var(--color-chart-1)',
         },
         {
             label: 'Interested replies',
             value: summary.interested_replies,
             detail: 'Interested or possible lead',
             icon: TrendingUp,
-            color: 'text-violet-500',
+            color: 'var(--color-chart-3)',
         },
         {
             label: 'Duplicates flagged',
             value: summary.duplicates,
             detail: 'Detected during uploads',
             icon: ShieldAlert,
-            color: 'text-amber-500',
+            color: 'var(--color-chart-4)',
         },
     ];
+    const isAdmin = agentPerformance.length > 0 || funnel.length > 0;
 
     return (
         <>
@@ -257,7 +555,11 @@ export default function Analytics({
                                         </div>
                                     </div>
                                     <div
-                                        className={`flex size-11 shrink-0 items-center justify-center rounded-2xl bg-current/10 ${metric.color}`}
+                                        className="flex size-11 shrink-0 items-center justify-center rounded-2xl"
+                                        style={{
+                                            color: metric.color,
+                                            backgroundColor: `color-mix(in oklab, ${metric.color} 12%, transparent)`,
+                                        }}
                                     >
                                         <Icon className="size-5" />
                                     </div>
@@ -277,48 +579,67 @@ export default function Analytics({
                         </div>
                         <div className="flex gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1.5">
-                                <i className="size-2 rounded-full bg-cyan-500" />
+                                <i
+                                    className="size-2 rounded-full"
+                                    style={{ backgroundColor: 'var(--color-chart-1)' }}
+                                />
                                 Leads
                             </span>
                             <span className="flex items-center gap-1.5">
-                                <i className="size-2 rounded-full bg-violet-500" />
+                                <i
+                                    className="size-2 rounded-full"
+                                    style={{ backgroundColor: 'var(--color-chart-2)' }}
+                                />
                                 Replies
                             </span>
                         </div>
                     </CardHeader>
-                    <CardContent className="overflow-x-auto">
-                        <div
-                            className="grid h-64 min-w-3xl items-end gap-1"
-                            style={{
-                                gridTemplateColumns: `repeat(${dailyActivity.length}, minmax(8px, 1fr))`,
-                            }}
-                        >
-                            {dailyActivity.map((day, index) => (
-                                <div
-                                    key={day.date}
-                                    className="group relative flex h-full items-end justify-center gap-px"
-                                    title={`${day.label}: ${day.leads} leads, ${day.replies} replies`}
-                                >
-                                    <div
-                                        className="w-1/2 min-w-1 rounded-t bg-cyan-500/85 transition-opacity group-hover:opacity-70"
-                                        style={{
-                                            height: `${Math.max((day.leads / maxActivity) * 88, day.leads ? 4 : 0)}%`,
-                                        }}
+                    <CardContent>
+                        <div className="h-64 min-w-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={dailyActivity}>
+                                    <CartesianGrid
+                                        vertical={false}
+                                        stroke="var(--color-border)"
+                                        strokeOpacity={0.6}
                                     />
-                                    <div
-                                        className="w-1/2 min-w-1 rounded-t bg-violet-500/85 transition-opacity group-hover:opacity-70"
-                                        style={{
-                                            height: `${Math.max((day.replies / maxActivity) * 88, day.replies ? 4 : 0)}%`,
-                                        }}
+                                    <XAxis
+                                        dataKey="label"
+                                        tick={{ fontSize: 11 }}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        interval="preserveStartEnd"
+                                        stroke="var(--color-muted-foreground)"
                                     />
-                                    {(dailyActivity.length <= 31 ||
-                                        index % 7 === 0) && (
-                                        <span className="absolute bottom-0 translate-y-5 text-[10px] whitespace-nowrap text-muted-foreground">
-                                            {day.label}
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
+                                    <YAxis
+                                        tick={{ fontSize: 11 }}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        width={32}
+                                        allowDecimals={false}
+                                        stroke="var(--color-muted-foreground)"
+                                    />
+                                    <RechartsTooltip content={<ChartTooltip />} />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="leads"
+                                        name="Leads"
+                                        stroke="var(--color-chart-1)"
+                                        strokeWidth={2}
+                                        dot={false}
+                                        activeDot={{ r: 4 }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="replies"
+                                        name="Replies"
+                                        stroke="var(--color-chart-2)"
+                                        strokeWidth={2}
+                                        dot={false}
+                                        activeDot={{ r: 4 }}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
                         </div>
                     </CardContent>
                 </Card>
@@ -327,24 +648,137 @@ export default function Analytics({
                     <Breakdown
                         title="Lead status"
                         items={leadStatuses}
-                        color="bg-emerald-500"
+                        color="var(--color-chart-3)"
                     />
                     <Breakdown
                         title="Reply classification"
                         items={replyClassifications}
-                        color="bg-violet-500"
+                        color="var(--color-chart-5)"
                     />
                     <Breakdown
                         title="Lead sources"
                         items={sources}
-                        color="bg-cyan-500"
+                        color="var(--color-chart-1)"
                     />
                     <Breakdown
                         title="Top countries"
                         items={countries}
-                        color="bg-indigo-500"
+                        color="var(--color-chart-2)"
                     />
                 </div>
+
+                {isAdmin && (
+                    <>
+                        <div className="grid gap-6 xl:grid-cols-2">
+                            <LeadFunnel stages={funnel} excluded={funnelExcluded} />
+                            <Breakdown
+                                title="Industries"
+                                items={industries}
+                                color="var(--color-chart-4)"
+                            />
+                        </div>
+
+                        <Card>
+                            <CardHeader className="flex-row items-center justify-between">
+                                <div className="flex flex-col gap-1">
+                                    <CardTitle>Data quality trend</CardTitle>
+                                    <p className="text-sm text-muted-foreground">
+                                        Share of uploaded rows flagged as
+                                        duplicate, rejected, or location errors
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1.5">
+                                        <i
+                                            className="size-2 rounded-full"
+                                            style={{ backgroundColor: 'var(--color-chart-1)' }}
+                                        />
+                                        Duplicate rate
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <i
+                                            className="size-2 rounded-full"
+                                            style={{ backgroundColor: 'var(--color-chart-2)' }}
+                                        />
+                                        Error rate
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <i
+                                            className="size-2 rounded-full"
+                                            style={{ backgroundColor: 'var(--color-chart-3)' }}
+                                        />
+                                        Location error rate
+                                    </span>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-64 min-w-0">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={dataQualityTrend}>
+                                            <CartesianGrid
+                                                vertical={false}
+                                                stroke="var(--color-border)"
+                                                strokeOpacity={0.6}
+                                            />
+                                            <XAxis
+                                                dataKey="label"
+                                                tick={{ fontSize: 11 }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                interval="preserveStartEnd"
+                                                stroke="var(--color-muted-foreground)"
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 11 }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                width={40}
+                                                unit="%"
+                                                stroke="var(--color-muted-foreground)"
+                                            />
+                                            <RechartsTooltip
+                                                content={
+                                                    <ChartTooltip
+                                                        formatter={(_, value) => `${value}%`}
+                                                    />
+                                                }
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="duplicate_rate"
+                                                name="Duplicate rate"
+                                                stroke="var(--color-chart-1)"
+                                                strokeWidth={2}
+                                                dot={false}
+                                                activeDot={{ r: 4 }}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="error_rate"
+                                                name="Error rate"
+                                                stroke="var(--color-chart-2)"
+                                                strokeWidth={2}
+                                                dot={false}
+                                                activeDot={{ r: 4 }}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="location_error_rate"
+                                                name="Location error rate"
+                                                stroke="var(--color-chart-3)"
+                                                strokeWidth={2}
+                                                dot={false}
+                                                activeDot={{ r: 4 }}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <UploadTimingHeatmap data={uploadTimingHeatmap} />
+                    </>
+                )}
 
                 {agentPerformance.length > 0 && (
                     <Card>
@@ -362,6 +796,10 @@ export default function Analytics({
                                             'Qualification rate',
                                             'Replies',
                                             'Interested',
+                                            'Uploads',
+                                            'Avg batch size',
+                                            'Duplicate rate',
+                                            'Error rate',
                                         ].map((heading) => (
                                             <th
                                                 key={heading}
@@ -395,6 +833,18 @@ export default function Analytics({
                                             </td>
                                             <td className="px-5 py-3 tabular-nums">
                                                 {agent.interested}
+                                            </td>
+                                            <td className="px-5 py-3 tabular-nums">
+                                                {agent.uploads}
+                                            </td>
+                                            <td className="px-5 py-3 tabular-nums">
+                                                {agent.avg_batch_size}
+                                            </td>
+                                            <td className="px-5 py-3 tabular-nums">
+                                                {agent.duplicate_rate}%
+                                            </td>
+                                            <td className="px-5 py-3 tabular-nums">
+                                                {agent.error_rate}%
                                             </td>
                                         </tr>
                                     ))}
