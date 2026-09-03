@@ -1,7 +1,17 @@
 import { Head } from '@inertiajs/react';
+import { History } from 'lucide-react';
+import { EmptyState } from '@/components/empty-state';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { index } from '@/routes/audit-logs';
 
 const SENSITIVE_ACTION_PATTERN = /delete|disconnect|stop|cancel|reject/i;
@@ -48,69 +58,68 @@ export default function AuditLogIndex({
                     title="Audit logs"
                     description="Review sensitive administrative actions across LeadGen Central."
                 />
-                <div className="overflow-hidden rounded-xl border bg-card">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-muted/60 text-left">
-                                <tr>
-                                    <th className="p-3">Date</th>
-                                    <th className="p-3">Administrator</th>
-                                    <th className="p-3">Action</th>
-                                    <th className="p-3">Details</th>
-                                    <th className="p-3">IP address</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {logs.data.map((log) => (
-                                    <tr key={log.id}>
-                                        <td className="p-3 whitespace-nowrap text-muted-foreground">
-                                            {new Date(
-                                                log.created_at,
-                                            ).toLocaleString()}
-                                        </td>
-                                        <td className="p-3">
-                                            <p className="font-medium">
-                                                {log.user?.name ??
-                                                    'Deleted user'}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {log.user?.email ?? '—'}
-                                            </p>
-                                        </td>
-                                        <td className="p-3">
-                                            <StatusBadge
-                                                value={log.action.replaceAll(
-                                                    '.',
-                                                    ' ',
-                                                )}
-                                                colorClass={actionColorClass(
-                                                    log.action,
-                                                )}
-                                            />
-                                        </td>
-                                        <td className="p-3">
-                                            <p>{log.description}</p>
-                                            {log.metadata?.batch_code && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    Batch:{' '}
-                                                    {log.metadata.batch_code}
-                                                </p>
+                {logs.data.length ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead>Date</TableHead>
+                                <TableHead>Administrator</TableHead>
+                                <TableHead>Action</TableHead>
+                                <TableHead>Details</TableHead>
+                                <TableHead>IP address</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {logs.data.map((log) => (
+                                <TableRow key={log.id}>
+                                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                                        {new Date(
+                                            log.created_at,
+                                        ).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell>
+                                        <p className="font-medium">
+                                            {log.user?.name ?? 'Deleted user'}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {log.user?.email ?? '—'}
+                                        </p>
+                                    </TableCell>
+                                    <TableCell>
+                                        <StatusBadge
+                                            value={log.action.replaceAll(
+                                                '.',
+                                                ' ',
                                             )}
-                                        </td>
-                                        <td className="p-3 font-mono text-xs text-muted-foreground">
-                                            {log.ip_address ?? '—'}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {!logs.data.length && (
-                            <p className="p-12 text-center text-muted-foreground">
-                                No audit activity recorded yet.
-                            </p>
-                        )}
+                                            colorClass={actionColorClass(
+                                                log.action,
+                                            )}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <p>{log.description}</p>
+                                        {log.metadata?.batch_code && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Batch: {log.metadata.batch_code}
+                                            </p>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="font-mono text-xs text-muted-foreground">
+                                        {log.ip_address ?? '—'}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <div className="rounded-xl border bg-card">
+                        <EmptyState
+                            icon={History}
+                            title="No audit activity recorded yet"
+                            description="Sensitive administrative actions will appear here as they happen."
+                        />
                     </div>
-                </div>
+                )}
                 <Pagination links={logs.links} />
             </div>
         </>

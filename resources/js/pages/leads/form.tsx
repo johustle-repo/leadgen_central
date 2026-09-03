@@ -1,8 +1,17 @@
 import { Form, Head } from '@inertiajs/react';
+import { FileText, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import InputError from '@/components/input-error';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -125,115 +134,155 @@ export default function LeadForm({
                     {({ errors, processing }) => (
                         <>
                             {agents.length > 0 && (
-                                <section className="rounded-xl border bg-card p-5">
-                                    <Label htmlFor="agent_id">Lead owner</Label>
-                                    <Select
-                                        name="agent_id"
-                                        defaultValue={String(
-                                            lead?.agent_id ??
-                                                defaults.agent_id ??
-                                                agents[0]?.id,
-                                        )}
-                                    >
-                                        <SelectTrigger
-                                            id="agent_id"
-                                            className="mt-2 w-full"
-                                        >
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {agents.map((agent) => (
-                                                <SelectItem
-                                                    key={agent.id}
-                                                    value={String(agent.id)}
-                                                >
-                                                    {agent.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </section>
-                            )}
-                            <section className="rounded-xl border bg-card p-5">
-                                <h2 className="mb-4 font-semibold">
-                                    Raw lead details
-                                </h2>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    {fields.map((field) => {
-                                        const value = String(
-                                            lead?.[field.name] ??
-                                                defaults[field.name] ??
-                                                '',
-                                        );
-
-                                        return (
-                                            <div
-                                                key={field.name}
-                                                className={
-                                                    field.name === 'source_url'
-                                                        ? 'md:col-span-2'
-                                                        : ''
-                                                }
-                                            >
-                                                <Label htmlFor={field.name}>
-                                                    {field.label}
-                                                    {field.required ? ' *' : ''}
-                                                </Label>
-                                                {field.name ===
-                                                'data_source' ? (
-                                                    <DataSourceSelect
-                                                        id={field.name}
-                                                        name={field.name}
-                                                        defaultValue={value}
-                                                    />
-                                                ) : (
-                                                    <Input
-                                                        id={field.name}
-                                                        name={field.name}
-                                                        type={
-                                                            field.type ?? 'text'
-                                                        }
-                                                        defaultValue={
-                                                            field.type ===
-                                                            'date'
-                                                                ? value.slice(
-                                                                      0,
-                                                                      10,
-                                                                  )
-                                                                : value
-                                                        }
-                                                        required={
-                                                            field.required
-                                                        }
-                                                        maxLength={
-                                                            field.maxLength
-                                                        }
-                                                        onBlur={
-                                                            field.name ===
-                                                            'contact_person'
-                                                                ? (event) => {
-                                                                      event.currentTarget.value =
-                                                                          titleCaseName(
-                                                                              event
-                                                                                  .currentTarget
-                                                                                  .value,
-                                                                          );
-                                                                  }
-                                                                : undefined
-                                                        }
-                                                        className="mt-2"
-                                                    />
-                                                )}
-                                                {errors[field.name] && (
-                                                    <p className="mt-1 text-sm text-destructive">
-                                                        {errors[field.name]}
-                                                    </p>
-                                                )}
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex items-center gap-3">
+                                            <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                                <UserRound className="size-5" />
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </section>
+                                            <div>
+                                                <CardTitle>
+                                                    Lead owner
+                                                </CardTitle>
+                                                <CardDescription>
+                                                    Choose which agent this lead
+                                                    belongs to.
+                                                </CardDescription>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Label htmlFor="agent_id">Agent</Label>
+                                        <Select
+                                            name="agent_id"
+                                            defaultValue={String(
+                                                lead?.agent_id ??
+                                                    defaults.agent_id ??
+                                                    agents[0]?.id,
+                                            )}
+                                        >
+                                            <SelectTrigger
+                                                id="agent_id"
+                                                className="mt-2 w-full"
+                                            >
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {agents.map((agent) => (
+                                                    <SelectItem
+                                                        key={agent.id}
+                                                        value={String(agent.id)}
+                                                    >
+                                                        {agent.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </CardContent>
+                                </Card>
+                            )}
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                            <FileText className="size-5" />
+                                        </div>
+                                        <div>
+                                            <CardTitle>
+                                                Raw lead details
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Match the fields from the raw
+                                                lead source.
+                                            </CardDescription>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {fields.map((field) => {
+                                            const value = String(
+                                                lead?.[field.name] ??
+                                                    defaults[field.name] ??
+                                                    '',
+                                            );
+
+                                            return (
+                                                <div
+                                                    key={field.name}
+                                                    className={
+                                                        field.name ===
+                                                        'source_url'
+                                                            ? 'md:col-span-2'
+                                                            : ''
+                                                    }
+                                                >
+                                                    <Label htmlFor={field.name}>
+                                                        {field.label}
+                                                        {field.required
+                                                            ? ' *'
+                                                            : ''}
+                                                    </Label>
+                                                    {field.name ===
+                                                    'data_source' ? (
+                                                        <DataSourceSelect
+                                                            id={field.name}
+                                                            name={field.name}
+                                                            defaultValue={value}
+                                                        />
+                                                    ) : (
+                                                        <Input
+                                                            id={field.name}
+                                                            name={field.name}
+                                                            type={
+                                                                field.type ??
+                                                                'text'
+                                                            }
+                                                            defaultValue={
+                                                                field.type ===
+                                                                'date'
+                                                                    ? value.slice(
+                                                                          0,
+                                                                          10,
+                                                                      )
+                                                                    : value
+                                                            }
+                                                            required={
+                                                                field.required
+                                                            }
+                                                            maxLength={
+                                                                field.maxLength
+                                                            }
+                                                            onBlur={
+                                                                field.name ===
+                                                                'contact_person'
+                                                                    ? (
+                                                                          event,
+                                                                      ) => {
+                                                                          event.currentTarget.value =
+                                                                              titleCaseName(
+                                                                                  event
+                                                                                      .currentTarget
+                                                                                      .value,
+                                                                              );
+                                                                      }
+                                                                    : undefined
+                                                            }
+                                                            className="mt-2"
+                                                        />
+                                                    )}
+                                                    <InputError
+                                                        className="mt-1"
+                                                        message={
+                                                            errors[field.name]
+                                                        }
+                                                    />
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </CardContent>
+                            </Card>
                             <div className="flex justify-end gap-3">
                                 <Button
                                     type="button"

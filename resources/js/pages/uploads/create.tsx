@@ -1,8 +1,16 @@
 import { Head, useForm } from '@inertiajs/react';
 import { UploadCloud } from 'lucide-react';
 import { useState } from 'react';
+import InputError from '@/components/input-error';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -47,93 +55,111 @@ export default function UploadCreate({
                         event.preventDefault();
                         setConfirmationOpen(true);
                     }}
-                    className="rounded-xl border bg-card p-6"
                 >
-                    <div className="flex flex-col gap-5">
-                        <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-12 text-center focus-within:ring-2 focus-within:ring-ring hover:bg-muted/40">
-                            <UploadCloud className="size-10 text-primary" />
-                            <span className="font-medium">
-                                Choose raw CSV files
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                                Select up to {maximumFiles} CSV or TXT files
-                            </span>
-                            <input
-                                type="file"
-                                accept=".csv,text/csv"
-                                multiple
-                                required
-                                className="sr-only"
-                                onChange={(event) => {
-                                    const files = Array.from(
-                                        event.target.files ?? [],
-                                    );
-
-                                    upload.setData(
-                                        'files',
-                                        files.slice(0, maximumFiles),
-                                    );
-
-                                    if (files.length > maximumFiles) {
-                                        upload.setError(
-                                            'files',
-                                            `Select no more than ${maximumFiles} files.`,
-                                        );
-                                    } else {
-                                        upload.clearErrors('files');
-                                    }
-                                }}
-                            />
-                            <span className="inline-flex min-w-36 items-center justify-center rounded-md border bg-background px-4 py-2 text-sm font-medium shadow-xs hover:bg-muted">
-                                Choose files
-                            </span>
-                            <span
-                                className={
-                                    selectedFileCount > 0
-                                        ? 'rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary'
-                                        : 'text-sm text-muted-foreground'
-                                }
-                            >
-                                {selectedFileCount > 0 ? (
-                                    <>
-                                        {selectedFileCount}{' '}
-                                        {selectedFileCount === 1
-                                            ? 'file selected'
-                                            : 'files selected'}
-                                    </>
-                                ) : (
-                                    'No files selected'
-                                )}
-                            </span>
-                        </label>
-                        {Object.values(upload.errors)[0] && (
-                            <p className="text-sm text-destructive">
-                                {Object.values(upload.errors)[0]}
-                            </p>
-                        )}
-                        {upload.progress && (
-                            <div className="h-2 overflow-hidden rounded-full bg-muted">
-                                <div
-                                    className="h-full bg-primary"
-                                    style={{
-                                        width: `${upload.progress.percentage}%`,
-                                    }}
-                                />
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                    <UploadCloud className="size-5" />
+                                </div>
+                                <div>
+                                    <CardTitle>Raw CSV files</CardTitle>
+                                    <CardDescription>
+                                        A single file goes to column mapping
+                                        review; multiple files are cleaned
+                                        together.
+                                    </CardDescription>
+                                </div>
                             </div>
-                        )}
-                        <Button
-                            type="submit"
-                            disabled={
-                                upload.processing || selectedFileCount === 0
-                            }
-                        >
-                            {upload.processing
-                                ? 'Uploading…'
-                                : selectedFileCount > 1
-                                  ? `Upload and clean ${selectedFileCount} files`
-                                  : 'Review column mapping'}
-                        </Button>
-                    </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-col gap-5">
+                                <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-12 text-center focus-within:ring-2 focus-within:ring-ring hover:bg-muted/40">
+                                    <UploadCloud className="size-10 text-primary" />
+                                    <span className="font-medium">
+                                        Choose raw CSV files
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">
+                                        Select up to {maximumFiles} CSV or TXT
+                                        files
+                                    </span>
+                                    <input
+                                        type="file"
+                                        accept=".csv,text/csv"
+                                        multiple
+                                        required
+                                        className="sr-only"
+                                        onChange={(event) => {
+                                            const files = Array.from(
+                                                event.target.files ?? [],
+                                            );
+
+                                            upload.setData(
+                                                'files',
+                                                files.slice(0, maximumFiles),
+                                            );
+
+                                            if (files.length > maximumFiles) {
+                                                upload.setError(
+                                                    'files',
+                                                    `Select no more than ${maximumFiles} files.`,
+                                                );
+                                            } else {
+                                                upload.clearErrors('files');
+                                            }
+                                        }}
+                                    />
+                                    <span className="inline-flex min-w-36 items-center justify-center rounded-md border bg-background px-4 py-2 text-sm font-medium shadow-xs hover:bg-muted">
+                                        Choose files
+                                    </span>
+                                    <span
+                                        className={
+                                            selectedFileCount > 0
+                                                ? 'rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary'
+                                                : 'text-sm text-muted-foreground'
+                                        }
+                                    >
+                                        {selectedFileCount > 0 ? (
+                                            <>
+                                                {selectedFileCount}{' '}
+                                                {selectedFileCount === 1
+                                                    ? 'file selected'
+                                                    : 'files selected'}
+                                            </>
+                                        ) : (
+                                            'No files selected'
+                                        )}
+                                    </span>
+                                </label>
+                                <InputError
+                                    message={Object.values(upload.errors)[0]}
+                                />
+                                {upload.progress && (
+                                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                        <div
+                                            className="h-full bg-primary"
+                                            style={{
+                                                width: `${upload.progress.percentage}%`,
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        upload.processing ||
+                                        selectedFileCount === 0
+                                    }
+                                >
+                                    {upload.processing
+                                        ? 'Uploading…'
+                                        : selectedFileCount > 1
+                                          ? `Upload and clean ${selectedFileCount} files`
+                                          : 'Review column mapping'}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </form>
             </div>
 

@@ -3,6 +3,7 @@ import {
     BarChart3,
     MailCheck,
     ShieldAlert,
+    SlidersHorizontal,
     Target,
     TrendingDown,
     TrendingUp,
@@ -21,7 +22,10 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
 import { PageHeader } from '@/components/page-header';
+import { StatTile } from '@/components/stat-tile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -143,8 +147,8 @@ function ChartTooltip({
     formatter?: (name: string, value: number) => string;
 }) {
     if (!active || !payload?.length) {
-return null;
-}
+        return null;
+    }
 
     return (
         <div className="rounded-md border bg-card p-2.5 text-xs shadow-md">
@@ -215,9 +219,10 @@ function Breakdown({
                         </div>
                     ))
                 ) : (
-                    <p className="py-8 text-center text-sm text-muted-foreground">
-                        No data for this period.
-                    </p>
+                    <EmptyState
+                        icon={BarChart3}
+                        title="No data for this period"
+                    />
                 )}
             </CardContent>
         </Card>
@@ -259,8 +264,8 @@ function LeadFunnel({
                                     <RechartsTooltip
                                         content={({ active, payload }) => {
                                             if (!active || !payload?.length) {
-return null;
-}
+                                                return null;
+                                            }
 
                                             const item = payload[0]
                                                 .payload as (typeof data)[number];
@@ -279,9 +284,16 @@ return null;
                                             );
                                         }}
                                     />
-                                    <Funnel dataKey="value" data={data} isAnimationActive={false}>
+                                    <Funnel
+                                        dataKey="value"
+                                        data={data}
+                                        isAnimationActive={false}
+                                    >
                                         {data.map((entry) => (
-                                            <Cell key={entry.name} fill={entry.fill} />
+                                            <Cell
+                                                key={entry.name}
+                                                fill={entry.fill}
+                                            />
                                         ))}
                                         <LabelList
                                             dataKey="label"
@@ -324,9 +336,10 @@ return null;
                         )}
                     </>
                 ) : (
-                    <p className="py-8 text-center text-sm text-muted-foreground">
-                        No data for this period.
-                    </p>
+                    <EmptyState
+                        icon={BarChart3}
+                        title="No data for this period"
+                    />
                 )}
             </CardContent>
         </Card>
@@ -337,22 +350,22 @@ function UploadTimingHeatmap({ data }: { data: HeatmapRow[] }) {
     const maximum = Math.max(...data.flatMap((row) => row.hours), 1);
     const bucket = (value: number) => {
         if (value === 0) {
-return 'var(--color-heat-0)';
-}
+            return 'var(--color-heat-0)';
+        }
 
         const ratio = value / maximum;
 
         if (ratio > 0.75) {
-return 'var(--color-heat-4)';
-}
+            return 'var(--color-heat-4)';
+        }
 
         if (ratio > 0.5) {
-return 'var(--color-heat-3)';
-}
+            return 'var(--color-heat-3)';
+        }
 
         if (ratio > 0.25) {
-return 'var(--color-heat-2)';
-}
+            return 'var(--color-heat-2)';
+        }
 
         return 'var(--color-heat-1)';
     };
@@ -362,8 +375,8 @@ return 'var(--color-heat-2)';
             <CardHeader>
                 <CardTitle>Upload timing</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                    When agents submit upload batches, by day and hour
-                    (server time).
+                    When agents submit upload batches, by day and hour (server
+                    time).
                 </p>
             </CardHeader>
             <CardContent className="overflow-x-auto">
@@ -371,7 +384,8 @@ return 'var(--color-heat-2)';
                     <div
                         className="grid gap-1"
                         style={{
-                            gridTemplateColumns: '3rem repeat(24, minmax(0, 1fr))',
+                            gridTemplateColumns:
+                                '3rem repeat(24, minmax(0, 1fr))',
                         }}
                     >
                         <span />
@@ -400,8 +414,8 @@ return 'var(--color-heat-2)';
                                             />
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                            {row.day} {hour}:00 &mdash;{' '}
-                                            {value} upload
+                                            {row.day} {hour}:00 &mdash; {value}{' '}
+                                            upload
                                             {value === 1 ? '' : 's'}
                                         </TooltipContent>
                                     </UiTooltip>
@@ -411,15 +425,19 @@ return 'var(--color-heat-2)';
                     </div>
                     <div className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
                         Fewer
-                        {['var(--color-heat-0)', 'var(--color-heat-1)', 'var(--color-heat-2)', 'var(--color-heat-3)', 'var(--color-heat-4)'].map(
-                            (color) => (
-                                <span
-                                    key={color}
-                                    className="size-3 rounded-sm border"
-                                    style={{ backgroundColor: color }}
-                                />
-                            ),
-                        )}
+                        {[
+                            'var(--color-heat-0)',
+                            'var(--color-heat-1)',
+                            'var(--color-heat-2)',
+                            'var(--color-heat-3)',
+                            'var(--color-heat-4)',
+                        ].map((color) => (
+                            <span
+                                key={color}
+                                className="size-3 rounded-sm border"
+                                style={{ backgroundColor: color }}
+                            />
+                        ))}
                         More
                     </div>
                 </div>
@@ -458,45 +476,49 @@ export default function Analytics({
             value: summary.total_leads,
             detail: <Change value={summary.lead_change} />,
             icon: UsersRound,
-            color: 'var(--color-chart-1)',
+            tone: 'text-chart-1',
         },
         {
             label: 'Qualified leads',
             value: summary.qualified_leads,
             detail: `${summary.qualification_rate}% qualification rate`,
             icon: Target,
-            color: 'var(--color-chart-3)',
+            tone: 'text-chart-3',
         },
         {
             label: 'Email replies',
             value: summary.replies,
             detail: <Change value={summary.reply_change} />,
             icon: MailCheck,
-            color: 'var(--color-chart-2)',
+            tone: 'text-chart-2',
         },
         {
             label: 'Reply rate',
             value: `${summary.reply_rate}%`,
             detail: `${summary.replied_leads} unique leads replied`,
             icon: BarChart3,
-            color: 'var(--color-chart-1)',
+            tone: 'text-chart-1',
         },
         {
             label: 'Interested replies',
             value: summary.interested_replies,
             detail: 'Interested or possible lead',
             icon: TrendingUp,
-            color: 'var(--color-chart-3)',
+            tone: 'text-chart-3',
         },
         {
             label: 'Duplicates flagged',
             value: summary.duplicates,
             detail: 'Detected during uploads',
             icon: ShieldAlert,
-            color: 'var(--color-chart-4)',
+            tone: 'text-chart-4',
         },
     ];
     const isAdmin = agentPerformance.length > 0 || funnel.length > 0;
+    const periodHint =
+        period === 'custom'
+            ? 'Showing the custom date range below.'
+            : `Showing the last ${period.replace('_days', '')} days.`;
 
     return (
         <>
@@ -507,82 +529,90 @@ export default function Analytics({
                     description="Measure lead quality, reply outcomes, and team performance over time."
                 />
 
-                <form
+                <FilterBar
+                    as="form"
                     onSubmit={applyFilters}
-                    className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-[minmax(180px,0.8fr)_1fr_1fr_auto]"
+                    icon={SlidersHorizontal}
+                    label="Reporting period"
+                    gridClassName="md:grid-cols-[minmax(180px,0.8fr)_1fr_1fr_auto]"
+                    hint={periodHint}
                 >
-                    <Select name="period" defaultValue={period}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="7_days">
-                                Last 7 days
-                            </SelectItem>
-                            <SelectItem value="30_days">
-                                Last 30 days
-                            </SelectItem>
-                            <SelectItem value="90_days">
-                                Last 90 days
-                            </SelectItem>
-                            <SelectItem value="custom">
-                                Custom range
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Input
-                        type="date"
-                        name="date_from"
-                        defaultValue={filters.date_from}
-                        aria-label="Analytics start date"
-                    />
-                    <Input
-                        type="date"
-                        name="date_to"
-                        defaultValue={filters.date_to}
-                        aria-label="Analytics end date"
-                    />
-                    <Button type="submit" variant="secondary">
-                        Update analytics
-                    </Button>
-                </form>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="analytics-period"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Period
+                        </label>
+                        <Select name="period" defaultValue={period}>
+                            <SelectTrigger
+                                id="analytics-period"
+                                className="w-full"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="7_days">
+                                    Last 7 days
+                                </SelectItem>
+                                <SelectItem value="30_days">
+                                    Last 30 days
+                                </SelectItem>
+                                <SelectItem value="90_days">
+                                    Last 90 days
+                                </SelectItem>
+                                <SelectItem value="custom">
+                                    Custom range
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="analytics-date-from"
+                            className="text-xs text-muted-foreground"
+                        >
+                            From
+                        </label>
+                        <Input
+                            id="analytics-date-from"
+                            type="date"
+                            name="date_from"
+                            defaultValue={filters.date_from}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="analytics-date-to"
+                            className="text-xs text-muted-foreground"
+                        >
+                            To
+                        </label>
+                        <Input
+                            id="analytics-date-to"
+                            type="date"
+                            name="date_to"
+                            defaultValue={filters.date_to}
+                        />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                        <Button type="submit" variant="secondary">
+                            Update analytics
+                        </Button>
+                    </div>
+                </FilterBar>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {metrics.map((metric) => {
-                        const Icon = metric.icon;
-
-                        return (
-                            <Card
-                                key={metric.label}
-                                className="overflow-hidden"
-                            >
-                                <CardContent className="flex items-start justify-between gap-4 p-5">
-                                    <div className="flex min-w-0 flex-col gap-1">
-                                        <p className="text-sm text-muted-foreground">
-                                            {metric.label}
-                                        </p>
-                                        <p className="text-3xl font-bold tracking-tight tabular-nums">
-                                            {typeof metric.value === 'number'
-                                                ? metric.value.toLocaleString()
-                                                : metric.value}
-                                        </p>
-                                        <div className="text-xs text-muted-foreground">
-                                            {metric.detail}
-                                        </div>
-                                    </div>
-                                    <div
-                                        className="flex size-11 shrink-0 items-center justify-center rounded-2xl"
-                                        style={{
-                                            color: metric.color,
-                                            backgroundColor: `color-mix(in oklab, ${metric.color} 12%, transparent)`,
-                                        }}
-                                    >
-                                        <Icon className="size-5" />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
+                    {metrics.map((metric) => (
+                        <StatTile
+                            key={metric.label}
+                            label={metric.label}
+                            value={metric.value}
+                            detail={metric.detail}
+                            icon={metric.icon}
+                            tone={metric.tone}
+                        />
+                    ))}
                 </div>
 
                 <Card>
@@ -597,14 +627,18 @@ export default function Analytics({
                             <span className="flex items-center gap-1.5">
                                 <i
                                     className="size-2 rounded-full"
-                                    style={{ backgroundColor: 'var(--color-chart-1)' }}
+                                    style={{
+                                        backgroundColor: 'var(--color-chart-1)',
+                                    }}
                                 />
                                 Leads
                             </span>
                             <span className="flex items-center gap-1.5">
                                 <i
                                     className="size-2 rounded-full"
-                                    style={{ backgroundColor: 'var(--color-chart-2)' }}
+                                    style={{
+                                        backgroundColor: 'var(--color-chart-2)',
+                                    }}
                                 />
                                 Replies
                             </span>
@@ -635,7 +669,9 @@ export default function Analytics({
                                         allowDecimals={false}
                                         stroke="var(--color-muted-foreground)"
                                     />
-                                    <RechartsTooltip content={<ChartTooltip />} />
+                                    <RechartsTooltip
+                                        content={<ChartTooltip />}
+                                    />
                                     <Line
                                         type="monotone"
                                         dataKey="leads"
@@ -686,7 +722,10 @@ export default function Analytics({
                 {isAdmin && (
                     <>
                         <div className="grid gap-6 xl:grid-cols-2">
-                            <LeadFunnel stages={funnel} excluded={funnelExcluded} />
+                            <LeadFunnel
+                                stages={funnel}
+                                excluded={funnelExcluded}
+                            />
                             <Breakdown
                                 title="Industries"
                                 items={industries}
@@ -707,21 +746,30 @@ export default function Analytics({
                                     <span className="flex items-center gap-1.5">
                                         <i
                                             className="size-2 rounded-full"
-                                            style={{ backgroundColor: 'var(--color-chart-1)' }}
+                                            style={{
+                                                backgroundColor:
+                                                    'var(--color-chart-1)',
+                                            }}
                                         />
                                         Duplicate rate
                                     </span>
                                     <span className="flex items-center gap-1.5">
                                         <i
                                             className="size-2 rounded-full"
-                                            style={{ backgroundColor: 'var(--color-chart-2)' }}
+                                            style={{
+                                                backgroundColor:
+                                                    'var(--color-chart-2)',
+                                            }}
                                         />
                                         Error rate
                                     </span>
                                     <span className="flex items-center gap-1.5">
                                         <i
                                             className="size-2 rounded-full"
-                                            style={{ backgroundColor: 'var(--color-chart-3)' }}
+                                            style={{
+                                                backgroundColor:
+                                                    'var(--color-chart-3)',
+                                            }}
                                         />
                                         Location error rate
                                     </span>
@@ -729,7 +777,10 @@ export default function Analytics({
                             </CardHeader>
                             <CardContent>
                                 <div className="h-64 min-w-0">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
                                         <LineChart data={dataQualityTrend}>
                                             <CartesianGrid
                                                 vertical={false}
@@ -755,7 +806,9 @@ export default function Analytics({
                                             <RechartsTooltip
                                                 content={
                                                     <ChartTooltip
-                                                        formatter={(_, value) => `${value}%`}
+                                                        formatter={(_, value) =>
+                                                            `${value}%`
+                                                        }
                                                     />
                                                 }
                                             />

@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react';
 import { Button } from '@/components/ui/button';
 
 /**
- * Shared "status filter tabs" used across Upload History and Verification.
+ * Shared "status filter tabs" row, currently used by Verification.
  */
 export function FilterTabs({
     tabs,

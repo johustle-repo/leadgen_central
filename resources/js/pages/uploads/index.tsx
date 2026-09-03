@@ -1,6 +1,8 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
-import { RotateCcw, Trash2, Upload } from 'lucide-react';
+import { RotateCcw, SlidersHorizontal, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
+import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
@@ -22,6 +24,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import {
     bulkDestroy,
     create,
@@ -201,16 +211,26 @@ export default function UploadIndex({
                         </div>
                     }
                 />
-                <div className="flex flex-wrap items-center justify-end gap-3">
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>Show</span>
+                <FilterBar
+                    as="div"
+                    icon={SlidersHorizontal}
+                    label="Filters"
+                    gridClassName="sm:grid-cols-3"
+                >
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="uploads-per-page"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Show
+                        </label>
                         <Select
                             value={filters.per_page}
                             onValueChange={(value) =>
                                 updateQuery({ per_page: value })
                             }
                         >
-                            <SelectTrigger aria-label="Uploads per page">
+                            <SelectTrigger id="uploads-per-page">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -222,10 +242,15 @@ export default function UploadIndex({
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                    </label>
+                    </div>
                     {agents.length > 0 && (
-                        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>Agent</span>
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="uploads-agent"
+                                className="text-xs text-muted-foreground"
+                            >
+                                Agent
+                            </label>
                             <Select
                                 value={filters.agent_id || ALL_AGENTS}
                                 onValueChange={(value) =>
@@ -235,7 +260,7 @@ export default function UploadIndex({
                                     })
                                 }
                             >
-                                <SelectTrigger aria-label="Filter by agent">
+                                <SelectTrigger id="uploads-agent">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -252,17 +277,22 @@ export default function UploadIndex({
                                     ))}
                                 </SelectContent>
                             </Select>
-                        </label>
+                        </div>
                     )}
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>Sort by</span>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="uploads-sort"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Sort by
+                        </label>
                         <Select
                             value={sort}
                             onValueChange={(value) =>
                                 updateQuery({ sort: value })
                             }
                         >
-                            <SelectTrigger aria-label="Sort upload history">
+                            <SelectTrigger id="uploads-sort">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -287,8 +317,8 @@ export default function UploadIndex({
                                 <SelectItem value="status">Status</SelectItem>
                             </SelectContent>
                         </Select>
-                    </label>
-                </div>
+                    </div>
+                </FilterBar>
                 {isAdministrator && canSelectAllMatching && (
                     <div className="flex items-center justify-between rounded-lg border border-info/20 bg-info/5 px-4 py-2.5 text-sm">
                         <span>
@@ -318,152 +348,215 @@ export default function UploadIndex({
                         </button>
                     </div>
                 )}
-                <div className="overflow-hidden rounded-xl border bg-card">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-muted/60 text-left">
-                                <tr>
+                {batches.data.length ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                                {isAdministrator && (
+                                    <TableHead className="w-12">
+                                        <Checkbox
+                                            checked={
+                                                allDeletableBatchesSelected ||
+                                                selectAllMatching
+                                            }
+                                            onCheckedChange={(checked) =>
+                                                toggleAllBatches(
+                                                    checked === true,
+                                                )
+                                            }
+                                            disabled={
+                                                deletableBatchIds.length === 0
+                                            }
+                                            aria-label="Select all deletable uploads on this page"
+                                        />
+                                    </TableHead>
+                                )}
+                                <TableHead>Batch</TableHead>
+                                <TableHead>Owner</TableHead>
+                                <TableHead>Date uploaded</TableHead>
+                                <TableHead align="right">Rows</TableHead>
+                                <TableHead align="right">Accepted</TableHead>
+                                <TableHead align="right">Rejected</TableHead>
+                                <TableHead align="right">Errors</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {batches.data.map((batch) => (
+                                <TableRow key={batch.id}>
                                     {isAdministrator && (
-                                        <th className="w-12 p-3">
+                                        <TableCell>
                                             <Checkbox
                                                 checked={
-                                                    allDeletableBatchesSelected ||
-                                                    selectAllMatching
+                                                    selectAllMatching ||
+                                                    selectedVisibleBatchIds.includes(
+                                                        batch.id,
+                                                    )
                                                 }
                                                 onCheckedChange={(checked) =>
-                                                    toggleAllBatches(
+                                                    toggleBatch(
+                                                        batch.id,
                                                         checked === true,
                                                     )
                                                 }
                                                 disabled={
-                                                    deletableBatchIds.length ===
-                                                    0
+                                                    !deletableBatchIds.includes(
+                                                        batch.id,
+                                                    )
                                                 }
-                                                aria-label="Select all deletable uploads on this page"
+                                                aria-label={`Select ${batch.original_filename}`}
                                             />
-                                        </th>
+                                        </TableCell>
                                     )}
-                                    <th className="p-3">Batch</th>
-                                    <th className="p-3">Owner</th>
-                                    <th className="p-3">Date uploaded</th>
-                                    <th className="p-3">Rows</th>
-                                    <th className="p-3">Accepted</th>
-                                    <th className="p-3">Rejected</th>
-                                    <th className="p-3">Errors</th>
-                                    <th className="p-3">Status</th>
-                                    <th className="p-3">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {batches.data.map((batch) => (
-                                    <tr key={batch.id}>
-                                        {isAdministrator && (
-                                            <td className="p-3">
-                                                <Checkbox
-                                                    checked={
-                                                        selectAllMatching ||
-                                                        selectedVisibleBatchIds.includes(
-                                                            batch.id,
-                                                        )
-                                                    }
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        toggleBatch(
-                                                            batch.id,
-                                                            checked === true,
-                                                        )
-                                                    }
-                                                    disabled={
-                                                        !deletableBatchIds.includes(
-                                                            batch.id,
-                                                        )
-                                                    }
-                                                    aria-label={`Select ${batch.original_filename}`}
-                                                />
-                                            </td>
-                                        )}
-                                        <td className="p-3">
-                                            <Link
-                                                href={show(batch.id)}
-                                                className="font-medium hover:underline"
-                                            >
-                                                {batch.original_filename}
-                                            </Link>
-                                            <div className="text-xs text-muted-foreground">
-                                                {batch.batch_code}
-                                            </div>
-                                        </td>
-                                        <td className="p-3">
-                                            {batch.user?.name ?? 'Former user'}
-                                        </td>
-                                        <td className="p-3 whitespace-nowrap">
-                                            {formatUploadedDate(
-                                                batch.created_at,
-                                            )}
-                                        </td>
-                                        <td className="p-3">
-                                            {batch.total_rows}
-                                        </td>
-                                        <td className="p-3 text-success">
-                                            {batch.accepted_rows}
-                                        </td>
-                                        <td className="p-3 text-destructive">
-                                            {batch.rejected_rows}
-                                        </td>
-                                        <td className="p-3 text-destructive">
-                                            {batch.error_rows}
-                                        </td>
-                                        <td className="p-3">
-                                            <StatusBadge
-                                                value={batch.processing_status}
-                                            />
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="flex items-center gap-2">
-                                                {batch.processing_status ===
-                                                    'pending' && (
-                                                    <Button
-                                                        asChild
-                                                        size="sm"
-                                                        variant="outline"
+                                    <TableCell>
+                                        <Link
+                                            href={show(batch.id)}
+                                            className="font-medium hover:underline"
+                                        >
+                                            {batch.original_filename}
+                                        </Link>
+                                        <div className="text-xs text-muted-foreground">
+                                            {batch.batch_code}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {batch.user?.name ?? 'Former user'}
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                        {formatUploadedDate(batch.created_at)}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        {batch.total_rows}
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        className="text-success"
+                                    >
+                                        {batch.accepted_rows}
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        className="text-destructive"
+                                    >
+                                        {batch.rejected_rows}
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        className="text-destructive"
+                                    >
+                                        {batch.error_rows}
+                                    </TableCell>
+                                    <TableCell>
+                                        <StatusBadge
+                                            value={batch.processing_status}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            {batch.processing_status ===
+                                                'pending' && (
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                >
+                                                    <Link
+                                                        href={retry(batch.id)}
+                                                        method="post"
+                                                        preserveScroll
                                                     >
-                                                        <Link
-                                                            href={retry(
-                                                                batch.id,
-                                                            )}
-                                                            method="post"
-                                                            preserveScroll
+                                                        <RotateCcw />
+                                                        Retry processing
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                            {batch.processing_status ===
+                                                'completed' && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
                                                         >
                                                             <RotateCcw />
-                                                            Retry processing
-                                                        </Link>
-                                                    </Button>
-                                                )}
-                                                {batch.processing_status ===
-                                                    'completed' && (
+                                                            Re-analyze
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogTitle>
+                                                            Re-analyze this
+                                                            upload?
+                                                        </DialogTitle>
+                                                        <DialogDescription>
+                                                            Duplicate rows will
+                                                            be re-checked using
+                                                            the latest rules.
+                                                        </DialogDescription>
+                                                        <DialogFooter>
+                                                            <DialogClose
+                                                                asChild
+                                                            >
+                                                                <Button variant="secondary">
+                                                                    Cancel
+                                                                </Button>
+                                                            </DialogClose>
+                                                            <Button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    router.post(
+                                                                        reanalyze(
+                                                                            batch.id,
+                                                                        ),
+                                                                        {},
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                Re-analyze
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                            {auth.user.role ===
+                                                'administrator' &&
+                                                [
+                                                    'completed',
+                                                    'failed',
+                                                ].includes(
+                                                    batch.processing_status,
+                                                ) && (
                                                     <Dialog>
                                                         <DialogTrigger asChild>
                                                             <Button
                                                                 type="button"
                                                                 size="sm"
-                                                                variant="outline"
+                                                                variant="destructive"
                                                             >
-                                                                <RotateCcw />
-                                                                Re-analyze
+                                                                <Trash2 />
+                                                                Delete
                                                             </Button>
                                                         </DialogTrigger>
                                                         <DialogContent>
                                                             <DialogTitle>
-                                                                Re-analyze this
-                                                                upload?
+                                                                Delete{' '}
+                                                                {
+                                                                    batch.original_filename
+                                                                }
+                                                                ?
                                                             </DialogTitle>
                                                             <DialogDescription>
-                                                                Duplicate rows
+                                                                Imported leads
                                                                 will be
-                                                                re-checked
-                                                                using the
-                                                                latest rules.
+                                                                preserved, but
+                                                                this removes the
+                                                                upload from
+                                                                history and
+                                                                can't be undone.
                                                             </DialogDescription>
                                                             <DialogFooter>
                                                                 <DialogClose
@@ -475,106 +568,39 @@ export default function UploadIndex({
                                                                 </DialogClose>
                                                                 <Button
                                                                     type="button"
+                                                                    variant="destructive"
                                                                     onClick={() =>
-                                                                        router.post(
-                                                                            reanalyze(
+                                                                        router.delete(
+                                                                            destroy(
                                                                                 batch.id,
                                                                             ),
-                                                                            {},
                                                                             {
                                                                                 preserveScroll: true,
                                                                             },
                                                                         )
                                                                     }
                                                                 >
-                                                                    Re-analyze
+                                                                    Delete
                                                                 </Button>
                                                             </DialogFooter>
                                                         </DialogContent>
                                                     </Dialog>
                                                 )}
-                                                {auth.user.role ===
-                                                    'administrator' &&
-                                                    [
-                                                        'completed',
-                                                        'failed',
-                                                    ].includes(
-                                                        batch.processing_status,
-                                                    ) && (
-                                                        <Dialog>
-                                                            <DialogTrigger
-                                                                asChild
-                                                            >
-                                                                <Button
-                                                                    type="button"
-                                                                    size="sm"
-                                                                    variant="destructive"
-                                                                >
-                                                                    <Trash2 />
-                                                                    Delete
-                                                                </Button>
-                                                            </DialogTrigger>
-                                                            <DialogContent>
-                                                                <DialogTitle>
-                                                                    Delete{' '}
-                                                                    {
-                                                                        batch.original_filename
-                                                                    }
-                                                                    ?
-                                                                </DialogTitle>
-                                                                <DialogDescription>
-                                                                    Imported
-                                                                    leads will
-                                                                    be
-                                                                    preserved,
-                                                                    but this
-                                                                    removes the
-                                                                    upload from
-                                                                    history and
-                                                                    can't be
-                                                                    undone.
-                                                                </DialogDescription>
-                                                                <DialogFooter>
-                                                                    <DialogClose
-                                                                        asChild
-                                                                    >
-                                                                        <Button variant="secondary">
-                                                                            Cancel
-                                                                        </Button>
-                                                                    </DialogClose>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="destructive"
-                                                                        onClick={() =>
-                                                                            router.delete(
-                                                                                destroy(
-                                                                                    batch.id,
-                                                                                ),
-                                                                                {
-                                                                                    preserveScroll: true,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Delete
-                                                                    </Button>
-                                                                </DialogFooter>
-                                                            </DialogContent>
-                                                        </Dialog>
-                                                    )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {!batches.data.length && (
-                            <p className="p-12 text-center text-muted-foreground">
-                                No upload batches yet.
-                            </p>
-                        )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <div className="rounded-xl border bg-card">
+                        <EmptyState
+                            icon={Upload}
+                            title="No upload batches yet"
+                            description="Upload a CSV to see its processing results here."
+                        />
                     </div>
-                </div>
+                )}
                 <Pagination links={batches.links} />
             </div>
         </>

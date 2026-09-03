@@ -1,9 +1,30 @@
 import { Head } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    ClipboardCheck,
+    Copy,
+    Database,
+    FileSearch,
+    FileWarning,
+    MapPinOff,
+    ShieldAlert,
+    UserPlus,
+} from 'lucide-react';
+import { EmptyState } from '@/components/empty-state';
 import { FilterTabs } from '@/components/filter-tabs';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { errors, index, show } from '@/routes/uploads';
 type Batch = {
     id: number;
@@ -73,25 +94,82 @@ export default function UploadShow({
                         </div>
                     }
                 />
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-                    {[
-                        ['Uploaded Rows', batch.total_rows],
-                        ['New Leads', batch.new_leads],
-                        ['Valid Leads', batch.valid_leads],
-                        ['Accepted Leads', batch.accepted_rows],
-                        ['Exact Duplicates', batch.exact_duplicate_rows],
-                        ['Possible Duplicates', batch.possible_duplicate_rows],
-                        ['Invalid Rows', batch.invalid_rows],
-                        ['Location Issues', batch.location_error_rows],
-                        ['Other Errors', batch.error_rows],
-                    ].map(([label, value]) => (
-                        <StatTile
-                            key={String(label)}
-                            label={String(label)}
-                            value={value as number}
-                        />
-                    ))}
-                </div>
+                <section className="flex flex-col gap-3">
+                    <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        Import results
+                    </h2>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {[
+                            {
+                                label: 'Uploaded Rows',
+                                value: batch.total_rows,
+                                icon: Database,
+                                tone: 'text-info',
+                            },
+                            {
+                                label: 'New Leads',
+                                value: batch.new_leads,
+                                icon: UserPlus,
+                                tone: 'text-chart-1',
+                            },
+                            {
+                                label: 'Valid Leads',
+                                value: batch.valid_leads,
+                                icon: CheckCircle2,
+                                tone: 'text-success',
+                            },
+                            {
+                                label: 'Accepted Leads',
+                                value: batch.accepted_rows,
+                                icon: ClipboardCheck,
+                                tone: 'text-chart-2',
+                            },
+                        ].map((metric) => (
+                            <StatTile key={metric.label} {...metric} />
+                        ))}
+                    </div>
+                </section>
+                <section className="flex flex-col gap-3">
+                    <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        Duplicates &amp; issues
+                    </h2>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                        {[
+                            {
+                                label: 'Exact Duplicates',
+                                value: batch.exact_duplicate_rows,
+                                icon: Copy,
+                                tone: 'text-warning',
+                            },
+                            {
+                                label: 'Possible Duplicates',
+                                value: batch.possible_duplicate_rows,
+                                icon: ShieldAlert,
+                                tone: 'text-chart-4',
+                            },
+                            {
+                                label: 'Invalid Rows',
+                                value: batch.invalid_rows,
+                                icon: FileWarning,
+                                tone: 'text-destructive',
+                            },
+                            {
+                                label: 'Location Issues',
+                                value: batch.location_error_rows,
+                                icon: MapPinOff,
+                                tone: 'text-chart-5',
+                            },
+                            {
+                                label: 'Other Errors',
+                                value: batch.error_rows,
+                                icon: AlertTriangle,
+                                tone: 'text-destructive',
+                            },
+                        ].map((metric) => (
+                            <StatTile key={metric.label} {...metric} />
+                        ))}
+                    </div>
+                </section>
                 {batch.failure_message && (
                     <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
                         {batch.failure_message}
@@ -112,80 +190,75 @@ export default function UploadShow({
                         active: filter === tab,
                     }))}
                 />
-                <div className="overflow-hidden rounded-xl border bg-card">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-muted/60 text-left">
-                                <tr>
-                                    <th className="p-3">Row</th>
-                                    <th className="p-3">Submitted data</th>
-                                    <th className="p-3">Result</th>
-                                    <th className="p-3">Message</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {rows.data.map((row) => {
-                                    const isDuplicate =
-                                        row.processing_status === 'duplicate' ||
-                                        row.error_category ===
-                                            'exact_duplicate' ||
-                                        row.error_category ===
-                                            'possible_duplicate';
-                                    const hasError = Boolean(row.error_message);
+                {rows.data.length ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead>Row</TableHead>
+                                <TableHead>Submitted data</TableHead>
+                                <TableHead>Result</TableHead>
+                                <TableHead>Message</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {rows.data.map((row) => {
+                                const isDuplicate =
+                                    row.processing_status === 'duplicate' ||
+                                    row.error_category === 'exact_duplicate' ||
+                                    row.error_category === 'possible_duplicate';
+                                const hasError = Boolean(row.error_message);
 
-                                    return (
-                                        <tr
-                                            key={row.id}
+                                return (
+                                    <TableRow
+                                        key={row.id}
+                                        className={
+                                            isDuplicate
+                                                ? 'bg-destructive/10 text-destructive'
+                                                : hasError
+                                                  ? 'bg-warning/10'
+                                                  : undefined
+                                        }
+                                    >
+                                        <TableCell>{row.row_number}</TableCell>
+                                        <TableCell>
+                                            <p className="max-w-xl truncate">
+                                                {Object.values(row.raw_data)
+                                                    .filter(Boolean)
+                                                    .join(' · ')}
+                                            </p>
+                                        </TableCell>
+                                        <TableCell>
+                                            <StatusBadge
+                                                value={row.processing_status}
+                                            />
+                                        </TableCell>
+                                        <TableCell
                                             className={
                                                 isDuplicate
-                                                    ? 'bg-red-500/10 text-red-700 dark:text-red-300'
+                                                    ? 'font-semibold text-destructive'
                                                     : hasError
-                                                      ? 'bg-amber-500/10'
-                                                      : undefined
+                                                      ? 'font-medium text-warning'
+                                                      : 'text-muted-foreground'
                                             }
                                         >
-                                            <td className="p-3">
-                                                {row.row_number}
-                                            </td>
-                                            <td className="p-3">
-                                                <p className="max-w-xl truncate">
-                                                    {Object.values(row.raw_data)
-                                                        .filter(Boolean)
-                                                        .join(' · ')}
-                                                </p>
-                                            </td>
-                                            <td className="p-3">
-                                                <StatusBadge
-                                                    value={
-                                                        row.processing_status
-                                                    }
-                                                />
-                                            </td>
-                                            <td
-                                                className={`p-3 ${
-                                                    isDuplicate
-                                                        ? 'font-semibold text-red-700 dark:text-red-300'
-                                                        : hasError
-                                                          ? 'font-medium text-amber-700 dark:text-amber-300'
-                                                          : 'text-muted-foreground'
-                                                }`}
-                                            >
-                                                {row.error_message ||
-                                                    row.lead?.lead_code ||
-                                                    '—'}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                        {!rows.data.length && (
-                            <p className="p-12 text-center text-muted-foreground">
-                                No rows in this view.
-                            </p>
-                        )}
+                                            {row.error_message ||
+                                                row.lead?.lead_code ||
+                                                '—'}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <div className="rounded-xl border bg-card">
+                        <EmptyState
+                            icon={FileSearch}
+                            title="No rows in this view"
+                            description="Try a different status filter above."
+                        />
                     </div>
-                </div>
+                )}
                 <Pagination links={rows.links} />
             </div>
         </>

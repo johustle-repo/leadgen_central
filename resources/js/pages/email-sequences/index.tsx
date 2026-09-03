@@ -1,5 +1,13 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Clock3, Mail, MessageSquareReply, Send, Square } from 'lucide-react';
+import {
+    Clock3,
+    Mail,
+    MessageSquareReply,
+    Send,
+    Square,
+    Workflow,
+} from 'lucide-react';
+import { EmptyState } from '@/components/empty-state';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
@@ -24,6 +32,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { cancel, enroll, update } from '@/routes/email-sequences';
 
 const SELECT_LEAD = '__select__';
@@ -177,8 +193,7 @@ export default function EmailSequencesIndex({
                                             key={lead.id}
                                             value={String(lead.id)}
                                         >
-                                            {lead.contact_person ||
-                                                lead.email}{' '}
+                                            {lead.contact_person || lead.email}{' '}
                                             — {lead.company_name}
                                         </SelectItem>
                                     ))}
@@ -323,116 +338,124 @@ export default function EmailSequencesIndex({
                     <CardHeader>
                         <CardTitle>Sequence activity</CardTitle>
                     </CardHeader>
-                    <CardContent className="overflow-x-auto px-0">
-                        <table className="w-full text-sm">
-                            <thead className="border-y bg-muted/50 text-left">
-                                <tr>
-                                    <th className="p-3 pl-6">Lead</th>
-                                    <th className="p-3">Progress</th>
-                                    <th className="p-3">Status</th>
-                                    <th className="p-3">Next send</th>
-                                    <th className="p-3 text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {enrollments.data.map((item) => (
-                                    <tr key={item.id}>
-                                        <td className="p-3 pl-6">
-                                            <p className="font-medium">
-                                                {item.lead?.contact_person ||
-                                                    item.lead?.email ||
-                                                    'Deleted lead'}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {item.lead
-                                                    ? `${item.lead.company_name} · ${item.lead.email}`
-                                                    : 'Enrollment retained for history'}
-                                            </p>
-                                        </td>
-                                        <td className="p-3">
-                                            {item.current_step} of 3 sent
-                                        </td>
-                                        <td className="p-3">
-                                            <StatusBadge value={item.status} />
-                                            <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                                                {item.stop_reason ||
-                                                    item.last_error}
-                                            </p>
-                                        </td>
-                                        <td className="p-3">
-                                            {displayDate(item.next_send_at)}
-                                        </td>
-                                        <td className="p-3 text-right">
-                                            {item.status === 'active' && (
-                                                <Dialog>
-                                                    <DialogTrigger asChild>
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="outline"
-                                                        >
-                                                            <Square /> Stop
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                    <DialogContent>
-                                                        <DialogTitle>
-                                                            Stop this sequence?
-                                                        </DialogTitle>
-                                                        <DialogDescription>
-                                                            Remaining follow-up
-                                                            steps for{' '}
-                                                            {item.lead
-                                                                ?.contact_person ||
-                                                                item.lead
-                                                                    ?.email ||
-                                                                'this lead'}{' '}
-                                                            will not be sent.
-                                                            This can't be
-                                                            undone.
-                                                        </DialogDescription>
-                                                        <DialogFooter>
-                                                            <DialogClose
-                                                                asChild
-                                                            >
-                                                                <Button variant="secondary">
-                                                                    Cancel
-                                                                </Button>
-                                                            </DialogClose>
+                    <CardContent className="px-0">
+                        {enrollments.data.length ? (
+                            <Table bare>
+                                <TableHeader>
+                                    <TableRow className="hover:bg-transparent">
+                                        <TableHead className="pl-6">
+                                            Lead
+                                        </TableHead>
+                                        <TableHead>Progress</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Next send</TableHead>
+                                        <TableHead align="right">
+                                            Action
+                                        </TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {enrollments.data.map((item) => (
+                                        <TableRow key={item.id}>
+                                            <TableCell className="pl-6">
+                                                <p className="font-medium">
+                                                    {item.lead
+                                                        ?.contact_person ||
+                                                        item.lead?.email ||
+                                                        'Deleted lead'}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {item.lead
+                                                        ? `${item.lead.company_name} · ${item.lead.email}`
+                                                        : 'Enrollment retained for history'}
+                                                </p>
+                                            </TableCell>
+                                            <TableCell>
+                                                {item.current_step} of 3 sent
+                                            </TableCell>
+                                            <TableCell>
+                                                <StatusBadge
+                                                    value={item.status}
+                                                />
+                                                <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                                                    {item.stop_reason ||
+                                                        item.last_error}
+                                                </p>
+                                            </TableCell>
+                                            <TableCell>
+                                                {displayDate(item.next_send_at)}
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                {item.status === 'active' && (
+                                                    <Dialog>
+                                                        <DialogTrigger asChild>
                                                             <Button
                                                                 type="button"
-                                                                variant="destructive"
-                                                                onClick={() =>
-                                                                    router.delete(
-                                                                        cancel.url(
-                                                                            item.id,
-                                                                        ),
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
+                                                                size="sm"
+                                                                variant="outline"
                                                             >
-                                                                Stop sequence
+                                                                <Square /> Stop
                                                             </Button>
-                                                        </DialogFooter>
-                                                    </DialogContent>
-                                                </Dialog>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                                {enrollments.data.length === 0 && (
-                                    <tr>
-                                        <td
-                                            colSpan={5}
-                                            className="p-8 text-center text-muted-foreground"
-                                        >
-                                            No leads are enrolled yet.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                                        </DialogTrigger>
+                                                        <DialogContent>
+                                                            <DialogTitle>
+                                                                Stop this
+                                                                sequence?
+                                                            </DialogTitle>
+                                                            <DialogDescription>
+                                                                Remaining
+                                                                follow-up steps
+                                                                for{' '}
+                                                                {item.lead
+                                                                    ?.contact_person ||
+                                                                    item.lead
+                                                                        ?.email ||
+                                                                    'this lead'}{' '}
+                                                                will not be
+                                                                sent. This can't
+                                                                be undone.
+                                                            </DialogDescription>
+                                                            <DialogFooter>
+                                                                <DialogClose
+                                                                    asChild
+                                                                >
+                                                                    <Button variant="secondary">
+                                                                        Cancel
+                                                                    </Button>
+                                                                </DialogClose>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="destructive"
+                                                                    onClick={() =>
+                                                                        router.delete(
+                                                                            cancel.url(
+                                                                                item.id,
+                                                                            ),
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Stop
+                                                                    sequence
+                                                                </Button>
+                                                            </DialogFooter>
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <EmptyState
+                                icon={Workflow}
+                                title="No leads are enrolled yet"
+                                description="Enroll a lead above to start Day 1, Day 3, and Day 7 outreach."
+                            />
+                        )}
                     </CardContent>
                 </Card>
                 <Pagination links={enrollments.links} />

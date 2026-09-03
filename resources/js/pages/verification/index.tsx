@@ -4,10 +4,13 @@ import {
     FileText,
     Plus,
     Search,
+    SlidersHorizontal,
     Sparkles,
     UserCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
 import { FilterTabs } from '@/components/filter-tabs';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
@@ -15,6 +18,14 @@ import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { index, possible as markPossible, show } from '@/routes/verification';
 import possibleLeads from '@/routes/verification/possible-leads';
 
@@ -118,10 +129,10 @@ export default function VerificationIndex({
                     ))}
                 </div>
 
-                <div className="rounded-xl border bg-card p-4">
+                <FilterBar as="div" icon={SlidersHorizontal} label="Filters">
                     <Form
                         {...index.form()}
-                        className="flex flex-col gap-3 lg:flex-row"
+                        className="flex flex-col gap-3 sm:col-span-2 lg:col-span-4 lg:flex-row"
                     >
                         <div className="relative flex-1">
                             <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -146,7 +157,7 @@ export default function VerificationIndex({
                             </Button>
                         )}
                     </Form>
-                    <div className="mt-4">
+                    <div className="sm:col-span-2 lg:col-span-4">
                         <FilterTabs
                             tabs={statuses.map(([value, label]) => ({
                                 label,
@@ -160,135 +171,118 @@ export default function VerificationIndex({
                             }))}
                         />
                     </div>
-                </div>
+                </FilterBar>
 
-                <div className="overflow-hidden rounded-xl border bg-card">
-                    <div className="flex items-center justify-between border-b px-4 py-3 text-sm text-muted-foreground">
-                        <span>
-                            Showing {leads.from ?? 0}–{leads.to ?? 0} of{' '}
-                            {leads.total} contacts
-                        </span>
-                        {filters.search && (
-                            <span>Results for “{filters.search}”</span>
-                        )}
+                <p className="px-1 text-sm text-muted-foreground">
+                    Showing {leads.from ?? 0}–{leads.to ?? 0} of {leads.total}{' '}
+                    contacts
+                    {filters.search && ` for “${filters.search}”`}
+                </p>
+                {leads.data.length ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead>Company</TableHead>
+                                <TableHead>Contact</TableHead>
+                                <TableHead>Location</TableHead>
+                                <TableHead>Owner</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Activity</TableHead>
+                                <TableHead>
+                                    <span className="sr-only">Actions</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {leads.data.map((lead) => (
+                                <TableRow key={lead.id}>
+                                    <TableCell>
+                                        <p className="font-medium">
+                                            {lead.company_name}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {lead.website_domain ||
+                                                lead.lead_code}
+                                        </p>
+                                    </TableCell>
+                                    <TableCell>
+                                        <p>
+                                            {lead.contact_person ||
+                                                'No contact name'}
+                                        </p>
+                                        <p className="max-w-64 truncate text-xs text-muted-foreground">
+                                            {lead.position || lead.email || '—'}
+                                        </p>
+                                    </TableCell>
+                                    <TableCell>
+                                        {[lead.city, lead.country]
+                                            .filter(Boolean)
+                                            .join(', ') || '—'}
+                                        <p className="text-xs text-muted-foreground">
+                                            {lead.timezone}
+                                        </p>
+                                    </TableCell>
+                                    <TableCell>
+                                        {lead.agent?.name || 'Unassigned'}
+                                    </TableCell>
+                                    <TableCell>
+                                        <StatusBadge value={lead.status} />
+                                    </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground">
+                                        {lead.structured_notes_count} notes ·{' '}
+                                        {lead.attachments_count} files
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex justify-end gap-2">
+                                            {lead.status !==
+                                                'possible_lead' && (
+                                                <Form
+                                                    {...markPossible.form(
+                                                        lead.id,
+                                                    )}
+                                                    options={{
+                                                        preserveState: true,
+                                                    }}
+                                                    onSuccess={() =>
+                                                        toast.success(
+                                                            'Lead marked as possible.',
+                                                        )
+                                                    }
+                                                >
+                                                    {({ processing }) => (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={
+                                                                processing
+                                                            }
+                                                        >
+                                                            <Sparkles />
+                                                            Possible
+                                                        </Button>
+                                                    )}
+                                                </Form>
+                                            )}
+                                            <Button asChild size="sm">
+                                                <Link href={show(lead.id)}>
+                                                    Review
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <div className="rounded-xl border bg-card">
+                        <EmptyState
+                            icon={Search}
+                            title="No matching contacts"
+                            description="Try a broader search or another verification status."
+                        />
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-muted/60 text-left">
-                                <tr>
-                                    <th className="p-3">Company</th>
-                                    <th className="p-3">Contact</th>
-                                    <th className="p-3">Location</th>
-                                    <th className="p-3">Owner</th>
-                                    <th className="p-3">Status</th>
-                                    <th className="p-3">Activity</th>
-                                    <th className="p-3">
-                                        <span className="sr-only">
-                                            Actions
-                                        </span>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {leads.data.map((lead) => (
-                                    <tr
-                                        key={lead.id}
-                                        className="transition-colors hover:bg-muted/30"
-                                    >
-                                        <td className="p-3">
-                                            <p className="font-medium">
-                                                {lead.company_name}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {lead.website_domain ||
-                                                    lead.lead_code}
-                                            </p>
-                                        </td>
-                                        <td className="p-3">
-                                            <p>
-                                                {lead.contact_person ||
-                                                    'No contact name'}
-                                            </p>
-                                            <p className="max-w-64 truncate text-xs text-muted-foreground">
-                                                {lead.position ||
-                                                    lead.email ||
-                                                    '—'}
-                                            </p>
-                                        </td>
-                                        <td className="p-3">
-                                            {[lead.city, lead.country]
-                                                .filter(Boolean)
-                                                .join(', ') || '—'}
-                                            <p className="text-xs text-muted-foreground">
-                                                {lead.timezone}
-                                            </p>
-                                        </td>
-                                        <td className="p-3">
-                                            {lead.agent?.name || 'Unassigned'}
-                                        </td>
-                                        <td className="p-3">
-                                            <StatusBadge value={lead.status} />
-                                        </td>
-                                        <td className="p-3 text-xs text-muted-foreground">
-                                            {lead.structured_notes_count} notes
-                                            · {lead.attachments_count} files
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="flex justify-end gap-2">
-                                                {lead.status !==
-                                                    'possible_lead' && (
-                                                    <Form
-                                                        {...markPossible.form(
-                                                            lead.id,
-                                                        )}
-                                                        options={{
-                                                            preserveState: true,
-                                                        }}
-                                                        onSuccess={() =>
-                                                            toast.success(
-                                                                'Lead marked as possible.',
-                                                            )
-                                                        }
-                                                    >
-                                                        {({ processing }) => (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                disabled={
-                                                                    processing
-                                                                }
-                                                            >
-                                                                <Sparkles />
-                                                                Possible
-                                                            </Button>
-                                                        )}
-                                                    </Form>
-                                                )}
-                                                <Button asChild size="sm">
-                                                    <Link href={show(lead.id)}>
-                                                        Review
-                                                    </Link>
-                                                </Button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {!leads.data.length && (
-                            <div className="p-12 text-center">
-                                <Search className="mx-auto size-8 text-muted-foreground" />
-                                <p className="mt-3 font-medium">
-                                    No matching contacts
-                                </p>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Try a broader search or another verification
-                                    status.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                )}
                 <Pagination links={leads.links} />
             </div>
         </>

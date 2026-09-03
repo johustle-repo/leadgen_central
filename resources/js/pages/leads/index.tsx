@@ -7,10 +7,15 @@ import {
     Plus,
     Search,
     Send,
+    SlidersHorizontal,
     Trash2,
+    Users,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
+import InputError from '@/components/input-error';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
@@ -33,6 +38,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import {
     bulkDestroy,
     create,
@@ -211,38 +224,67 @@ Regards,`;
                         </div>
                     }
                 />
-                <form
+                <FilterBar
+                    as="form"
                     onSubmit={search}
-                    className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4"
+                    icon={SlidersHorizontal}
+                    label="Filters"
+                    gridClassName="sm:grid-cols-2 lg:grid-cols-4"
+                    hint="Search matches company, contact, and email. Lead date filters by the date recorded on each lead, not when it was uploaded."
                 >
-                    <div className="relative sm:col-span-2 lg:col-span-3">
-                        <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
-                        <Input
-                            name="search"
-                            defaultValue={filters.search}
-                            placeholder="Search leads…"
-                            className="pl-9"
-                        />
-                    </div>
-                    <Select
-                        name="per_page"
-                        defaultValue={filters.per_page || '10'}
-                    >
-                        <SelectTrigger
-                            className="w-full"
-                            aria-label="Leads per page"
+                    <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-3">
+                        <label
+                            htmlFor="leads-search"
+                            className="text-xs text-muted-foreground"
                         >
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="10">10 per page</SelectItem>
-                            <SelectItem value="25">25 per page</SelectItem>
-                            <SelectItem value="50">50 per page</SelectItem>
-                            <SelectItem value="100">100 per page</SelectItem>
-                        </SelectContent>
-                    </Select>
+                            Search
+                        </label>
+                        <div className="relative">
+                            <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
+                            <Input
+                                id="leads-search"
+                                name="search"
+                                defaultValue={filters.search}
+                                placeholder="Search leads…"
+                                className="pl-9"
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="leads-per-page"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Per page
+                        </label>
+                        <Select
+                            name="per_page"
+                            defaultValue={filters.per_page || '10'}
+                        >
+                            <SelectTrigger
+                                id="leads-per-page"
+                                className="w-full"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="10">10 per page</SelectItem>
+                                <SelectItem value="25">25 per page</SelectItem>
+                                <SelectItem value="50">50 per page</SelectItem>
+                                <SelectItem value="100">
+                                    100 per page
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     {agents.length > 0 && (
-                        <>
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="leads-agent"
+                                className="text-xs text-muted-foreground"
+                            >
+                                Agent
+                            </label>
                             <input
                                 type="hidden"
                                 name="agent_id"
@@ -257,8 +299,8 @@ Regards,`;
                                 onValueChange={setAgentFilter}
                             >
                                 <SelectTrigger
+                                    id="leads-agent"
                                     className="w-full"
-                                    aria-label="Filter by agent"
                                 >
                                     <SelectValue />
                                 </SelectTrigger>
@@ -276,263 +318,274 @@ Regards,`;
                                     ))}
                                 </SelectContent>
                             </Select>
-                        </>
+                        </div>
                     )}
                     {agents.length > 0 && (
-                        <Select
-                            name="sort"
-                            defaultValue={filters.sort || 'created_at'}
-                        >
-                            <SelectTrigger
-                                className="w-full"
-                                aria-label="Sort leads by"
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="leads-sort"
+                                className="text-xs text-muted-foreground"
                             >
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="created_at">
-                                    Sort: Date added
-                                </SelectItem>
-                                <SelectItem value="agent">
-                                    Sort: Agent
-                                </SelectItem>
-                                <SelectItem value="company_name">
-                                    Sort: Company
-                                </SelectItem>
-                                <SelectItem value="status">
-                                    Sort: Status
-                                </SelectItem>
-                                <SelectItem value="source">
-                                    Sort: Source
-                                </SelectItem>
-                                <SelectItem value="country">
-                                    Sort: Country
-                                </SelectItem>
-                                <SelectItem value="city">
-                                    Sort: City
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                                Sort by
+                            </label>
+                            <Select
+                                name="sort"
+                                defaultValue={filters.sort || 'created_at'}
+                            >
+                                <SelectTrigger
+                                    id="leads-sort"
+                                    className="w-full"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="created_at">
+                                        Date added
+                                    </SelectItem>
+                                    <SelectItem value="agent">Agent</SelectItem>
+                                    <SelectItem value="company_name">
+                                        Company
+                                    </SelectItem>
+                                    <SelectItem value="status">
+                                        Status
+                                    </SelectItem>
+                                    <SelectItem value="source">
+                                        Source
+                                    </SelectItem>
+                                    <SelectItem value="country">
+                                        Country
+                                    </SelectItem>
+                                    <SelectItem value="city">City</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     )}
                     {agents.length > 0 && (
-                        <Select
-                            name="direction"
-                            defaultValue={filters.direction || 'desc'}
-                        >
-                            <SelectTrigger
-                                className="w-full"
-                                aria-label="Sort direction"
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="leads-direction"
+                                className="text-xs text-muted-foreground"
                             >
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="desc">
-                                    Descending
-                                </SelectItem>
-                                <SelectItem value="asc">Ascending</SelectItem>
-                            </SelectContent>
-                        </Select>
+                                Direction
+                            </label>
+                            <Select
+                                name="direction"
+                                defaultValue={filters.direction || 'desc'}
+                            >
+                                <SelectTrigger
+                                    id="leads-direction"
+                                    className="w-full"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="desc">
+                                        Descending
+                                    </SelectItem>
+                                    <SelectItem value="asc">
+                                        Ascending
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     )}
-                    <div className="relative">
-                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center border-r pr-3 text-xs font-medium text-muted-foreground">
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="leads-date"
+                            className="text-xs text-muted-foreground"
+                        >
                             Lead date
-                        </span>
+                        </label>
                         <Input
+                            id="leads-date"
                             name="date"
                             type="date"
                             value={selectedDate}
                             onChange={(event) =>
                                 setSelectedDate(event.target.value)
                             }
-                            aria-label="Lead date"
-                            className="pl-24"
                         />
                     </div>
-                    <Button type="submit" variant="secondary">
-                        Apply filters
-                    </Button>
-                    <Button asChild variant="outline">
-                        <a
-                            href={downloadRaw.url({
-                                query: {
-                                    date_from: selectedDate || undefined,
-                                    date_to: selectedDate || undefined,
-                                },
-                            })}
-                            download
-                        >
-                            <Download />
-                            Download raw CSV
-                        </a>
-                    </Button>
-                    <Button asChild variant="outline">
-                        <a
-                            href={downloadCleaned.url({
-                                query: {
-                                    date_from: selectedDate || undefined,
-                                    date_to: selectedDate || undefined,
-                                },
-                            })}
-                            download
-                            onClick={() =>
-                                toast.success(
-                                    'Cleaned CSV download started with dataset cleaning.',
-                                )
-                            }
-                        >
-                            <Download />
-                            Download cleaned CSV
-                        </a>
-                    </Button>
-                </form>
-                <div className="overflow-hidden rounded-xl border bg-card">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-muted/60 text-left">
-                                <tr>
+                    <div className="flex flex-col justify-end gap-1.5 sm:col-span-2 lg:col-span-4 lg:flex-row">
+                        <Button type="submit" variant="secondary">
+                            Apply filters
+                        </Button>
+                        <Button asChild variant="outline">
+                            <a
+                                href={downloadRaw.url({
+                                    query: {
+                                        date_from: selectedDate || undefined,
+                                        date_to: selectedDate || undefined,
+                                    },
+                                })}
+                                download
+                            >
+                                <Download />
+                                Download raw CSV
+                            </a>
+                        </Button>
+                        <Button asChild variant="outline">
+                            <a
+                                href={downloadCleaned.url({
+                                    query: {
+                                        date_from: selectedDate || undefined,
+                                        date_to: selectedDate || undefined,
+                                    },
+                                })}
+                                download
+                                onClick={() =>
+                                    toast.success(
+                                        'Cleaned CSV download started with dataset cleaning.',
+                                    )
+                                }
+                            >
+                                <Download />
+                                Download cleaned CSV
+                            </a>
+                        </Button>
+                    </div>
+                </FilterBar>
+                {leads.data.length ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                                {canBulkDelete && (
+                                    <TableHead className="w-12">
+                                        <Checkbox
+                                            checked={allVisibleLeadsSelected}
+                                            onCheckedChange={(checked) =>
+                                                toggleAllVisibleLeads(
+                                                    checked === true,
+                                                )
+                                            }
+                                            aria-label="Select all leads on this page"
+                                        />
+                                    </TableHead>
+                                )}
+                                <TableHead>Company</TableHead>
+                                <TableHead>Location</TableHead>
+                                <TableHead>Contact</TableHead>
+                                <TableHead>Owner</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Source</TableHead>
+                                <TableHead>Replies</TableHead>
+                                <TableHead align="right">Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {leads.data.map((lead) => (
+                                <TableRow key={lead.id}>
                                     {canBulkDelete && (
-                                        <th className="w-12 p-3">
+                                        <TableCell>
                                             <Checkbox
-                                                checked={
-                                                    allVisibleLeadsSelected
-                                                }
+                                                checked={selectedVisibleLeadIds.includes(
+                                                    lead.id,
+                                                )}
                                                 onCheckedChange={(checked) =>
-                                                    toggleAllVisibleLeads(
+                                                    toggleLead(
+                                                        lead.id,
                                                         checked === true,
                                                     )
                                                 }
-                                                aria-label="Select all leads on this page"
+                                                aria-label={`Select ${lead.company_name}`}
                                             />
-                                        </th>
+                                        </TableCell>
                                     )}
-                                    <th className="p-3">Company</th>
-                                    <th className="p-3">Location</th>
-                                    <th className="p-3">Contact</th>
-                                    <th className="p-3">Owner</th>
-                                    <th className="p-3">Status</th>
-                                    <th className="p-3">Source</th>
-                                    <th className="p-3">Replies</th>
-                                    <th className="p-3 text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {leads.data.map((lead) => (
-                                    <tr key={lead.id}>
-                                        {canBulkDelete && (
-                                            <td className="p-3">
-                                                <Checkbox
-                                                    checked={selectedVisibleLeadIds.includes(
-                                                        lead.id,
-                                                    )}
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        toggleLead(
-                                                            lead.id,
-                                                            checked === true,
-                                                        )
+                                    <TableCell>
+                                        <Link
+                                            href={edit(lead.id)}
+                                            className="font-medium hover:underline"
+                                        >
+                                            {lead.company_name}
+                                        </Link>
+                                        <div className="text-xs text-muted-foreground">
+                                            {lead.website_domain ||
+                                                lead.lead_code}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {[lead.city, lead.country]
+                                            .filter(Boolean)
+                                            .join(', ') || '—'}
+                                    </TableCell>
+                                    <TableCell>
+                                        {lead.contact_person || '—'}
+                                        <div className="text-xs text-muted-foreground">
+                                            {lead.email}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {lead.agent?.name || 'Unassigned'}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col items-start gap-1">
+                                            <StatusBadge value={lead.status} />
+                                            <span className="text-xs text-muted-foreground">
+                                                {lead.validation_status}
+                                            </span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="capitalize">
+                                        {lead.source}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <Mail className="size-4 text-muted-foreground" />
+                                            <span className="font-medium">
+                                                {lead.email_replies_count}
+                                            </span>
+                                            {lead.unread_email_replies_count >
+                                                0 && (
+                                                <span className="rounded-full bg-info/15 px-2 py-0.5 text-xs font-semibold text-info">
+                                                    {
+                                                        lead.unread_email_replies_count
+                                                    }{' '}
+                                                    new
+                                                </span>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <div className="flex justify-end gap-2">
+                                            {lead.can_send_email && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        openComposer(lead)
                                                     }
-                                                    aria-label={`Select ${lead.company_name}`}
-                                                />
-                                            </td>
-                                        )}
-                                        <td className="p-3">
-                                            <Link
-                                                href={edit(lead.id)}
-                                                className="font-medium hover:underline"
-                                            >
-                                                {lead.company_name}
-                                            </Link>
-                                            <div className="text-xs text-muted-foreground">
-                                                {lead.website_domain ||
-                                                    lead.lead_code}
-                                            </div>
-                                        </td>
-                                        <td className="p-3">
-                                            {[lead.city, lead.country]
-                                                .filter(Boolean)
-                                                .join(', ') || '—'}
-                                        </td>
-                                        <td className="p-3">
-                                            {lead.contact_person || '—'}
-                                            <div className="text-xs text-muted-foreground">
-                                                {lead.email}
-                                            </div>
-                                        </td>
-                                        <td className="p-3">
-                                            {lead.agent?.name || 'Unassigned'}
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="flex flex-col items-start gap-1">
-                                                <StatusBadge
-                                                    value={lead.status}
-                                                />
-                                                <span className="text-xs text-muted-foreground">
-                                                    {lead.validation_status}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="p-3 capitalize">
-                                            {lead.source}
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="flex items-center gap-2">
-                                                <Mail className="size-4 text-muted-foreground" />
-                                                <span className="font-medium">
-                                                    {lead.email_replies_count}
-                                                </span>
-                                                {lead.unread_email_replies_count >
-                                                    0 && (
-                                                    <span className="rounded-full bg-cyan-500/15 px-2 py-0.5 text-xs font-semibold text-cyan-700 dark:text-cyan-300">
-                                                        {
-                                                            lead.unread_email_replies_count
-                                                        }{' '}
-                                                        new
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-3 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                {lead.can_send_email && (
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            openComposer(lead)
-                                                        }
-                                                    >
-                                                        <Send className="size-3.5" />
-                                                        Send email
-                                                    </Button>
-                                                )}
-                                                {lead.can_update && (
-                                                    <Button
-                                                        asChild
-                                                        size="sm"
-                                                        variant="outline"
-                                                    >
-                                                        <Link
-                                                            href={edit(lead.id)}
-                                                        >
-                                                            <Pencil className="size-3.5" />
-                                                            Edit
-                                                        </Link>
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {!leads.data.length && (
-                            <p className="p-12 text-center text-muted-foreground">
-                                No leads match your filters.
-                            </p>
-                        )}
+                                                >
+                                                    <Send className="size-3.5" />
+                                                    Send email
+                                                </Button>
+                                            )}
+                                            {lead.can_update && (
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                >
+                                                    <Link href={edit(lead.id)}>
+                                                        <Pencil className="size-3.5" />
+                                                        Edit
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <div className="rounded-xl border bg-card">
+                        <EmptyState
+                            icon={Users}
+                            title="No leads match your filters"
+                            description="Try a broader search or clear a filter."
+                        />
                     </div>
-                </div>
+                )}
                 <Pagination links={leads.links} />
             </div>
 
@@ -606,11 +659,7 @@ Regards,`;
                                 maxLength={150}
                                 required
                             />
-                            {emailForm.errors.subject && (
-                                <p className="text-sm text-destructive">
-                                    {emailForm.errors.subject}
-                                </p>
-                            )}
+                            <InputError message={emailForm.errors.subject} />
                         </div>
 
                         <div className="grid gap-2">
@@ -629,15 +678,11 @@ Regards,`;
                                 required
                                 className="min-h-80 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             />
-                            {emailForm.errors.body && (
-                                <p className="text-sm text-destructive">
-                                    {emailForm.errors.body}
-                                </p>
-                            )}
+                            <InputError message={emailForm.errors.body} />
                         </div>
 
-                        <div className="flex items-center gap-2 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2 text-sm text-muted-foreground">
-                            <Paperclip className="size-4 text-cyan-500" />
+                        <div className="flex items-center gap-2 rounded-lg border border-info/20 bg-info/5 px-3 py-2 text-sm text-muted-foreground">
+                            <Paperclip className="size-4 text-info" />
                             DUSCAFF Scaffolding Products brochure 2026.pdf
                         </div>
 

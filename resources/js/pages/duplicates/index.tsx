@@ -1,9 +1,12 @@
 import { Form, Head } from '@inertiajs/react';
+import { Layers } from 'lucide-react';
 import { toast } from 'sonner';
+import { EmptyState } from '@/components/empty-state';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     Dialog,
     DialogClose,
@@ -56,144 +59,156 @@ export default function DuplicateIndex({
                 />
                 <div className="flex flex-col gap-4">
                     {matches.data.map((match) => (
-                        <section
-                            key={match.id}
-                            className="rounded-xl border bg-card p-5"
-                        >
-                            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                                <div className="flex items-center gap-2">
-                                    <StatusBadge value={match.match_type} />
-                                    <StatusBadge value={match.status} />
-                                    <span className="text-sm text-muted-foreground">
-                                        Score {match.match_score ?? '—'} ·{' '}
-                                        {match.matched_fields.join(', ')}
-                                    </span>
+                        <Card key={match.id}>
+                            <CardContent className="p-5">
+                                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                            Type
+                                            <StatusBadge
+                                                value={match.match_type}
+                                            />
+                                        </span>
+                                        <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                            Status
+                                            <StatusBadge value={match.status} />
+                                        </span>
+                                        <span className="text-sm text-muted-foreground">
+                                            Score {match.match_score ?? '—'} ·{' '}
+                                            {match.matched_fields.join(', ')}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="grid gap-4 lg:grid-cols-2">
-                                <LeadPanel
-                                    title="Incoming submission"
-                                    lead={match.incoming_lead}
-                                    raw={match.upload_row?.raw_data}
-                                />
-                                <LeadPanel
-                                    title="Existing owner record"
-                                    lead={match.existing_lead}
-                                />
-                            </div>
-                            <div className="mt-4 flex flex-wrap justify-end gap-2">
-                                <Form
-                                    {...update.form(match.id)}
-                                    options={{ preserveState: true }}
-                                    onSuccess={() =>
-                                        toast.success(
-                                            'Marked as not a duplicate.',
-                                        )
-                                    }
-                                >
-                                    {({ processing }) => (
-                                        <>
-                                            <input
-                                                type="hidden"
-                                                name="action"
-                                                value="not_duplicate"
-                                            />
-                                            <Button
-                                                type="submit"
-                                                variant="outline"
-                                                disabled={processing}
-                                            >
-                                                Not duplicate
-                                            </Button>
-                                        </>
-                                    )}
-                                </Form>
-                                <Form
-                                    {...update.form(match.id)}
-                                    options={{ preserveState: true }}
-                                    onSuccess={() =>
-                                        toast.success('Both leads kept.')
-                                    }
-                                >
-                                    {({ processing }) => (
-                                        <>
-                                            <input
-                                                type="hidden"
-                                                name="action"
-                                                value="keep_both"
-                                            />
-                                            <Button
-                                                type="submit"
-                                                variant="outline"
-                                                disabled={processing}
-                                            >
-                                                Keep both
-                                            </Button>
-                                        </>
-                                    )}
-                                </Form>
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button type="button">
-                                            Confirm duplicate
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogTitle>
-                                            Confirm this is a duplicate?
-                                        </DialogTitle>
-                                        <DialogDescription>
-                                            The incoming submission will be
-                                            recorded as a duplicate of the
-                                            existing owner's record. This
-                                            can't be undone.
-                                        </DialogDescription>
-                                        <DialogFooter>
-                                            <DialogClose asChild>
-                                                <Button variant="secondary">
-                                                    Cancel
+                                <div className="grid gap-4 lg:grid-cols-2">
+                                    <LeadPanel
+                                        title="Incoming submission"
+                                        lead={match.incoming_lead}
+                                        raw={match.upload_row?.raw_data}
+                                    />
+                                    <LeadPanel
+                                        title="Existing owner record"
+                                        lead={match.existing_lead}
+                                    />
+                                </div>
+                                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                                    <Form
+                                        {...update.form(match.id)}
+                                        options={{ preserveState: true }}
+                                        onSuccess={() =>
+                                            toast.success(
+                                                'Marked as not a duplicate.',
+                                            )
+                                        }
+                                    >
+                                        {({ processing }) => (
+                                            <>
+                                                <input
+                                                    type="hidden"
+                                                    name="action"
+                                                    value="not_duplicate"
+                                                />
+                                                <Button
+                                                    type="submit"
+                                                    variant="outline"
+                                                    disabled={processing}
+                                                >
+                                                    Not duplicate
                                                 </Button>
-                                            </DialogClose>
-                                            <Form
-                                                {...update.form(match.id)}
-                                                options={{
-                                                    preserveState: true,
-                                                }}
-                                                onSuccess={() =>
-                                                    toast.success(
-                                                        'Marked as a duplicate.',
-                                                    )
-                                                }
-                                            >
-                                                {({ processing }) => (
-                                                    <>
-                                                        <input
-                                                            type="hidden"
-                                                            name="action"
-                                                            value="confirm_duplicate"
-                                                        />
-                                                        <Button
-                                                            type="submit"
-                                                            variant="destructive"
-                                                            disabled={
-                                                                processing
-                                                            }
-                                                        >
-                                                            Confirm duplicate
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </Form>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        </section>
+                                            </>
+                                        )}
+                                    </Form>
+                                    <Form
+                                        {...update.form(match.id)}
+                                        options={{ preserveState: true }}
+                                        onSuccess={() =>
+                                            toast.success('Both leads kept.')
+                                        }
+                                    >
+                                        {({ processing }) => (
+                                            <>
+                                                <input
+                                                    type="hidden"
+                                                    name="action"
+                                                    value="keep_both"
+                                                />
+                                                <Button
+                                                    type="submit"
+                                                    variant="outline"
+                                                    disabled={processing}
+                                                >
+                                                    Keep both
+                                                </Button>
+                                            </>
+                                        )}
+                                    </Form>
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button type="button">
+                                                Confirm duplicate
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogTitle>
+                                                Confirm this is a duplicate?
+                                            </DialogTitle>
+                                            <DialogDescription>
+                                                The incoming submission will be
+                                                recorded as a duplicate of the
+                                                existing owner's record. This
+                                                can't be undone.
+                                            </DialogDescription>
+                                            <DialogFooter>
+                                                <DialogClose asChild>
+                                                    <Button variant="secondary">
+                                                        Cancel
+                                                    </Button>
+                                                </DialogClose>
+                                                <Form
+                                                    {...update.form(match.id)}
+                                                    options={{
+                                                        preserveState: true,
+                                                    }}
+                                                    onSuccess={() =>
+                                                        toast.success(
+                                                            'Marked as a duplicate.',
+                                                        )
+                                                    }
+                                                >
+                                                    {({ processing }) => (
+                                                        <>
+                                                            <input
+                                                                type="hidden"
+                                                                name="action"
+                                                                value="confirm_duplicate"
+                                                            />
+                                                            <Button
+                                                                type="submit"
+                                                                variant="destructive"
+                                                                disabled={
+                                                                    processing
+                                                                }
+                                                            >
+                                                                Confirm
+                                                                duplicate
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </Form>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+                            </CardContent>
+                        </Card>
                     ))}
                     {!matches.data.length && (
-                        <p className="rounded-xl border p-12 text-center text-muted-foreground">
-                            No duplicate matches found.
-                        </p>
+                        <div className="rounded-xl border bg-card">
+                            <EmptyState
+                                icon={Layers}
+                                title="No duplicate matches found"
+                                description="Possible duplicates flagged during import will appear here for review."
+                            />
+                        </div>
                     )}
                 </div>
                 <Pagination links={matches.links} />

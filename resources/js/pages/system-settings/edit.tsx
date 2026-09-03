@@ -9,6 +9,7 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
+import InputError from '@/components/input-error';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,7 +54,7 @@ export default function SettingsEdit({
                 <div className="grid gap-4 sm:grid-cols-3">
                     <Card className="gap-3 py-5">
                         <CardContent className="flex items-center gap-4">
-                            <div className="rounded-xl bg-cyan-500/10 p-3 text-cyan-500">
+                            <div className="rounded-xl bg-info/10 p-3 text-info">
                                 <HardDriveUpload className="size-5" />
                             </div>
                             <div>
@@ -68,7 +69,7 @@ export default function SettingsEdit({
                     </Card>
                     <Card className="gap-3 py-5">
                         <CardContent className="flex items-center gap-4">
-                            <div className="rounded-xl bg-indigo-500/10 p-3 text-indigo-500">
+                            <div className="rounded-xl bg-chart-1/10 p-3 text-chart-1">
                                 <FileSpreadsheet className="size-5" />
                             </div>
                             <div>
@@ -83,7 +84,7 @@ export default function SettingsEdit({
                     </Card>
                     <Card className="gap-3 py-5">
                         <CardContent className="flex items-center gap-4">
-                            <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-500">
+                            <div className="rounded-xl bg-success/10 p-3 text-success">
                                 <ShieldCheck className="size-5" />
                             </div>
                             <div>
@@ -164,9 +165,11 @@ export default function SettingsEdit({
                                             </span>
                                         </div>
                                         {errors.csv_max_kilobytes ? (
-                                            <p className="text-sm text-destructive">
-                                                {errors.csv_max_kilobytes}
-                                            </p>
+                                            <InputError
+                                                message={
+                                                    errors.csv_max_kilobytes
+                                                }
+                                            />
                                         ) : (
                                             <p className="text-sm leading-6 text-muted-foreground">
                                                 Larger limits support bigger
@@ -209,9 +212,9 @@ export default function SettingsEdit({
                                             className="h-11 tabular-nums"
                                         />
                                         {errors.csv_max_files ? (
-                                            <p className="text-sm text-destructive">
-                                                {errors.csv_max_files}
-                                            </p>
+                                            <InputError
+                                                message={errors.csv_max_files}
+                                            />
                                         ) : (
                                             <p className="text-sm leading-6 text-muted-foreground">
                                                 Agents cannot select or submit
@@ -220,9 +223,9 @@ export default function SettingsEdit({
                                             </p>
                                         )}
                                     </div>
-                                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-4">
+                                    <div className="rounded-lg border border-info/20 bg-info/5 p-4">
                                         <div className="flex gap-3">
-                                            <Info className="mt-0.5 size-4 shrink-0 text-cyan-500" />
+                                            <Info className="mt-0.5 size-4 shrink-0 text-info" />
                                             <div className="space-y-1 text-sm">
                                                 <p className="font-medium">
                                                     Recommended configuration
@@ -241,7 +244,7 @@ export default function SettingsEdit({
                                 <CardFooter className="justify-between gap-4 border-t border-border/60 bg-muted/20 py-4">
                                     <div className="min-h-5 text-sm">
                                         {recentlySuccessful ? (
-                                            <span className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                                            <span className="flex items-center gap-2 text-success">
                                                 <CheckCircle2 className="size-4" />
                                                 Settings saved
                                             </span>
@@ -283,7 +286,7 @@ export default function SettingsEdit({
                                     'Review the mapping before processing.',
                                 ].map((item) => (
                                     <li key={item} className="flex gap-3">
-                                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
                                         <span className="leading-5 text-muted-foreground">
                                             {item}
                                         </span>

@@ -1,6 +1,15 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import {
+    Pencil,
+    Plus,
+    Search,
+    SlidersHorizontal,
+    Trash2,
+    UsersRound,
+} from 'lucide-react';
 import { useState } from 'react';
+import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
@@ -22,6 +31,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { create, destroy, edit, index } from '@/routes/users';
 
 const ALL_ROLES = '__all__';
@@ -84,203 +101,222 @@ export default function UsersIndex({
                         </Button>
                     }
                 />
-                <form
+                <FilterBar
+                    as="form"
                     onSubmit={search}
-                    className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-4"
+                    icon={SlidersHorizontal}
+                    label="Filters"
                 >
-                    <div className="relative sm:col-span-2">
-                        <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
-                        <Input
-                            name="search"
-                            defaultValue={filters.search}
-                            placeholder="Search name or email…"
-                            className="pl-9"
-                        />
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                        <label
+                            htmlFor="users-search"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Search
+                        </label>
+                        <div className="relative">
+                            <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
+                            <Input
+                                id="users-search"
+                                name="search"
+                                defaultValue={filters.search}
+                                placeholder="Search name or email…"
+                                className="pl-9"
+                            />
+                        </div>
                     </div>
-                    <input
-                        type="hidden"
-                        name="role"
-                        value={roleFilter === ALL_ROLES ? '' : roleFilter}
-                    />
-                    <Select value={roleFilter} onValueChange={setRoleFilter}>
-                        <SelectTrigger aria-label="Filter by role">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ALL_ROLES}>
-                                All roles
-                            </SelectItem>
-                            <SelectItem value="administrator">
-                                Administrator
-                            </SelectItem>
-                            <SelectItem value="sub_administrator">
-                                Sub-Administrator
-                            </SelectItem>
-                            <SelectItem value="agent">Agent</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Button type="submit" variant="secondary">
-                        Apply filters
-                    </Button>
-                </form>
-                <div className="overflow-hidden rounded-xl border bg-card">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-muted/60 text-left">
-                                <tr>
-                                    <th className="p-3">User</th>
-                                    <th className="p-3">Role</th>
-                                    <th className="p-3">Team</th>
-                                    <th className="p-3">Status</th>
-                                    <th className="p-3 text-center">
-                                        Total leads
-                                    </th>
-                                    <th className="p-3 text-center">Replies</th>
-                                    <th className="p-3">Sequence</th>
-                                    <th className="p-3">Created</th>
-                                    <th className="p-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {users.data.length === 0 && (
-                                    <tr>
-                                        <td
-                                            colSpan={9}
-                                            className="p-8 text-center text-sm text-muted-foreground"
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="users-role"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Role
+                        </label>
+                        <input
+                            type="hidden"
+                            name="role"
+                            value={roleFilter === ALL_ROLES ? '' : roleFilter}
+                        />
+                        <Select
+                            value={roleFilter}
+                            onValueChange={setRoleFilter}
+                        >
+                            <SelectTrigger id="users-role">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_ROLES}>
+                                    All roles
+                                </SelectItem>
+                                <SelectItem value="administrator">
+                                    Administrator
+                                </SelectItem>
+                                <SelectItem value="sub_administrator">
+                                    Sub-Administrator
+                                </SelectItem>
+                                <SelectItem value="agent">Agent</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex flex-col justify-end">
+                        <Button type="submit" variant="secondary">
+                            Apply filters
+                        </Button>
+                    </div>
+                </FilterBar>
+                {users.data.length ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead>User</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Team</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead align="right">Total leads</TableHead>
+                                <TableHead align="right">Replies</TableHead>
+                                <TableHead>Sequence</TableHead>
+                                <TableHead>Created</TableHead>
+                                <TableHead align="right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {users.data.map((user) => (
+                                <TableRow key={user.id}>
+                                    <TableCell>
+                                        <Link
+                                            href={edit(user.id)}
+                                            className="font-medium hover:underline"
                                         >
-                                            No users match your filters.
-                                        </td>
-                                    </tr>
-                                )}
-                                {users.data.map((user) => (
-                                    <tr key={user.id}>
-                                        <td className="p-3">
-                                            <Link
-                                                href={edit(user.id)}
-                                                className="font-medium hover:underline"
+                                            {user.name}
+                                        </Link>
+                                        <div className="text-xs text-muted-foreground">
+                                            {user.email}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="capitalize">
+                                        {user.role.replaceAll('_', ' ')}
+                                    </TableCell>
+                                    <TableCell>{user.team || '—'}</TableCell>
+                                    <TableCell>
+                                        <StatusBadge value={user.status} />
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        className="font-medium"
+                                    >
+                                        {user.leads_count.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        className="font-medium"
+                                    >
+                                        {user.email_replies_count.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell>
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={
+                                                user.email_sequence_enabled
+                                            }
+                                            aria-label={`${user.email_sequence_enabled ? 'Pause' : 'Enable'} email sequence for ${user.name}`}
+                                            onClick={() => toggleSequence(user)}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none ${user.email_sequence_enabled ? 'bg-success' : 'bg-muted-foreground/35'}`}
+                                        >
+                                            <span
+                                                className={`inline-block size-4 rounded-full bg-white shadow-sm transition-transform ${user.email_sequence_enabled ? 'translate-x-6' : 'translate-x-1'}`}
+                                            />
+                                        </button>
+                                        <span className="ml-2 align-top text-xs text-muted-foreground">
+                                            {user.email_sequence_enabled
+                                                ? 'Active'
+                                                : 'Paused'}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
+                                        {new Date(
+                                            user.created_at,
+                                        ).toLocaleDateString()}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                variant="outline"
                                             >
-                                                {user.name}
-                                            </Link>
-                                            <div className="text-xs text-muted-foreground">
-                                                {user.email}
-                                            </div>
-                                        </td>
-                                        <td className="p-3 capitalize">
-                                            {user.role.replaceAll('_', ' ')}
-                                        </td>
-                                        <td className="p-3">
-                                            {user.team || '—'}
-                                        </td>
-                                        <td className="p-3">
-                                            <StatusBadge value={user.status} />
-                                        </td>
-                                        <td className="p-3 text-center font-medium tabular-nums">
-                                            {user.leads_count.toLocaleString()}
-                                        </td>
-                                        <td className="p-3 text-center font-medium tabular-nums">
-                                            {user.email_replies_count.toLocaleString()}
-                                        </td>
-                                        <td className="p-3">
-                                            <button
-                                                type="button"
-                                                role="switch"
-                                                aria-checked={
-                                                    user.email_sequence_enabled
-                                                }
-                                                aria-label={`${user.email_sequence_enabled ? 'Pause' : 'Enable'} email sequence for ${user.name}`}
-                                                onClick={() =>
-                                                    toggleSequence(user)
-                                                }
-                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none ${user.email_sequence_enabled ? 'bg-emerald-500' : 'bg-muted-foreground/35'}`}
-                                            >
-                                                <span
-                                                    className={`inline-block size-4 rounded-full bg-white shadow-sm transition-transform ${user.email_sequence_enabled ? 'translate-x-6' : 'translate-x-1'}`}
-                                                />
-                                            </button>
-                                            <span className="ml-2 align-top text-xs text-muted-foreground">
-                                                {user.email_sequence_enabled
-                                                    ? 'Active'
-                                                    : 'Paused'}
-                                            </span>
-                                        </td>
-                                        <td className="p-3">
-                                            {new Date(
-                                                user.created_at,
-                                            ).toLocaleDateString()}
-                                        </td>
-                                        <td className="p-3 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    asChild
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    <Link href={edit(user.id)}>
-                                                        <Pencil />
-                                                        Edit
-                                                    </Link>
-                                                </Button>
-                                                {user.can_delete && (
-                                                    <Dialog>
-                                                        <DialogTrigger asChild>
+                                                <Link href={edit(user.id)}>
+                                                    <Pencil />
+                                                    Edit
+                                                </Link>
+                                            </Button>
+                                            {user.can_delete && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="destructive"
+                                                        >
+                                                            <Trash2 />
+                                                            Delete
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogTitle>
+                                                            Delete {user.name}?
+                                                        </DialogTitle>
+                                                        <DialogDescription>
+                                                            This removes the
+                                                            user from active
+                                                            access. Their
+                                                            historical leads and
+                                                            replies remain
+                                                            stored.
+                                                        </DialogDescription>
+                                                        <DialogFooter>
+                                                            <DialogClose
+                                                                asChild
+                                                            >
+                                                                <Button variant="secondary">
+                                                                    Cancel
+                                                                </Button>
+                                                            </DialogClose>
                                                             <Button
                                                                 type="button"
-                                                                size="sm"
                                                                 variant="destructive"
+                                                                onClick={() =>
+                                                                    router.delete(
+                                                                        destroy.url(
+                                                                            user.id,
+                                                                        ),
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    )
+                                                                }
                                                             >
-                                                                <Trash2 />
-                                                                Delete
+                                                                Delete user
                                                             </Button>
-                                                        </DialogTrigger>
-                                                        <DialogContent>
-                                                            <DialogTitle>
-                                                                Delete{' '}
-                                                                {user.name}?
-                                                            </DialogTitle>
-                                                            <DialogDescription>
-                                                                This removes the
-                                                                user from active
-                                                                access. Their
-                                                                historical leads
-                                                                and replies
-                                                                remain stored.
-                                                            </DialogDescription>
-                                                            <DialogFooter>
-                                                                <DialogClose
-                                                                    asChild
-                                                                >
-                                                                    <Button variant="secondary">
-                                                                        Cancel
-                                                                    </Button>
-                                                                </DialogClose>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="destructive"
-                                                                    onClick={() =>
-                                                                        router.delete(
-                                                                            destroy.url(
-                                                                                user.id,
-                                                                            ),
-                                                                            {
-                                                                                preserveScroll: true,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Delete user
-                                                                </Button>
-                                                            </DialogFooter>
-                                                        </DialogContent>
-                                                    </Dialog>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <div className="rounded-xl border bg-card">
+                        <EmptyState
+                            icon={UsersRound}
+                            title="No users match your filters"
+                            description="Try a broader search or another role."
+                        />
                     </div>
-                </div>
+                )}
                 <Pagination links={users.links} />
             </div>
         </>

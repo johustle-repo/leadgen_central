@@ -1,7 +1,7 @@
 import { Form, Head } from '@inertiajs/react';
+import { KeyRound } from 'lucide-react';
 import { useRef } from 'react';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
-import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import type { Props as ManagePasskeysProps } from '@/components/manage-passkeys';
 import ManagePasskeys from '@/components/manage-passkeys';
@@ -9,6 +9,13 @@ import type { Props as ManageTwoFactorProps } from '@/components/manage-two-fact
 import ManageTwoFactor from '@/components/manage-two-factor';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/security';
 
@@ -27,37 +34,44 @@ export default function Security(props: Props) {
 
             <h1 className="sr-only">Security settings</h1>
 
-            <div className="space-y-6">
-                <Heading
-                    variant="small"
-                    title="Update password"
-                    description="Ensure your account is using a long, random password to stay secure"
-                />
+            <Form
+                {...SecurityController.update.form()}
+                options={{
+                    preserveScroll: true,
+                }}
+                resetOnError={[
+                    'password',
+                    'password_confirmation',
+                    'current_password',
+                ]}
+                resetOnSuccess
+                onError={(errors) => {
+                    if (errors.password) {
+                        passwordInput.current?.focus();
+                    }
 
-                <Form
-                    {...SecurityController.update.form()}
-                    options={{
-                        preserveScroll: true,
-                    }}
-                    resetOnError={[
-                        'password',
-                        'password_confirmation',
-                        'current_password',
-                    ]}
-                    resetOnSuccess
-                    onError={(errors) => {
-                        if (errors.password) {
-                            passwordInput.current?.focus();
-                        }
-
-                        if (errors.current_password) {
-                            currentPasswordInput.current?.focus();
-                        }
-                    }}
-                    className="space-y-6"
-                >
-                    {({ errors, processing }) => (
-                        <>
+                    if (errors.current_password) {
+                        currentPasswordInput.current?.focus();
+                    }
+                }}
+            >
+                {({ errors, processing }) => (
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                    <KeyRound className="size-5" />
+                                </div>
+                                <div>
+                                    <CardTitle>Update password</CardTitle>
+                                    <CardDescription>
+                                        Ensure your account is using a long,
+                                        random password to stay secure.
+                                    </CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="current_password">
                                     Current password
@@ -118,10 +132,10 @@ export default function Security(props: Props) {
                                     Save
                                 </Button>
                             </div>
-                        </>
-                    )}
-                </Form>
-            </div>
+                        </CardContent>
+                    </Card>
+                )}
+            </Form>
 
             <ManageTwoFactor
                 canManageTwoFactor={props.canManageTwoFactor}

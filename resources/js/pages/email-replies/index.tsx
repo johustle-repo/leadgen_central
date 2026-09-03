@@ -8,12 +8,15 @@ import {
     Mail,
     MailOpen,
     RefreshCw,
+    SlidersHorizontal,
     Sparkles,
     Unplug,
 } from 'lucide-react';
 import { useState } from 'react';
+import { FilterBar } from '@/components/filter-bar';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
+import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -188,7 +191,7 @@ export default function EmailRepliesIndex({
                                         : 'Only messages from email addresses belonging to your leads are saved.'}
                                 </p>
                                 {connection?.last_error && (
-                                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                                    <p className="mt-2 text-sm text-destructive">
                                         {connection.last_error}
                                     </p>
                                 )}
@@ -259,114 +262,121 @@ export default function EmailRepliesIndex({
                 </Card>
 
                 <div className="grid gap-4 sm:grid-cols-3">
-                    {[
-                        {
-                            label: 'Unread replies',
-                            value: summary.unread,
-                            icon: Inbox,
-                            color: 'text-cyan-600 dark:text-cyan-300',
-                        },
-                        {
-                            label: 'Interested replies',
-                            value: summary.possible,
-                            icon: Sparkles,
-                            color: 'text-emerald-600 dark:text-emerald-300',
-                        },
-                        {
-                            label: 'Needs review',
-                            value: summary.needs_review,
-                            icon: AlertCircle,
-                            color: 'text-amber-600 dark:text-amber-300',
-                        },
-                    ].map((item) => {
-                        const Icon = item.icon;
-
-                        return (
-                            <Card key={item.label}>
-                                <CardContent className="flex items-center justify-between gap-4 p-5">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            {item.label}
-                                        </p>
-                                        <p className="mt-1 text-3xl font-bold">
-                                            {item.value.toLocaleString('en-US')}
-                                        </p>
-                                    </div>
-                                    <Icon className={`size-6 ${item.color}`} />
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
+                    <StatTile
+                        label="Unread replies"
+                        value={summary.unread}
+                        icon={Inbox}
+                        tone="text-info"
+                    />
+                    <StatTile
+                        label="Interested replies"
+                        value={summary.possible}
+                        icon={Sparkles}
+                        tone="text-success"
+                    />
+                    <StatTile
+                        label="Needs review"
+                        value={summary.needs_review}
+                        icon={AlertCircle}
+                        tone="text-warning"
+                    />
                 </div>
 
-                <form
+                <FilterBar
+                    as="form"
                     onSubmit={filter}
-                    className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-5"
+                    icon={SlidersHorizontal}
+                    label="Filters"
+                    gridClassName="md:grid-cols-5"
                 >
-                    <Input
-                        name="search"
-                        defaultValue={filters.search}
-                        placeholder="Search sender, subject, or company…"
-                        className="md:col-span-2"
-                    />
-                    <Input
-                        name="date"
-                        type="date"
-                        defaultValue={filters.date}
-                        aria-label="Reply date"
-                    />
-                    <input
-                        type="hidden"
-                        name="classification"
-                        value={
-                            classificationFilter === ALL_CLASSIFICATIONS
-                                ? ''
-                                : classificationFilter
-                        }
-                    />
-                    <Select
-                        value={classificationFilter}
-                        onValueChange={setClassificationFilter}
-                    >
-                        <SelectTrigger aria-label="Reply classification">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ALL_CLASSIFICATIONS}>
-                                All classifications
-                            </SelectItem>
-                            <SelectItem value="interested">
-                                Interested
-                            </SelectItem>
-                            <SelectItem value="not_interested">
-                                Not interested
-                            </SelectItem>
-                            <SelectItem value="not_now">Not now</SelectItem>
-                            <SelectItem value="do_not_contact">
-                                Do not contact
-                            </SelectItem>
-                            <SelectItem value="bounce">Bounce</SelectItem>
-                            <SelectItem value="retired">
-                                Retired / left company
-                            </SelectItem>
-                            <SelectItem value="out_of_office">
-                                Out of office
-                            </SelectItem>
-                            <SelectItem value="needs_review">
-                                Needs review
-                            </SelectItem>
-                            <SelectItem value="automatic_reply">
-                                Automatic reply
-                            </SelectItem>
-                            <SelectItem value="possible_lead">
-                                Possible lead (legacy)
-                            </SelectItem>
-                            <SelectItem value="not_lead">
-                                Not lead (legacy)
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                        <label
+                            htmlFor="replies-search"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Search
+                        </label>
+                        <Input
+                            id="replies-search"
+                            name="search"
+                            defaultValue={filters.search}
+                            placeholder="Search sender, subject, or company…"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="replies-date"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Date
+                        </label>
+                        <Input
+                            id="replies-date"
+                            name="date"
+                            type="date"
+                            defaultValue={filters.date}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="replies-classification"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Classification
+                        </label>
+                        <input
+                            type="hidden"
+                            name="classification"
+                            value={
+                                classificationFilter === ALL_CLASSIFICATIONS
+                                    ? ''
+                                    : classificationFilter
+                            }
+                        />
+                        <Select
+                            value={classificationFilter}
+                            onValueChange={setClassificationFilter}
+                        >
+                            <SelectTrigger id="replies-classification">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_CLASSIFICATIONS}>
+                                    All classifications
+                                </SelectItem>
+                                <SelectItem value="interested">
+                                    Interested
+                                </SelectItem>
+                                <SelectItem value="not_interested">
+                                    Not interested
+                                </SelectItem>
+                                <SelectItem value="not_now">Not now</SelectItem>
+                                <SelectItem value="do_not_contact">
+                                    Do not contact
+                                </SelectItem>
+                                <SelectItem value="bounce">Bounce</SelectItem>
+                                <SelectItem value="retired">
+                                    Retired / left company
+                                </SelectItem>
+                                <SelectItem value="out_of_office">
+                                    Out of office
+                                </SelectItem>
+                                <SelectItem value="needs_review">
+                                    Needs review
+                                </SelectItem>
+                                <SelectItem value="automatic_reply">
+                                    Automatic reply
+                                </SelectItem>
+                                <SelectItem value="possible_lead">
+                                    Possible lead (legacy)
+                                </SelectItem>
+                                <SelectItem value="not_lead">
+                                    Not lead (legacy)
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex flex-col justify-end gap-2 sm:flex-row">
                         <label className="flex flex-1 items-center gap-2 rounded-md border px-3 text-sm">
                             <Checkbox
                                 name="unread"
@@ -379,7 +389,7 @@ export default function EmailRepliesIndex({
                             Apply
                         </Button>
                     </div>
-                </form>
+                </FilterBar>
 
                 <Card className="overflow-hidden">
                     {!!replies.data.length && (

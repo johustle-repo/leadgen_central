@@ -1,10 +1,17 @@
 import { Form, Head, usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
+import { UserRound } from 'lucide-react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
-import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/profile';
@@ -30,22 +37,28 @@ export default function Profile({
 
             <h1 className="sr-only">Profile settings</h1>
 
-            <div className="space-y-6">
-                <Heading
-                    variant="small"
-                    title="Profile"
-                    description="Update your name and email address"
-                />
-
-                <Form
-                    {...ProfileController.update.form()}
-                    options={{
-                        preserveScroll: true,
-                    }}
-                    className="space-y-6"
-                >
-                    {({ processing, errors }) => (
-                        <>
+            <Form
+                {...ProfileController.update.form()}
+                options={{
+                    preserveScroll: true,
+                }}
+            >
+                {({ processing, errors }) => (
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                    <UserRound className="size-5" />
+                                </div>
+                                <div>
+                                    <CardTitle>Profile</CardTitle>
+                                    <CardDescription>
+                                        Update your name and email address.
+                                    </CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="name">Name</Label>
 
@@ -102,7 +115,7 @@ export default function Profile({
 
                                         {status ===
                                             'verification-link-sent' && (
-                                            <div className="mt-2 text-sm font-medium text-green-600">
+                                            <div className="mt-2 text-sm font-medium text-success">
                                                 A new verification link has been
                                                 sent to your email address.
                                             </div>
@@ -118,10 +131,10 @@ export default function Profile({
                                     Save
                                 </Button>
                             </div>
-                        </>
-                    )}
-                </Form>
-            </div>
+                        </CardContent>
+                    </Card>
+                )}
+            </Form>
 
             <DeleteUser />
         </>
