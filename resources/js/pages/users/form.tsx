@@ -3,6 +3,13 @@ import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { index, store, update } from '@/routes/users';
 type User = {
     id: number;
@@ -96,35 +103,56 @@ export default function UserForm({
                             ))}
                             <div>
                                 <Label htmlFor="role">Role</Label>
-                                <select
-                                    id="role"
+                                <Select
                                     name="role"
-                                    defaultValue={managedUser?.role ?? 'agent'}
-                                    className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                    defaultValue={
+                                        managedUser?.role ?? 'agent'
+                                    }
                                 >
-                                    {roles.map((role) => (
-                                        <option key={role} value={role}>
-                                            {role.replaceAll('_', ' ')}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger
+                                        id="role"
+                                        className="mt-2 w-full"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {roles.map((role) => (
+                                            <SelectItem
+                                                key={role}
+                                                value={role}
+                                                className="capitalize"
+                                            >
+                                                {role.replaceAll('_', ' ')}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div>
                                 <Label htmlFor="status">Status</Label>
-                                <select
-                                    id="status"
+                                <Select
                                     name="status"
                                     defaultValue={
                                         managedUser?.status ?? 'active'
                                     }
-                                    className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
                                 >
-                                    {statuses.map((status) => (
-                                        <option key={status} value={status}>
-                                            {status}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger
+                                        id="status"
+                                        className="mt-2 w-full"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {statuses.map((status) => (
+                                            <SelectItem
+                                                key={status}
+                                                value={status}
+                                            >
+                                                {status}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 {errors.status && (
                                     <p className="mt-1 text-sm text-destructive">
                                         {errors.status}

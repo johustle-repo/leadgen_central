@@ -10,7 +10,7 @@ export function Pagination({
     }
 
     return (
-        <nav className="flex flex-wrap gap-2">
+        <nav className="flex flex-wrap gap-2" aria-label="Pagination">
             {links.map((link, index) =>
                 link.url ? (
                     <Link

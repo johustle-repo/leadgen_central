@@ -5,9 +5,28 @@ import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { cancel, enroll, update } from '@/routes/email-sequences';
+
+const SELECT_LEAD = '__select__';
 
 type Step = {
     day: number;
@@ -119,7 +138,7 @@ export default function EmailSequencesIndex({
                 </div>
 
                 {!gmailConnected && (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
                         Connect Gmail from Email Replies before enrolling a
                         lead.
                     </div>
@@ -134,27 +153,37 @@ export default function EmailSequencesIndex({
                             onSubmit={addLead}
                             className="flex flex-col gap-3 sm:flex-row"
                         >
-                            <select
-                                value={enrollment.data.lead_id}
-                                onChange={(event) =>
+                            <Select
+                                value={enrollment.data.lead_id || SELECT_LEAD}
+                                onValueChange={(value) =>
                                     enrollment.setData(
                                         'lead_id',
-                                        event.target.value,
+                                        value === SELECT_LEAD ? '' : value,
                                     )
                                 }
-                                className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
-                                aria-label="Lead to enroll"
                             >
-                                <option value="">
-                                    Select one of your leads…
-                                </option>
-                                {availableLeads.map((lead) => (
-                                    <option key={lead.id} value={lead.id}>
-                                        {lead.contact_person || lead.email} —{' '}
-                                        {lead.company_name}
-                                    </option>
-                                ))}
-                            </select>
+                                <SelectTrigger
+                                    className="flex-1"
+                                    aria-label="Lead to enroll"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={SELECT_LEAD}>
+                                        Select one of your leads…
+                                    </SelectItem>
+                                    {availableLeads.map((lead) => (
+                                        <SelectItem
+                                            key={lead.id}
+                                            value={String(lead.id)}
+                                        >
+                                            {lead.contact_person ||
+                                                lead.email}{' '}
+                                            — {lead.company_name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <Button
                                 disabled={
                                     !gmailConnected ||
@@ -193,13 +222,12 @@ export default function EmailSequencesIndex({
                                     />
                                 </div>
                                 <label className="flex items-center gap-2 text-sm">
-                                    <input
-                                        type="checkbox"
+                                    <Checkbox
                                         checked={editor.data.is_active}
-                                        onChange={(event) =>
+                                        onCheckedChange={(checked) =>
                                             editor.setData(
                                                 'is_active',
-                                                event.target.checked,
+                                                checked === true,
                                             )
                                         }
                                     />
@@ -263,13 +291,12 @@ export default function EmailSequencesIndex({
                                         />
                                     </div>
                                     <label className="flex items-center gap-2 text-sm">
-                                        <input
-                                            type="checkbox"
+                                        <Checkbox
                                             checked={step.attach_brochure}
-                                            onChange={(event) =>
+                                            onCheckedChange={(checked) =>
                                                 setStep(index, {
                                                     attach_brochure:
-                                                        event.target.checked,
+                                                        checked === true,
                                                 })
                                             }
                                         />
@@ -337,21 +364,59 @@ export default function EmailSequencesIndex({
                                         </td>
                                         <td className="p-3 text-right">
                                             {item.status === 'active' && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        router.delete(
-                                                            cancel.url(item.id),
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
-                                                        )
-                                                    }
-                                                >
-                                                    <Square /> Stop
-                                                </Button>
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                        >
+                                                            <Square /> Stop
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogTitle>
+                                                            Stop this sequence?
+                                                        </DialogTitle>
+                                                        <DialogDescription>
+                                                            Remaining follow-up
+                                                            steps for{' '}
+                                                            {item.lead
+                                                                ?.contact_person ||
+                                                                item.lead
+                                                                    ?.email ||
+                                                                'this lead'}{' '}
+                                                            will not be sent.
+                                                            This can't be
+                                                            undone.
+                                                        </DialogDescription>
+                                                        <DialogFooter>
+                                                            <DialogClose
+                                                                asChild
+                                                            >
+                                                                <Button variant="secondary">
+                                                                    Cancel
+                                                                </Button>
+                                                            </DialogClose>
+                                                            <Button
+                                                                type="button"
+                                                                variant="destructive"
+                                                                onClick={() =>
+                                                                    router.delete(
+                                                                        cancel.url(
+                                                                            item.id,
+                                                                        ),
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                Stop sequence
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
                                             )}
                                         </td>
                                     </tr>

@@ -1,6 +1,8 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
+import { FilterTabs } from '@/components/filter-tabs';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
+import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { errors, index, show } from '@/routes/uploads';
 type Batch = {
@@ -83,15 +85,11 @@ export default function UploadShow({
                         ['Location Issues', batch.location_error_rows],
                         ['Other Errors', batch.error_rows],
                     ].map(([label, value]) => (
-                        <div
+                        <StatTile
                             key={String(label)}
-                            className="rounded-xl border bg-card p-5"
-                        >
-                            <p className="text-sm text-muted-foreground">
-                                {label}
-                            </p>
-                            <p className="text-3xl font-semibold">{value}</p>
-                        </div>
+                            label={String(label)}
+                            value={value as number}
+                        />
                     ))}
                 </div>
                 {batch.failure_message && (
@@ -99,19 +97,21 @@ export default function UploadShow({
                         {batch.failure_message}
                     </div>
                 )}
-                <div className="flex flex-wrap gap-2">
-                    {tabs.map((tab) => (
-                        <Link
-                            key={tab}
-                            href={show(batch.id, {
-                                query: { status: tab || undefined },
-                            })}
-                            className={`rounded-md px-3 py-2 text-sm capitalize ${filter === tab ? 'bg-primary text-primary-foreground' : 'border'}`}
-                        >
-                            {tab || 'all rows'}
-                        </Link>
-                    ))}
-                </div>
+                <FilterTabs
+                    tabs={tabs.map((tab) => ({
+                        label: tab
+                            ? tab
+                                  .replaceAll('_', ' ')
+                                  .replace(/\b\w/g, (letter) =>
+                                      letter.toUpperCase(),
+                                  )
+                            : 'All rows',
+                        href: show(batch.id, {
+                            query: { status: tab || undefined },
+                        }),
+                        active: filter === tab,
+                    }))}
+                />
                 <div className="overflow-hidden rounded-xl border bg-card">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">

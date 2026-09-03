@@ -1,10 +1,57 @@
 import { Form, Head } from '@inertiajs/react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { index, store, update } from '@/routes/leads';
+
+const NO_DATA_SOURCE = '__none__';
+
+function DataSourceSelect({
+    id,
+    name,
+    defaultValue,
+}: {
+    id: string;
+    name: string;
+    defaultValue: string;
+}) {
+    const [value, setValue] = useState(defaultValue || NO_DATA_SOURCE);
+
+    return (
+        <>
+            <input
+                type="hidden"
+                name={name}
+                value={value === NO_DATA_SOURCE ? '' : value}
+            />
+            <Select value={value} onValueChange={setValue}>
+                <SelectTrigger id={id} className="mt-2 w-full">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value={NO_DATA_SOURCE}>
+                        Select a source
+                    </SelectItem>
+                    {dataSources.map((source) => (
+                        <SelectItem key={source} value={source}>
+                            {source}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </>
+    );
+}
 type Lead = Record<string, string | number | null> & {
     id: number;
     company_name: string;
@@ -80,25 +127,31 @@ export default function LeadForm({
                             {agents.length > 0 && (
                                 <section className="rounded-xl border bg-card p-5">
                                     <Label htmlFor="agent_id">Lead owner</Label>
-                                    <select
-                                        id="agent_id"
+                                    <Select
                                         name="agent_id"
                                         defaultValue={String(
                                             lead?.agent_id ??
                                                 defaults.agent_id ??
                                                 agents[0]?.id,
                                         )}
-                                        className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
                                     >
-                                        {agents.map((agent) => (
-                                            <option
-                                                key={agent.id}
-                                                value={agent.id}
-                                            >
-                                                {agent.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger
+                                            id="agent_id"
+                                            className="mt-2 w-full"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {agents.map((agent) => (
+                                                <SelectItem
+                                                    key={agent.id}
+                                                    value={String(agent.id)}
+                                                >
+                                                    {agent.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </section>
                             )}
                             <section className="rounded-xl border bg-card p-5">
@@ -128,28 +181,11 @@ export default function LeadForm({
                                                 </Label>
                                                 {field.name ===
                                                 'data_source' ? (
-                                                    <select
+                                                    <DataSourceSelect
                                                         id={field.name}
                                                         name={field.name}
                                                         defaultValue={value}
-                                                        className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                                                    >
-                                                        <option value="">
-                                                            Select a source
-                                                        </option>
-                                                        {dataSources.map(
-                                                            (source) => (
-                                                                <option
-                                                                    key={source}
-                                                                    value={
-                                                                        source
-                                                                    }
-                                                                >
-                                                                    {source}
-                                                                </option>
-                                                            ),
-                                                        )}
-                                                    </select>
+                                                    />
                                                 ) : (
                                                     <Input
                                                         id={field.name}

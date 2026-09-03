@@ -7,6 +7,22 @@ import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     bulkDestroy,
     create,
     destroy,
@@ -29,6 +45,7 @@ type Batch = {
     user: { name: string } | null;
 };
 type Agent = { id: number; name: string };
+const ALL_AGENTS = '__all__';
 
 const formatUploadedDate = (value: string) =>
     new Intl.DateTimeFormat('en-US', {
@@ -115,14 +132,6 @@ export default function UploadIndex({
     };
 
     const deleteSelectedBatches = () => {
-        if (
-            !window.confirm(
-                `Delete ${selectedCount} selected upload histories? Imported leads will be preserved, but the raw files and row history will be removed.`,
-            )
-        ) {
-            return;
-        }
-
         router.delete(bulkDestroy.url(), {
             data: selectAllMatching
                 ? { select_all: true }
@@ -145,14 +154,43 @@ export default function UploadIndex({
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
                             {isAdministrator && selectedCount > 0 && (
-                                <Button
-                                    type="button"
-                                    variant="destructive"
-                                    onClick={deleteSelectedBatches}
-                                >
-                                    <Trash2 />
-                                    Delete selected ({selectedCount})
-                                </Button>
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                        >
+                                            <Trash2 />
+                                            Delete selected ({selectedCount})
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogTitle>
+                                            Delete {selectedCount} upload
+                                            {selectedCount === 1 ? '' : 's'}?
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            Imported leads will be preserved,
+                                            but the raw files and row history
+                                            will be removed. This can't be
+                                            undone.
+                                        </DialogDescription>
+                                        <DialogFooter>
+                                            <DialogClose asChild>
+                                                <Button variant="secondary">
+                                                    Cancel
+                                                </Button>
+                                            </DialogClose>
+                                            <Button
+                                                type="button"
+                                                variant="destructive"
+                                                onClick={deleteSelectedBatches}
+                                            >
+                                                Delete
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                             )}
                             <Button asChild>
                                 <Link href={create()}>
@@ -166,71 +204,100 @@ export default function UploadIndex({
                 <div className="flex flex-wrap items-center justify-end gap-3">
                     <label className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span>Show</span>
-                        <select
+                        <Select
                             value={filters.per_page}
-                            onChange={(event) =>
-                                updateQuery({ per_page: event.target.value })
+                            onValueChange={(value) =>
+                                updateQuery({ per_page: value })
                             }
-                            className="h-9 rounded-md border bg-background px-3 text-sm text-foreground"
-                            aria-label="Uploads per page"
                         >
-                            <option value="10">10 per page</option>
-                            <option value="25">25 per page</option>
-                            <option value="50">50 per page</option>
-                            <option value="100">100 per page</option>
-                        </select>
+                            <SelectTrigger aria-label="Uploads per page">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="10">10 per page</SelectItem>
+                                <SelectItem value="25">25 per page</SelectItem>
+                                <SelectItem value="50">50 per page</SelectItem>
+                                <SelectItem value="100">
+                                    100 per page
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
                     </label>
                     {agents.length > 0 && (
                         <label className="flex items-center gap-2 text-sm text-muted-foreground">
                             <span>Agent</span>
-                            <select
-                                value={filters.agent_id}
-                                onChange={(event) =>
+                            <Select
+                                value={filters.agent_id || ALL_AGENTS}
+                                onValueChange={(value) =>
                                     updateQuery({
-                                        agent_id: event.target.value,
+                                        agent_id:
+                                            value === ALL_AGENTS ? '' : value,
                                     })
                                 }
-                                className="h-9 rounded-md border bg-background px-3 text-sm text-foreground"
-                                aria-label="Filter by agent"
                             >
-                                <option value="">All agents</option>
-                                {agents.map((agent) => (
-                                    <option key={agent.id} value={agent.id}>
-                                        {agent.name}
-                                    </option>
-                                ))}
-                            </select>
+                                <SelectTrigger aria-label="Filter by agent">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ALL_AGENTS}>
+                                        All agents
+                                    </SelectItem>
+                                    {agents.map((agent) => (
+                                        <SelectItem
+                                            key={agent.id}
+                                            value={String(agent.id)}
+                                        >
+                                            {agent.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </label>
                     )}
                     <label className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span>Sort by</span>
-                        <select
+                        <Select
                             value={sort}
-                            onChange={(event) =>
-                                updateQuery({ sort: event.target.value })
+                            onValueChange={(value) =>
+                                updateQuery({ sort: value })
                             }
-                            className="h-9 rounded-md border bg-background px-3 text-sm text-foreground"
-                            aria-label="Sort upload history"
                         >
-                            <option value="newest">Newest first</option>
-                            <option value="oldest">Oldest first</option>
-                            <option value="filename_asc">Filename A–Z</option>
-                            <option value="filename_desc">Filename Z–A</option>
-                            <option value="agent_asc">Agent A–Z</option>
-                            <option value="agent_desc">Agent Z–A</option>
-                            <option value="status">Status</option>
-                        </select>
+                            <SelectTrigger aria-label="Sort upload history">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="newest">
+                                    Newest first
+                                </SelectItem>
+                                <SelectItem value="oldest">
+                                    Oldest first
+                                </SelectItem>
+                                <SelectItem value="filename_asc">
+                                    Filename A–Z
+                                </SelectItem>
+                                <SelectItem value="filename_desc">
+                                    Filename Z–A
+                                </SelectItem>
+                                <SelectItem value="agent_asc">
+                                    Agent A–Z
+                                </SelectItem>
+                                <SelectItem value="agent_desc">
+                                    Agent Z–A
+                                </SelectItem>
+                                <SelectItem value="status">Status</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </label>
                 </div>
                 {isAdministrator && canSelectAllMatching && (
-                    <div className="flex items-center justify-between rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-4 py-2.5 text-sm">
+                    <div className="flex items-center justify-between rounded-lg border border-info/20 bg-info/5 px-4 py-2.5 text-sm">
                         <span>
                             All {selectedVisibleBatchIds.length} deletable
                             uploads on this page are selected.
                         </span>
                         <button
                             type="button"
-                            className="font-medium text-cyan-600 hover:underline dark:text-cyan-400"
+                            className="font-medium text-info hover:underline"
                             onClick={() => setSelectAllMatching(true)}
                         >
                             Select all {deletableTotal} matching uploads
@@ -238,13 +305,13 @@ export default function UploadIndex({
                     </div>
                 )}
                 {isAdministrator && selectAllMatching && (
-                    <div className="flex items-center justify-between rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-4 py-2.5 text-sm">
+                    <div className="flex items-center justify-between rounded-lg border border-info/20 bg-info/5 px-4 py-2.5 text-sm">
                         <span>
                             All {deletableTotal} deletable uploads are selected.
                         </span>
                         <button
                             type="button"
-                            className="font-medium text-cyan-600 hover:underline dark:text-cyan-400"
+                            className="font-medium text-info hover:underline"
                             onClick={() => setSelectAllMatching(false)}
                         >
                             Select just this page instead
@@ -338,13 +405,13 @@ export default function UploadIndex({
                                         <td className="p-3">
                                             {batch.total_rows}
                                         </td>
-                                        <td className="p-3 text-emerald-700">
+                                        <td className="p-3 text-success">
                                             {batch.accepted_rows}
                                         </td>
-                                        <td className="p-3 text-red-700">
+                                        <td className="p-3 text-destructive">
                                             {batch.rejected_rows}
                                         </td>
-                                        <td className="p-3 text-red-700">
+                                        <td className="p-3 text-destructive">
                                             {batch.error_rows}
                                         </td>
                                         <td className="p-3">
@@ -356,36 +423,75 @@ export default function UploadIndex({
                                             <div className="flex items-center gap-2">
                                                 {batch.processing_status ===
                                                     'pending' && (
-                                                    <Link
-                                                        href={retry(batch.id)}
-                                                        method="post"
-                                                        as="button"
-                                                        preserveScroll
-                                                        className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium whitespace-nowrap hover:bg-muted"
+                                                    <Button
+                                                        asChild
+                                                        size="sm"
+                                                        variant="outline"
                                                     >
-                                                        <RotateCcw className="size-3.5" />
-                                                        Retry processing
-                                                    </Link>
+                                                        <Link
+                                                            href={retry(
+                                                                batch.id,
+                                                            )}
+                                                            method="post"
+                                                            preserveScroll
+                                                        >
+                                                            <RotateCcw />
+                                                            Retry processing
+                                                        </Link>
+                                                    </Button>
                                                 )}
                                                 {batch.processing_status ===
                                                     'completed' && (
-                                                    <Link
-                                                        href={reanalyze(
-                                                            batch.id,
-                                                        )}
-                                                        method="post"
-                                                        as="button"
-                                                        preserveScroll
-                                                        onBefore={() =>
-                                                            window.confirm(
-                                                                'Re-analyze this upload’s duplicate rows using the latest rules?',
-                                                            )
-                                                        }
-                                                        className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium whitespace-nowrap hover:bg-muted"
-                                                    >
-                                                        <RotateCcw className="size-3.5" />
-                                                        Re-analyze
-                                                    </Link>
+                                                    <Dialog>
+                                                        <DialogTrigger asChild>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                            >
+                                                                <RotateCcw />
+                                                                Re-analyze
+                                                            </Button>
+                                                        </DialogTrigger>
+                                                        <DialogContent>
+                                                            <DialogTitle>
+                                                                Re-analyze this
+                                                                upload?
+                                                            </DialogTitle>
+                                                            <DialogDescription>
+                                                                Duplicate rows
+                                                                will be
+                                                                re-checked
+                                                                using the
+                                                                latest rules.
+                                                            </DialogDescription>
+                                                            <DialogFooter>
+                                                                <DialogClose
+                                                                    asChild
+                                                                >
+                                                                    <Button variant="secondary">
+                                                                        Cancel
+                                                                    </Button>
+                                                                </DialogClose>
+                                                                <Button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        router.post(
+                                                                            reanalyze(
+                                                                                batch.id,
+                                                                            ),
+                                                                            {},
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Re-analyze
+                                                                </Button>
+                                                            </DialogFooter>
+                                                        </DialogContent>
+                                                    </Dialog>
                                                 )}
                                                 {auth.user.role ===
                                                     'administrator' &&
@@ -395,23 +501,66 @@ export default function UploadIndex({
                                                     ].includes(
                                                         batch.processing_status,
                                                     ) && (
-                                                        <Link
-                                                            href={destroy(
-                                                                batch.id,
-                                                            )}
-                                                            method="delete"
-                                                            as="button"
-                                                            preserveScroll
-                                                            onBefore={() =>
-                                                                window.confirm(
-                                                                    `Delete ${batch.original_filename} from upload history? Imported leads will be preserved, but this cannot be undone.`,
-                                                                )
-                                                            }
-                                                            className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-2 text-xs font-medium whitespace-nowrap text-red-700 hover:bg-red-500/10 dark:text-red-300"
-                                                        >
-                                                            <Trash2 className="size-3.5" />
-                                                            Delete
-                                                        </Link>
+                                                        <Dialog>
+                                                            <DialogTrigger
+                                                                asChild
+                                                            >
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="destructive"
+                                                                >
+                                                                    <Trash2 />
+                                                                    Delete
+                                                                </Button>
+                                                            </DialogTrigger>
+                                                            <DialogContent>
+                                                                <DialogTitle>
+                                                                    Delete{' '}
+                                                                    {
+                                                                        batch.original_filename
+                                                                    }
+                                                                    ?
+                                                                </DialogTitle>
+                                                                <DialogDescription>
+                                                                    Imported
+                                                                    leads will
+                                                                    be
+                                                                    preserved,
+                                                                    but this
+                                                                    removes the
+                                                                    upload from
+                                                                    history and
+                                                                    can't be
+                                                                    undone.
+                                                                </DialogDescription>
+                                                                <DialogFooter>
+                                                                    <DialogClose
+                                                                        asChild
+                                                                    >
+                                                                        <Button variant="secondary">
+                                                                            Cancel
+                                                                        </Button>
+                                                                    </DialogClose>
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="destructive"
+                                                                        onClick={() =>
+                                                                            router.delete(
+                                                                                destroy(
+                                                                                    batch.id,
+                                                                                ),
+                                                                                {
+                                                                                    preserveScroll: true,
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Delete
+                                                                    </Button>
+                                                                </DialogFooter>
+                                                            </DialogContent>
+                                                        </Dialog>
                                                     )}
                                             </div>
                                         </td>

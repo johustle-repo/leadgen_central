@@ -1,7 +1,24 @@
 import { Head } from '@inertiajs/react';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
+import { StatusBadge } from '@/components/status-badge';
 import { index } from '@/routes/audit-logs';
+
+const SENSITIVE_ACTION_PATTERN = /delete|disconnect|stop|cancel|reject/i;
+const ROUTINE_ACTION_PATTERN =
+    /create|upload|connect|enroll|sent|verified|forward/i;
+
+function actionColorClass(action: string): string {
+    if (SENSITIVE_ACTION_PATTERN.test(action)) {
+        return 'bg-destructive/15 text-destructive dark:bg-destructive/20';
+    }
+
+    if (ROUTINE_ACTION_PATTERN.test(action)) {
+        return 'bg-success/15 text-success dark:bg-success/20';
+    }
+
+    return 'bg-muted text-muted-foreground';
+}
 
 type AuditLog = {
     id: number;
@@ -61,12 +78,15 @@ export default function AuditLogIndex({
                                             </p>
                                         </td>
                                         <td className="p-3">
-                                            <span className="rounded-full bg-red-500/10 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-300">
-                                                {log.action.replaceAll(
-                                                    '_',
+                                            <StatusBadge
+                                                value={log.action.replaceAll(
+                                                    '.',
                                                     ' ',
                                                 )}
-                                            </span>
+                                                colorClass={actionColorClass(
+                                                    log.action,
+                                                )}
+                                            />
                                         </td>
                                         <td className="p-3">
                                             <p>{log.description}</p>

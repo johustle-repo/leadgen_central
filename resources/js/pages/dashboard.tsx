@@ -10,10 +10,18 @@ import {
     TrendingUp,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
+import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { dashboard } from '@/routes';
 import { edit as leadEdit } from '@/routes/leads';
 import { show as uploadShow } from '@/routes/uploads';
@@ -69,49 +77,49 @@ export default function Dashboard({
             label: 'Total leads',
             value: stats.total_leads ?? 0,
             icon: Database,
-            tone: 'text-cyan-600 dark:text-cyan-300',
+            tone: 'text-info',
         },
         {
             label: 'Unique leads',
             value: stats.unique_leads ?? 0,
             icon: CheckCircle2,
-            tone: 'text-emerald-600 dark:text-emerald-300',
+            tone: 'text-success',
         },
         {
             label: 'Qualified leads',
             value: stats.qualified_leads ?? 0,
             icon: Target,
-            tone: 'text-indigo-600 dark:text-indigo-300',
+            tone: 'text-chart-1',
         },
         {
             label: 'Qualification rate',
             value: `${stats.qualification_rate ?? 0}%`,
             icon: TrendingUp,
-            tone: 'text-sky-600 dark:text-sky-300',
+            tone: 'text-chart-2',
         },
         {
             label: 'Duplicates flagged',
             value: stats.duplicates_flagged ?? 0,
             icon: ShieldAlert,
-            tone: 'text-amber-600 dark:text-amber-300',
+            tone: 'text-warning',
         },
         {
             label: 'Data issues',
             value: stats.data_issues ?? 0,
             icon: FileWarning,
-            tone: 'text-red-600 dark:text-red-300',
+            tone: 'text-destructive',
         },
         {
             label: 'Unread replies',
             value: stats.unread_replies ?? 0,
             icon: MailCheck,
-            tone: 'text-cyan-600 dark:text-cyan-300',
+            tone: 'text-info',
         },
         {
             label: 'Possible leads from replies',
             value: stats.possible_reply_leads ?? 0,
             icon: Sparkles,
-            tone: 'text-emerald-600 dark:text-emerald-300',
+            tone: 'text-success',
         },
     ];
 
@@ -127,16 +135,19 @@ export default function Dashboard({
                     onSubmit={applyPeriod}
                     className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-4"
                 >
-                    <select
-                        name="period"
-                        defaultValue={period}
-                        className="h-9 rounded-md border bg-background px-3 text-sm"
-                    >
-                        <option value="today">Today</option>
-                        <option value="week">This Week</option>
-                        <option value="month">This Month</option>
-                        <option value="custom">Custom Date</option>
-                    </select>
+                    <Select name="period" defaultValue={period}>
+                        <SelectTrigger className="w-full">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="today">Today</SelectItem>
+                            <SelectItem value="week">This Week</SelectItem>
+                            <SelectItem value="month">This Month</SelectItem>
+                            <SelectItem value="custom">
+                                Custom Date
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
                     <Input
                         type="date"
                         name="date_from"
@@ -154,31 +165,15 @@ export default function Dashboard({
                     </Button>
                 </form>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {criticalMetrics.map((metric) => {
-                        const Icon = metric.icon;
-
-                        return (
-                            <Card key={metric.label}>
-                                <CardContent className="flex items-center justify-between gap-4 p-5">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            {metric.label}
-                                        </p>
-                                        <p className="mt-1 text-3xl font-bold tracking-tight">
-                                            {typeof metric.value === 'number'
-                                                ? metric.value.toLocaleString()
-                                                : metric.value}
-                                        </p>
-                                    </div>
-                                    <div
-                                        className={`flex size-11 items-center justify-center rounded-2xl bg-current/8 ${metric.tone}`}
-                                    >
-                                        <Icon className="size-5" />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
+                    {criticalMetrics.map((metric) => (
+                        <StatTile
+                            key={metric.label}
+                            label={metric.label}
+                            value={metric.value}
+                            icon={metric.icon}
+                            tone={metric.tone}
+                        />
+                    ))}
                 </div>
                 {productivity.length > 0 && (
                     <Card>

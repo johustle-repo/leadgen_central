@@ -7,8 +7,11 @@ import {
     Sparkles,
     UserCheck,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { FilterTabs } from '@/components/filter-tabs';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
+import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,24 +109,12 @@ export default function VerificationIndex({
                             ['Documents', summary.documents, FileText],
                         ] as const
                     ).map(([label, value, Icon]) => (
-                        <div
+                        <StatTile
                             key={label}
-                            className="rounded-xl border bg-card p-4 shadow-sm"
-                        >
-                            <div className="flex items-center justify-between gap-3">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        {label}
-                                    </p>
-                                    <p className="mt-1 text-2xl font-semibold">
-                                        {value}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                                    <Icon className="size-5" />
-                                </div>
-                            </div>
-                        </div>
+                            label={label}
+                            value={value}
+                            icon={Icon}
+                        />
                     ))}
                 </div>
 
@@ -155,30 +146,19 @@ export default function VerificationIndex({
                             </Button>
                         )}
                     </Form>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        {statuses.map(([value, label]) => (
-                            <Button
-                                key={value}
-                                asChild
-                                variant={
-                                    filters.status === value
-                                        ? 'default'
-                                        : 'outline'
-                                }
-                                size="sm"
-                            >
-                                <Link
-                                    href={index({
-                                        query: {
-                                            status: value || undefined,
-                                            search: filters.search || undefined,
-                                        },
-                                    })}
-                                >
-                                    {label}
-                                </Link>
-                            </Button>
-                        ))}
+                    <div className="mt-4">
+                        <FilterTabs
+                            tabs={statuses.map(([value, label]) => ({
+                                label,
+                                href: index({
+                                    query: {
+                                        status: value || undefined,
+                                        search: filters.search || undefined,
+                                    },
+                                }),
+                                active: filters.status === value,
+                            }))}
+                        />
                     </div>
                 </div>
 
@@ -202,7 +182,11 @@ export default function VerificationIndex({
                                     <th className="p-3">Owner</th>
                                     <th className="p-3">Status</th>
                                     <th className="p-3">Activity</th>
-                                    <th className="p-3" />
+                                    <th className="p-3">
+                                        <span className="sr-only">
+                                            Actions
+                                        </span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -257,6 +241,14 @@ export default function VerificationIndex({
                                                         {...markPossible.form(
                                                             lead.id,
                                                         )}
+                                                        options={{
+                                                            preserveState: true,
+                                                        }}
+                                                        onSuccess={() =>
+                                                            toast.success(
+                                                                'Lead marked as possible.',
+                                                            )
+                                                        }
                                                     >
                                                         {({ processing }) => (
                                                             <Button

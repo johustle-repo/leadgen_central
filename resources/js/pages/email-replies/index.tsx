@@ -14,8 +14,10 @@ import {
 import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
+import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -24,6 +26,13 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { index, markAllRead, update } from '@/routes/email-replies';
 import { connect, disconnect, sync } from '@/routes/gmail';
 
@@ -116,16 +125,6 @@ function formatManilaDateTime(value: string): string {
     return `${datePart}, ${timePart} PHT`;
 }
 
-function ClassificationBadge({ value }: { value: Classification }) {
-    return (
-        <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${classificationStyles[value]}`}
-        >
-            {value.replaceAll('_', ' ')}
-        </span>
-    );
-}
-
 const manualClassifications: Classification[] = [
     'interested',
     'not_interested',
@@ -141,6 +140,10 @@ export default function EmailRepliesIndex({
     connection,
     summary,
 }: Props) {
+    const ALL_CLASSIFICATIONS = '__all__';
+    const [classificationFilter, setClassificationFilter] = useState(
+        filters.classification || ALL_CLASSIFICATIONS,
+    );
     const [selectedReplyId, setSelectedReplyId] = useState<number | null>(null);
     const selectedReply =
         replies.data.find((reply) => reply.id === selectedReplyId) ?? null;
@@ -312,31 +315,60 @@ export default function EmailRepliesIndex({
                         defaultValue={filters.date}
                         aria-label="Reply date"
                     />
-                    <select
+                    <input
+                        type="hidden"
                         name="classification"
-                        defaultValue={filters.classification}
-                        className="h-9 rounded-md border bg-background px-3 text-sm"
-                        aria-label="Reply classification"
+                        value={
+                            classificationFilter === ALL_CLASSIFICATIONS
+                                ? ''
+                                : classificationFilter
+                        }
+                    />
+                    <Select
+                        value={classificationFilter}
+                        onValueChange={setClassificationFilter}
                     >
-                        <option value="">All classifications</option>
-                        <option value="interested">Interested</option>
-                        <option value="not_interested">Not interested</option>
-                        <option value="not_now">Not now</option>
-                        <option value="do_not_contact">Do not contact</option>
-                        <option value="bounce">Bounce</option>
-                        <option value="retired">Retired / left company</option>
-                        <option value="out_of_office">Out of office</option>
-                        <option value="needs_review">Needs review</option>
-                        <option value="automatic_reply">Automatic reply</option>
-                        <option value="possible_lead">
-                            Possible lead (legacy)
-                        </option>
-                        <option value="not_lead">Not lead (legacy)</option>
-                    </select>
+                        <SelectTrigger aria-label="Reply classification">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ALL_CLASSIFICATIONS}>
+                                All classifications
+                            </SelectItem>
+                            <SelectItem value="interested">
+                                Interested
+                            </SelectItem>
+                            <SelectItem value="not_interested">
+                                Not interested
+                            </SelectItem>
+                            <SelectItem value="not_now">Not now</SelectItem>
+                            <SelectItem value="do_not_contact">
+                                Do not contact
+                            </SelectItem>
+                            <SelectItem value="bounce">Bounce</SelectItem>
+                            <SelectItem value="retired">
+                                Retired / left company
+                            </SelectItem>
+                            <SelectItem value="out_of_office">
+                                Out of office
+                            </SelectItem>
+                            <SelectItem value="needs_review">
+                                Needs review
+                            </SelectItem>
+                            <SelectItem value="automatic_reply">
+                                Automatic reply
+                            </SelectItem>
+                            <SelectItem value="possible_lead">
+                                Possible lead (legacy)
+                            </SelectItem>
+                            <SelectItem value="not_lead">
+                                Not lead (legacy)
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
                     <div className="flex gap-2">
                         <label className="flex flex-1 items-center gap-2 rounded-md border px-3 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
                                 name="unread"
                                 value="1"
                                 defaultChecked={filters.unread === '1'}
@@ -395,8 +427,13 @@ export default function EmailRepliesIndex({
                                 </div>
                                 <div className="flex items-center justify-between gap-3 pl-5 md:min-w-52 md:justify-end md:pl-0">
                                     <div className="flex flex-col items-start gap-1.5 md:items-end">
-                                        <ClassificationBadge
+                                        <StatusBadge
                                             value={reply.classification}
+                                            colorClass={
+                                                classificationStyles[
+                                                    reply.classification
+                                                ]
+                                            }
                                         />
                                         <span className="text-xs whitespace-nowrap text-muted-foreground">
                                             {formatManilaDateTime(
@@ -463,8 +500,13 @@ export default function EmailRepliesIndex({
                                     <span className="text-xs text-muted-foreground">
                                         Classification
                                     </span>
-                                    <ClassificationBadge
+                                    <StatusBadge
                                         value={selectedReply.classification}
+                                        colorClass={
+                                            classificationStyles[
+                                                selectedReply.classification
+                                            ]
+                                        }
                                     />
                                 </div>
                             </div>
@@ -495,7 +537,10 @@ export default function EmailRepliesIndex({
 
                         <div className="flex flex-wrap gap-2 border-t pt-4">
                             {!selectedReply.is_read && (
-                                <Form {...update.form(selectedReply.id)}>
+                                <Form
+                                    {...update.form(selectedReply.id)}
+                                    options={{ preserveState: true }}
+                                >
                                     <input
                                         type="hidden"
                                         name="is_read"
@@ -514,6 +559,7 @@ export default function EmailRepliesIndex({
                                 <Form
                                     key={classification}
                                     {...update.form(selectedReply.id)}
+                                    options={{ preserveState: true }}
                                 >
                                     <input
                                         type="hidden"

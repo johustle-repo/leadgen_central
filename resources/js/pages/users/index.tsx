@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
@@ -14,7 +15,16 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { create, destroy, edit, index } from '@/routes/users';
+
+const ALL_ROLES = '__all__';
 import { toggle } from '@/routes/users/email-sequence';
 type User = {
     id: number;
@@ -39,6 +49,8 @@ export default function UsersIndex({
     };
     filters: Record<string, string>;
 }) {
+    const [roleFilter, setRoleFilter] = useState(filters.role || ALL_ROLES);
+
     const toggleSequence = (user: User) => {
         router.patch(
             toggle.url(user.id),
@@ -85,18 +97,28 @@ export default function UsersIndex({
                             className="pl-9"
                         />
                     </div>
-                    <select
+                    <input
+                        type="hidden"
                         name="role"
-                        defaultValue={filters.role}
-                        className="h-9 rounded-md border bg-background px-3 text-sm"
-                    >
-                        <option value="">All roles</option>
-                        <option value="administrator">Administrator</option>
-                        <option value="sub_administrator">
-                            Sub-Administrator
-                        </option>
-                        <option value="agent">Agent</option>
-                    </select>
+                        value={roleFilter === ALL_ROLES ? '' : roleFilter}
+                    />
+                    <Select value={roleFilter} onValueChange={setRoleFilter}>
+                        <SelectTrigger aria-label="Filter by role">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ALL_ROLES}>
+                                All roles
+                            </SelectItem>
+                            <SelectItem value="administrator">
+                                Administrator
+                            </SelectItem>
+                            <SelectItem value="sub_administrator">
+                                Sub-Administrator
+                            </SelectItem>
+                            <SelectItem value="agent">Agent</SelectItem>
+                        </SelectContent>
+                    </Select>
                     <Button type="submit" variant="secondary">
                         Apply filters
                     </Button>
@@ -120,6 +142,16 @@ export default function UsersIndex({
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
+                                {users.data.length === 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={9}
+                                            className="p-8 text-center text-sm text-muted-foreground"
+                                        >
+                                            No users match your filters.
+                                        </td>
+                                    </tr>
+                                )}
                                 {users.data.map((user) => (
                                     <tr key={user.id}>
                                         <td className="p-3">

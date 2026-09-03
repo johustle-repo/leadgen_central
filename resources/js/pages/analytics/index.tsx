@@ -26,6 +26,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Tooltip as UiTooltip,
     TooltipContent,
     TooltipTrigger,
@@ -504,16 +511,25 @@ export default function Analytics({
                     onSubmit={applyFilters}
                     className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-[minmax(180px,0.8fr)_1fr_1fr_auto]"
                 >
-                    <select
-                        name="period"
-                        defaultValue={period}
-                        className="h-9 rounded-md border bg-background px-3 text-sm"
-                    >
-                        <option value="7_days">Last 7 days</option>
-                        <option value="30_days">Last 30 days</option>
-                        <option value="90_days">Last 90 days</option>
-                        <option value="custom">Custom range</option>
-                    </select>
+                    <Select name="period" defaultValue={period}>
+                        <SelectTrigger className="w-full">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="7_days">
+                                Last 7 days
+                            </SelectItem>
+                            <SelectItem value="30_days">
+                                Last 30 days
+                            </SelectItem>
+                            <SelectItem value="90_days">
+                                Last 90 days
+                            </SelectItem>
+                            <SelectItem value="custom">
+                                Custom range
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
                     <Input
                         type="date"
                         name="date_from"

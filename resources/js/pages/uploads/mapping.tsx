@@ -1,6 +1,14 @@
 import { Form, Head } from '@inertiajs/react';
+import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { process } from '@/routes/uploads';
 type Batch = {
     id: number;
@@ -13,6 +21,46 @@ const label = (value: string) =>
     value
         .replaceAll('_', ' ')
         .replace(/\b\w/g, (character) => character.toUpperCase());
+
+const DO_NOT_IMPORT = '__skip__';
+
+function MappingRowSelect({
+    name,
+    defaultValue,
+    fields,
+}: {
+    name: string;
+    defaultValue: string;
+    fields: string[];
+}) {
+    const [value, setValue] = useState(defaultValue || DO_NOT_IMPORT);
+
+    return (
+        <>
+            <input
+                type="hidden"
+                name={name}
+                value={value === DO_NOT_IMPORT ? '' : value}
+            />
+            <Select value={value} onValueChange={setValue}>
+                <SelectTrigger className="w-full">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value={DO_NOT_IMPORT}>
+                        Do not import
+                    </SelectItem>
+                    {fields.map((field) => (
+                        <SelectItem key={field} value={field}>
+                            {label(field)}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </>
+    );
+}
+
 export default function UploadMapping({
     batch,
     fields,
@@ -48,20 +96,13 @@ export default function UploadMapping({
                                             ? header
                                             : `Column ${index + 1} (no header — likely a row number; leave as "Do not import")`}
                                     </span>
-                                    <select
+                                    <MappingRowSelect
                                         name={`mapping[${index}]`}
                                         defaultValue={
                                             batch.column_mapping[header] ?? ''
                                         }
-                                        className="h-9 rounded-md border bg-background px-3 text-sm"
-                                    >
-                                        <option value="">Do not import</option>
-                                        {fields.map((field) => (
-                                            <option key={field} value={field}>
-                                                {label(field)}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        fields={fields}
+                                    />
                                 </div>
                             ))}
                             {errors.mapping && (

@@ -27,6 +27,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     bulkDestroy,
     create,
     downloadCleaned,
@@ -75,6 +82,10 @@ export default function LeadsIndex({
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [selectedDate, setSelectedDate] = useState(filters.date || '');
+    const ALL_AGENTS = '__all__';
+    const [agentFilter, setAgentFilter] = useState(
+        filters.agent_id || ALL_AGENTS,
+    );
     const emailForm = useForm({ subject: '', body: '' });
     const visibleLeadIds = leads.data.map((lead) => lead.id);
     const selectedVisibleLeadIds = selectedLeadIds.filter((id) =>
@@ -213,58 +224,114 @@ Regards,`;
                             className="pl-9"
                         />
                     </div>
-                    <select
+                    <Select
                         name="per_page"
                         defaultValue={filters.per_page || '10'}
-                        className="h-9 rounded-md border bg-background px-3 text-sm"
-                        aria-label="Leads per page"
                     >
-                        <option value="10">10 per page</option>
-                        <option value="25">25 per page</option>
-                        <option value="50">50 per page</option>
-                        <option value="100">100 per page</option>
-                    </select>
-                    {agents.length > 0 && (
-                        <select
-                            name="agent_id"
-                            defaultValue={filters.agent_id || ''}
-                            className="h-9 rounded-md border bg-background px-3 text-sm"
-                            aria-label="Filter by agent"
+                        <SelectTrigger
+                            className="w-full"
+                            aria-label="Leads per page"
                         >
-                            <option value="">All agents</option>
-                            {agents.map((agent) => (
-                                <option key={agent.id} value={agent.id}>
-                                    {agent.name}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="10">10 per page</SelectItem>
+                            <SelectItem value="25">25 per page</SelectItem>
+                            <SelectItem value="50">50 per page</SelectItem>
+                            <SelectItem value="100">100 per page</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {agents.length > 0 && (
+                        <>
+                            <input
+                                type="hidden"
+                                name="agent_id"
+                                value={
+                                    agentFilter === ALL_AGENTS
+                                        ? ''
+                                        : agentFilter
+                                }
+                            />
+                            <Select
+                                value={agentFilter}
+                                onValueChange={setAgentFilter}
+                            >
+                                <SelectTrigger
+                                    className="w-full"
+                                    aria-label="Filter by agent"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ALL_AGENTS}>
+                                        All agents
+                                    </SelectItem>
+                                    {agents.map((agent) => (
+                                        <SelectItem
+                                            key={agent.id}
+                                            value={String(agent.id)}
+                                        >
+                                            {agent.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </>
                     )}
                     {agents.length > 0 && (
-                        <select
+                        <Select
                             name="sort"
                             defaultValue={filters.sort || 'created_at'}
-                            className="h-9 rounded-md border bg-background px-3 text-sm"
-                            aria-label="Sort leads by"
                         >
-                            <option value="created_at">Sort: Date added</option>
-                            <option value="agent">Sort: Agent</option>
-                            <option value="company_name">Sort: Company</option>
-                            <option value="status">Sort: Status</option>
-                            <option value="source">Sort: Source</option>
-                            <option value="country">Sort: Country</option>
-                            <option value="city">Sort: City</option>
-                        </select>
+                            <SelectTrigger
+                                className="w-full"
+                                aria-label="Sort leads by"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="created_at">
+                                    Sort: Date added
+                                </SelectItem>
+                                <SelectItem value="agent">
+                                    Sort: Agent
+                                </SelectItem>
+                                <SelectItem value="company_name">
+                                    Sort: Company
+                                </SelectItem>
+                                <SelectItem value="status">
+                                    Sort: Status
+                                </SelectItem>
+                                <SelectItem value="source">
+                                    Sort: Source
+                                </SelectItem>
+                                <SelectItem value="country">
+                                    Sort: Country
+                                </SelectItem>
+                                <SelectItem value="city">
+                                    Sort: City
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
                     )}
                     {agents.length > 0 && (
-                        <select
+                        <Select
                             name="direction"
                             defaultValue={filters.direction || 'desc'}
-                            className="h-9 rounded-md border bg-background px-3 text-sm"
-                            aria-label="Sort direction"
                         >
-                            <option value="desc">Descending</option>
-                            <option value="asc">Ascending</option>
-                        </select>
+                            <SelectTrigger
+                                className="w-full"
+                                aria-label="Sort direction"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="desc">
+                                    Descending
+                                </SelectItem>
+                                <SelectItem value="asc">Ascending</SelectItem>
+                            </SelectContent>
+                        </Select>
                     )}
                     <div className="relative">
                         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center border-r pr-3 text-xs font-medium text-muted-foreground">

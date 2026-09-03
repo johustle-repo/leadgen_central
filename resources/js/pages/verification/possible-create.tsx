@@ -1,12 +1,22 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { Building2, Save, UserRound } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { index } from '@/routes/verification';
 import possibleLeads from '@/routes/verification/possible-leads';
+
+const SELECT_AGENT = '__select__';
 
 type Agent = { id: number; name: string };
 type Defaults = { lead_date: string; data_source: string };
@@ -24,6 +34,10 @@ export default function PossibleLeadCreate({
     agents: Agent[];
     defaults: Defaults;
 }) {
+    const [agentId, setAgentId] = useState(
+        agents[0] ? String(agents[0].id) : SELECT_AGENT,
+    );
+
     return (
         <>
             <Head title="Add Possible Lead" />
@@ -75,25 +89,43 @@ export default function PossibleLeadCreate({
                                         <Label htmlFor="agent_id">
                                             Lead owner *
                                         </Label>
-                                        <select
-                                            id="agent_id"
+                                        <input
+                                            type="hidden"
                                             name="agent_id"
-                                            required
-                                            defaultValue={agents[0]?.id}
-                                            className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                            value={
+                                                agentId === SELECT_AGENT
+                                                    ? ''
+                                                    : agentId
+                                            }
+                                        />
+                                        <Select
+                                            value={agentId}
+                                            onValueChange={setAgentId}
                                         >
-                                            <option value="">
-                                                Select an active agent
-                                            </option>
-                                            {agents.map((agent) => (
-                                                <option
-                                                    key={agent.id}
-                                                    value={agent.id}
+                                            <SelectTrigger
+                                                id="agent_id"
+                                                className="mt-2 w-full"
+                                            >
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem
+                                                    value={SELECT_AGENT}
                                                 >
-                                                    {agent.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                                    Select an active agent
+                                                </SelectItem>
+                                                {agents.map((agent) => (
+                                                    <SelectItem
+                                                        key={agent.id}
+                                                        value={String(
+                                                            agent.id,
+                                                        )}
+                                                    >
+                                                        {agent.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                         {errors.agent_id && (
                                             <p className="mt-1 text-sm text-destructive">
                                                 {errors.agent_id}
@@ -215,27 +247,36 @@ export default function PossibleLeadCreate({
                                         <Label htmlFor="data_source">
                                             Source of data
                                         </Label>
-                                        <select
-                                            id="data_source"
+                                        <Select
                                             name="data_source"
-                                            defaultValue={defaults.data_source}
-                                            className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                            defaultValue={
+                                                defaults.data_source ||
+                                                'Manual'
+                                            }
                                         >
-                                            {[
-                                                'Manual',
-                                                'Email',
-                                                'Tendata',
-                                                'Lusha',
-                                                'Tendata/Lusha',
-                                            ].map((source) => (
-                                                <option
-                                                    key={source}
-                                                    value={source}
-                                                >
-                                                    {source}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            <SelectTrigger
+                                                id="data_source"
+                                                className="mt-2 w-full"
+                                            >
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[
+                                                    'Manual',
+                                                    'Email',
+                                                    'Tendata',
+                                                    'Lusha',
+                                                    'Tendata/Lusha',
+                                                ].map((source) => (
+                                                    <SelectItem
+                                                        key={source}
+                                                        value={source}
+                                                    >
+                                                        {source}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <div className="md:col-span-2">
                                         <Label htmlFor="notes">

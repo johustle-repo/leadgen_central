@@ -14,6 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     destroy as destroyAttachment,
     download as downloadAttachment,
     store as storeAttachment,
@@ -186,28 +193,34 @@ export default function VerificationShow({
                                         <Label htmlFor="status">
                                             Classification
                                         </Label>
-                                        <select
-                                            id="status"
+                                        <Select
                                             name="status"
                                             defaultValue={lead.status}
-                                            className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm"
                                         >
-                                            <option value="needs_review">
-                                                Needs Review
-                                            </option>
-                                            <option value="possible_lead">
-                                                Possible Lead
-                                            </option>
-                                            <option value="qualified_lead">
-                                                Qualified Lead
-                                            </option>
-                                            <option value="not_a_lead">
-                                                Not a Lead
-                                            </option>
-                                            <option value="duplicate">
-                                                Duplicate
-                                            </option>
-                                        </select>
+                                            <SelectTrigger
+                                                id="status"
+                                                className="mt-2 w-full"
+                                            >
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="needs_review">
+                                                    Needs Review
+                                                </SelectItem>
+                                                <SelectItem value="possible_lead">
+                                                    Possible Lead
+                                                </SelectItem>
+                                                <SelectItem value="qualified_lead">
+                                                    Qualified Lead
+                                                </SelectItem>
+                                                <SelectItem value="not_a_lead">
+                                                    Not a Lead
+                                                </SelectItem>
+                                                <SelectItem value="duplicate">
+                                                    Duplicate
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <div>
                                         <Label htmlFor="remarks">
@@ -388,20 +401,25 @@ export default function VerificationShow({
                                             className="w-full rounded-md border bg-background p-3 text-sm"
                                             placeholder="Add verification note…"
                                         />
-                                        <select
+                                        <Select
                                             name="note_type"
-                                            className="h-9 rounded-md border bg-background px-3 text-sm"
+                                            defaultValue="verification"
                                         >
-                                            <option value="verification">
-                                                Verification
-                                            </option>
-                                            <option value="correction">
-                                                Correction
-                                            </option>
-                                            <option value="general">
-                                                General
-                                            </option>
-                                        </select>
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="verification">
+                                                    Verification
+                                                </SelectItem>
+                                                <SelectItem value="correction">
+                                                    Correction
+                                                </SelectItem>
+                                                <SelectItem value="general">
+                                                    General
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                         <Button size="sm" disabled={processing}>
                                             Add note
                                         </Button>
