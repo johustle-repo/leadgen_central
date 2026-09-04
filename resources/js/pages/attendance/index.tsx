@@ -98,6 +98,7 @@ export default function AttendanceIndex({
     async function handleDownloadCard(user: AttendanceUser) {
         const dataUrl = await drawIdentityCard(
             {
+                id: user.id,
                 name: user.name,
                 roleLabel: user.role.replaceAll('_', ' '),
                 team: user.team,

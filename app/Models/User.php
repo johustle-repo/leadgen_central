@@ -59,9 +59,16 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     /**
      * The literal value encoded into the user's attendance QR code.
+     *
+     * Backfills a missing token for users created before qr_token existed,
+     * since the creating hook above only covers brand-new inserts.
      */
     public function getQrValueAttribute(): string
     {
+        if ($this->qr_token === null) {
+            $this->forceFill(['qr_token' => (string) Str::uuid()])->saveQuietly();
+        }
+
         return "attendance:{$this->qr_token}";
     }
 
