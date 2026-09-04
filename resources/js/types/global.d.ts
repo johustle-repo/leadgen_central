@@ -15,6 +15,10 @@ declare module '@inertiajs/core' {
             notificationCounts: { unread_email_replies: number };
             sidebarOpen: boolean;
             impersonator: { id: number; name: string } | null;
+            flash: {
+                toast?: { type: string; message: string } | null;
+                importErrors?: string[] | null;
+            };
             [key: string]: unknown;
         };
     }

@@ -6,6 +6,7 @@ use App\AttendanceEntryType;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\AttendanceImportService;
 use App\Services\AttendanceScanService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -17,7 +18,7 @@ use Inertia\Response;
 
 class AttendanceController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         Gate::authorize('manage-attendance');
 
@@ -33,27 +34,49 @@ class AttendanceController extends Controller
                 'qr_value' => $user->qr_value,
             ]);
 
-        $records = Attendance::query()
-            ->with('user:id,name')
-            ->orderByDesc('recorded_at')
-            ->limit(100)
-            ->get()
-            ->map(fn (Attendance $attendance): array => [
-                'id' => $attendance->id,
-                'user_id' => $attendance->user_id,
-                'user_name' => $attendance->user?->name,
-                'entry_type' => $attendance->entry_type,
-                'recorded_at' => $attendance->recorded_at->toIso8601String(),
-                ...(
-                    $attendance->entry_type === AttendanceEntryType::TimeIn
-                        ? Attendance::lateStatusFor($attendance->recorded_at)
-                        : ['status' => null, 'late_minutes' => 0]
-                ),
-            ]);
+        $query = Attendance::query()->with('user:id,name');
+        if ($search = $request->string('search')->trim()->toString()) {
+            $query->whereHas('user', fn ($q) => $q->where('name', 'like', "%{$search}%"));
+        }
+        if ($entryType = $request->string('entry_type')->toString()) {
+            $query->where('entry_type', $entryType);
+        }
+        if ($date = $request->string('date')->toString()) {
+            $query->whereDate('recorded_at', $date);
+        }
+
+        $records = $query->orderByDesc('recorded_at')->paginate(20)->withQueryString();
+        $records->through(fn (Attendance $attendance): array => [
+            'id' => $attendance->id,
+            'user_id' => $attendance->user_id,
+            'user_name' => $attendance->user?->name,
+            'entry_type' => $attendance->entry_type,
+            'recorded_at' => $attendance->recorded_at->toIso8601String(),
+            ...(
+                $attendance->entry_type === AttendanceEntryType::TimeIn
+                    ? Attendance::lateStatusFor($attendance->recorded_at)
+                    : ['status' => null, 'late_minutes' => 0]
+            ),
+        ]);
+
+        $today = now()->startOfDay();
+        $summary = [
+            'total_records' => Attendance::query()->count(),
+            'time_ins_today' => Attendance::query()->where('entry_type', AttendanceEntryType::TimeIn)->whereDate('recorded_at', $today)->count(),
+            'late_today' => Attendance::query()
+                ->where('entry_type', AttendanceEntryType::TimeIn)
+                ->whereDate('recorded_at', $today)
+                ->get()
+                ->filter(fn (Attendance $attendance): bool => Attendance::lateStatusFor($attendance->recorded_at)['status'] === 'late')
+                ->count(),
+            'active_staff' => User::query()->where('status', 'active')->count(),
+        ];
 
         return Inertia::render('attendance/index', [
             'users' => $users,
             'records' => $records,
+            'summary' => $summary,
+            'filters' => $request->only(['search', 'entry_type', 'date']),
         ]);
     }
 
@@ -81,6 +104,40 @@ class AttendanceController extends Controller
             'type' => 'success',
             'message' => "{$attendance->entry_type->label()} recorded for {$attendance->user?->name}.",
         ]);
+    }
+
+    public function importJson(Request $request, AttendanceImportService $service): RedirectResponse
+    {
+        Gate::authorize('manage-attendance');
+        $performedBy = $request->user();
+        abort_unless($performedBy instanceof User, 401);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:json', 'max:10240'],
+        ]);
+
+        $result = $service->import($validated['file']);
+
+        AuditLog::query()->create([
+            'user_id' => $performedBy->id,
+            'action' => 'attendance.imported',
+            'auditable_type' => 'attendance',
+            'auditable_id' => null,
+            'description' => "Imported {$result->imported} attendance record(s) from JSON.",
+            'metadata' => ['imported' => $result->imported, 'skipped' => count($result->errors), 'total' => $result->total],
+        ]);
+
+        if ($result->total === 0) {
+            return back()->with('toast', ['type' => 'error', 'message' => 'That file had no readable records.']);
+        }
+
+        $message = $result->errors === []
+            ? "Imported {$result->imported} attendance record(s)."
+            : "Imported {$result->imported} of {$result->total} record(s); ".count($result->errors).' skipped.';
+
+        return back()
+            ->with('toast', ['type' => $result->errors === [] ? 'success' : 'warning', 'message' => $message])
+            ->with('importErrors', array_slice($result->errors, 0, 30));
     }
 
     public function exportPdf(Request $request): HttpResponse

@@ -43,7 +43,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
-            'flash' => ['toast' => fn () => $request->session()->get('toast')],
+            'flash' => [
+                'toast' => fn () => $request->session()->get('toast'),
+                'importErrors' => fn () => $request->session()->get('importErrors'),
+            ],
             'notificationCounts' => [
                 'unread_email_replies' => function () use ($request): int {
                     $user = $request->user();
