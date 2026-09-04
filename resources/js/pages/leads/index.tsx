@@ -407,10 +407,12 @@ Regards,`;
                         />
                     </div>
                     <div className="flex flex-col justify-end gap-1.5 sm:col-span-2 lg:col-span-4 lg:flex-row">
-                        <Button type="submit" variant="secondary">
-                            Apply filters
-                        </Button>
-                        <Button asChild variant="outline">
+                        <Button type="submit">Apply filters</Button>
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                        >
                             <a
                                 href={downloadRaw.url({
                                     query: {
@@ -424,7 +426,11 @@ Regards,`;
                                 Download raw CSV
                             </a>
                         </Button>
-                        <Button asChild variant="outline">
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                        >
                             <a
                                 href={downloadCleaned.url({
                                     query: {
