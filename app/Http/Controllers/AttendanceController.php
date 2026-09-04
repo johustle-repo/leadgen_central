@@ -113,31 +113,54 @@ class AttendanceController extends Controller
         abort_unless($performedBy instanceof User, 401);
 
         $validated = $request->validate([
-            'file' => ['required', 'file', 'mimes:json', 'max:10240'],
+            'files' => ['required', 'array', 'min:1'],
+            'files.*' => ['file', 'mimes:json', 'max:10240'],
         ]);
 
-        $result = $service->import($validated['file']);
+        $total = 0;
+        $imported = 0;
+        $duplicates = 0;
+        $holidaysImported = 0;
+        $errors = [];
+
+        foreach ($validated['files'] as $file) {
+            $result = $service->import($file);
+            $total += $result->total;
+            $imported += $result->imported;
+            $duplicates += $result->duplicates;
+            $holidaysImported += $result->holidaysImported;
+            foreach ($result->errors as $error) {
+                $errors[] = count($validated['files']) > 1 ? "{$file->getClientOriginalName()} — {$error}" : $error;
+            }
+        }
 
         AuditLog::query()->create([
             'user_id' => $performedBy->id,
             'action' => 'attendance.imported',
             'auditable_type' => 'attendance',
             'auditable_id' => null,
-            'description' => "Imported {$result->imported} attendance record(s) from JSON.",
-            'metadata' => ['imported' => $result->imported, 'skipped' => count($result->errors), 'total' => $result->total],
+            'description' => "Imported {$imported} attendance record(s) and {$holidaysImported} holiday(s) from ".count($validated['files']).' file(s).',
+            'metadata' => ['imported' => $imported, 'duplicates' => $duplicates, 'holidays_imported' => $holidaysImported, 'skipped' => count($errors), 'total' => $total, 'files' => count($validated['files'])],
         ]);
 
-        if ($result->total === 0) {
-            return back()->with('toast', ['type' => 'error', 'message' => 'That file had no readable records.']);
+        if ($total === 0) {
+            return back()->with('toast', ['type' => 'error', 'message' => 'Those file(s) had no readable records.']);
         }
 
-        $message = $result->errors === []
-            ? "Imported {$result->imported} attendance record(s)."
-            : "Imported {$result->imported} of {$result->total} record(s); ".count($result->errors).' skipped.';
+        $messageParts = ["Imported {$imported} attendance record(s)"];
+        if ($duplicates > 0) {
+            $messageParts[] = "{$duplicates} already existed";
+        }
+        if ($holidaysImported > 0) {
+            $messageParts[] = "{$holidaysImported} holiday(s) added";
+        }
+        if ($errors !== []) {
+            $messageParts[] = count($errors).' row(s) skipped';
+        }
 
         return back()
-            ->with('toast', ['type' => $result->errors === [] ? 'success' : 'warning', 'message' => $message])
-            ->with('importErrors', array_slice($result->errors, 0, 30));
+            ->with('toast', ['type' => $errors === [] ? 'success' : 'warning', 'message' => implode('; ', $messageParts).'.'])
+            ->with('importErrors', array_slice($errors, 0, 30));
     }
 
     public function exportPdf(Request $request): HttpResponse

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Attendance;
+use App\Models\Holiday;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -93,7 +94,7 @@ it('imports attendance records from a flat JSON array, matching staff by email',
         ['email' => 'staff@example.test', 'entry_type' => 'time_out', 'recorded_at' => '2026-01-05 17:10:00'],
     ]));
 
-    $response = $this->actingAs($superAdministrator)->post(route('attendance.import'), ['file' => $file]);
+    $response = $this->actingAs($superAdministrator)->post(route('attendance.import'), ['files' => [$file]]);
 
     $response->assertRedirect()->assertSessionHas('toast.type', 'success');
     expect(Attendance::where('user_id', $staff->id)->count())->toBe(2);
@@ -108,7 +109,7 @@ it('matches an import row by name when no email is given', function () {
         ['name' => 'Import Match Staff', 'type' => 'in', 'timestamp' => '2026-01-05 08:00:00'],
     ]));
 
-    $this->actingAs($superAdministrator)->post(route('attendance.import'), ['file' => $file]);
+    $this->actingAs($superAdministrator)->post(route('attendance.import'), ['files' => [$file]]);
 
     $this->assertDatabaseHas('attendances', ['user_id' => $staff->id, 'entry_type' => 'time_in']);
 });
@@ -126,7 +127,7 @@ it('reads records nested under a phpMyAdmin-style table export', function () {
     ];
     $file = UploadedFile::fake()->createWithContent('export.json', json_encode($payload));
 
-    $this->actingAs($superAdministrator)->post(route('attendance.import'), ['file' => $file]);
+    $this->actingAs($superAdministrator)->post(route('attendance.import'), ['files' => [$file]]);
 
     expect(Attendance::where('user_id', $staff->id)->count())->toBe(1);
 });
@@ -142,7 +143,7 @@ it('skips rows it cannot match or parse and reports why', function () {
         ['email' => 'known@example.test', 'entry_type' => 'time_out', 'recorded_at' => 'not-a-date'],
     ]));
 
-    $response = $this->actingAs($superAdministrator)->post(route('attendance.import'), ['file' => $file]);
+    $response = $this->actingAs($superAdministrator)->post(route('attendance.import'), ['files' => [$file]]);
 
     $response->assertSessionHas('toast.type', 'warning');
     $errors = session('importErrors');
@@ -150,9 +151,102 @@ it('skips rows it cannot match or parse and reports why', function () {
     expect(Attendance::where('user_id', $staff->id)->count())->toBe(1);
 });
 
+it('imports the nested export format, routing holiday days to the holidays table', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $staff = User::factory()->create(['name' => 'Elmar B. Noche', 'email' => 'elmar@leadgen.test']);
+
+    $payload = [
+        'generated_at' => '2026-09-04T22:12:00+08:00',
+        'period' => ['year' => 2026, 'month' => 4, 'label' => 'April 2026'],
+        'users' => [
+            [
+                'id' => 3,
+                'name' => 'Elmar B. Noche',
+                'sub_name' => 'Alexander Bennett',
+                'email' => 'a.bennett@duscaff.com',
+                'attendance_days' => [
+                    [
+                        'date' => '2026-04-01',
+                        'is_holiday' => false,
+                        'logs' => [
+                            ['id' => 1, 'entry_type' => 'time_in', 'recorded_at' => '2026-04-01T07:45:57+08:00'],
+                            ['id' => 2, 'entry_type' => 'time_out', 'recorded_at' => '2026-04-01T17:14:00+08:00'],
+                        ],
+                    ],
+                    [
+                        'date' => '2026-04-09',
+                        'is_holiday' => true,
+                        'holiday_name' => 'Araw ng Kagitingan',
+                        'holiday_type_label' => 'Regular Holiday',
+                        'holiday_notes' => 'Day of Valor in the Philippines.',
+                        'logs' => [
+                            ['id' => 0, 'entry_type' => 'holiday', 'recorded_at' => '2026-04-09T00:00:00+08:00'],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+    $file = UploadedFile::fake()->createWithContent('attendance-backup-2026-04.json', json_encode($payload));
+
+    $response = $this->actingAs($superAdministrator)->post(route('attendance.import'), ['files' => [$file]]);
+
+    $response->assertSessionHas('toast.type', 'success');
+    expect(Attendance::where('user_id', $staff->id)->count())->toBe(2);
+    expect(Holiday::query()->whereDate('holiday_date', '2026-04-09')->where('name', 'Araw ng Kagitingan')->where('country_code', 'PH')->exists())->toBeTrue();
+    $this->assertDatabaseMissing('attendances', ['entry_type' => 'holiday']);
+});
+
+it('does not duplicate attendance or holidays when the same file is imported twice', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    User::factory()->create(['email' => 'staff@example.test']);
+
+    $payload = [
+        'users' => [
+            [
+                'name' => 'Someone',
+                'email' => 'staff@example.test',
+                'attendance_days' => [
+                    ['date' => '2026-04-01', 'is_holiday' => false, 'logs' => [
+                        ['entry_type' => 'time_in', 'recorded_at' => '2026-04-01T07:45:00+08:00'],
+                    ]],
+                    ['date' => '2026-04-09', 'is_holiday' => true, 'holiday_name' => 'Araw ng Kagitingan', 'holiday_type_label' => 'Regular Holiday', 'logs' => [
+                        ['entry_type' => 'holiday', 'recorded_at' => '2026-04-09T00:00:00+08:00'],
+                    ]],
+                ],
+            ],
+        ],
+    ];
+    $file = fn () => UploadedFile::fake()->createWithContent('history.json', json_encode($payload));
+
+    $this->actingAs($superAdministrator)->post(route('attendance.import'), ['files' => [$file()]]);
+    $second = $this->actingAs($superAdministrator)->post(route('attendance.import'), ['files' => [$file()]]);
+
+    $second->assertSessionHas('toast.message', 'Imported 0 attendance record(s); 1 already existed.');
+    expect(Attendance::query()->count())->toBe(1);
+    expect(Holiday::query()->count())->toBe(1);
+});
+
+it('imports multiple files in one request and aggregates the results', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $staff = User::factory()->create(['email' => 'multi@example.test']);
+
+    $fileA = UploadedFile::fake()->createWithContent('a.json', json_encode([
+        ['email' => 'multi@example.test', 'entry_type' => 'time_in', 'recorded_at' => '2026-04-01 08:00:00'],
+    ]));
+    $fileB = UploadedFile::fake()->createWithContent('b.json', json_encode([
+        ['email' => 'multi@example.test', 'entry_type' => 'time_out', 'recorded_at' => '2026-04-01 17:00:00'],
+    ]));
+
+    $response = $this->actingAs($superAdministrator)->post(route('attendance.import'), ['files' => [$fileA, $fileB]]);
+
+    $response->assertSessionHas('toast.message', 'Imported 2 attendance record(s).');
+    expect(Attendance::where('user_id', $staff->id)->count())->toBe(2);
+});
+
 it('forbids a regular administrator from importing attendance', function () {
     $administrator = User::factory()->administrator()->create();
     $file = UploadedFile::fake()->createWithContent('history.json', json_encode([]));
 
-    $this->actingAs($administrator)->post(route('attendance.import'), ['file' => $file])->assertForbidden();
+    $this->actingAs($administrator)->post(route('attendance.import'), ['files' => [$file]])->assertForbidden();
 });

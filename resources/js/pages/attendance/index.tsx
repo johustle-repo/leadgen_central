@@ -88,7 +88,7 @@ export default function AttendanceIndex({
         code: '',
         entry_type: 'time_in',
     });
-    const importForm = useForm<{ file: File | null }>({ file: null });
+    const importForm = useForm<{ files: File[] }>({ files: [] });
     const [entryTypeFilter, setEntryTypeFilter] = useState(
         filters.entry_type || ALL_ENTRY_TYPES,
     );
@@ -160,7 +160,7 @@ export default function AttendanceIndex({
         importForm.post(importAttendance.url(), {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => importForm.reset('file'),
+            onSuccess: () => importForm.reset('files'),
         });
     }
 
@@ -340,9 +340,10 @@ export default function AttendanceIndex({
                             <CardHeader>
                                 <CardTitle>Import attendance history</CardTitle>
                                 <CardDescription>
-                                    Upload a JSON export from a previous
-                                    system. Rows are matched to staff by
-                                    email or name.
+                                    Upload one or more JSON exports from a
+                                    previous system. Rows are matched to
+                                    staff by email or name; re-importing the
+                                    same file is safe.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -353,23 +354,39 @@ export default function AttendanceIndex({
                                     <Input
                                         type="file"
                                         accept="application/json,.json"
+                                        multiple
                                         onChange={(event) =>
                                             importForm.setData(
-                                                'file',
-                                                event.target.files?.[0] ??
-                                                    null,
+                                                'files',
+                                                Array.from(
+                                                    event.target.files ?? [],
+                                                ),
                                             )
                                         }
                                     />
+                                    {importForm.data.files.length > 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {importForm.data.files.length}{' '}
+                                            file
+                                            {importForm.data.files.length ===
+                                            1
+                                                ? ''
+                                                : 's'}{' '}
+                                            selected:{' '}
+                                            {importForm.data.files
+                                                .map((file) => file.name)
+                                                .join(', ')}
+                                        </p>
+                                    )}
                                     <InputError
-                                        message={importForm.errors.file}
+                                        message={importForm.errors.files}
                                     />
                                     <Button
                                         type="submit"
                                         variant="outline"
                                         disabled={
                                             importForm.processing ||
-                                            !importForm.data.file
+                                            importForm.data.files.length === 0
                                         }
                                     >
                                         <FileJson />
