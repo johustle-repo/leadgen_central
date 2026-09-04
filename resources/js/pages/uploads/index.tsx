@@ -460,6 +460,7 @@ export default function UploadIndex({
                                                     asChild
                                                     size="sm"
                                                     variant="outline"
+                                                    className="border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
                                                 >
                                                     <Link
                                                         href={retry(batch.id)}
@@ -479,6 +480,7 @@ export default function UploadIndex({
                                                             type="button"
                                                             size="sm"
                                                             variant="outline"
+                                                            className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
                                                         >
                                                             <RotateCcw />
                                                             Re-analyze
