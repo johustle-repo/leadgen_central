@@ -25,6 +25,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { isAdministratorRole } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
 import { index as auditLogIndex } from '@/routes/audit-logs';
@@ -78,7 +79,7 @@ export function AppSidebar() {
         );
     }
 
-    if (auth.user.role === 'administrator') {
+    if (isAdministratorRole(auth.user.role)) {
         mainNavItems.push(
             { title: 'Users', href: userIndex(), icon: Users },
             {

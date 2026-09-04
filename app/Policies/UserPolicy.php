@@ -32,18 +32,37 @@ class UserPolicy
 
     /**
      * Determine whether the user can update the model.
+     *
+     * A Super Administrator can update anyone. A regular Administrator can
+     * update their own account and anyone below the administrator tier, but
+     * not another Administrator or Super Administrator.
      */
     public function update(User $user, User $model): bool
     {
-        return $user->isAdministrator();
+        if ($user->isSuperAdministrator()) {
+            return true;
+        }
+
+        return $user->isAdministrator() && ($user->is($model) || ! $model->isAdministrator());
     }
 
     /**
      * Determine whether the user can delete the model.
+     *
+     * A Super Administrator can delete anyone but themselves. A regular
+     * Administrator can only delete accounts below the administrator tier.
      */
     public function delete(User $user, User $model): bool
     {
-        return $user->isAdministrator() && ! $user->is($model);
+        if ($user->is($model)) {
+            return false;
+        }
+
+        if ($user->isSuperAdministrator()) {
+            return true;
+        }
+
+        return $user->isAdministrator() && ! $model->isAdministrator();
     }
 
     /**

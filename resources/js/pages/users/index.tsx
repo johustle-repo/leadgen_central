@@ -148,6 +148,9 @@ export default function UsersIndex({
                                 <SelectItem value={ALL_ROLES}>
                                     All roles
                                 </SelectItem>
+                                <SelectItem value="super_administrator">
+                                    Super Administrator
+                                </SelectItem>
                                 <SelectItem value="administrator">
                                     Administrator
                                 </SelectItem>

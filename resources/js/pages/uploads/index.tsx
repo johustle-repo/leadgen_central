@@ -32,6 +32,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { isAdministratorRole } from '@/lib/utils';
 import {
     bulkDestroy,
     create,
@@ -85,7 +86,7 @@ export default function UploadIndex({
     usePoll(5000, { only: ['batches'] });
     const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
     const [selectAllMatching, setSelectAllMatching] = useState(false);
-    const isAdministrator = auth.user.role === 'administrator';
+    const isAdministrator = isAdministratorRole(auth.user.role);
     const deletableBatchIds = batches.data
         .filter((batch) =>
             ['completed', 'failed'].includes(batch.processing_status),
@@ -524,8 +525,7 @@ export default function UploadIndex({
                                                     </DialogContent>
                                                 </Dialog>
                                             )}
-                                            {auth.user.role ===
-                                                'administrator' &&
+                                            {isAdministrator &&
                                                 [
                                                     'completed',
                                                     'failed',

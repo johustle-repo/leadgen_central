@@ -91,3 +91,80 @@ it('does not authenticate inactive users', function () {
     $this->post(route('login.store'), ['email' => $inactive->email, 'password' => 'password'])->assertSessionHasErrors('email');
     $this->assertGuest();
 });
+
+it('allows a super administrator to create an administrator account', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+
+    $response = $this->actingAs($superAdministrator)->post(route('users.store'), ['name' => 'New Admin', 'email' => 'new-admin@example.com', 'password' => 'password', 'password_confirmation' => 'password', 'role' => 'administrator', 'status' => 'active']);
+
+    $response->assertRedirect(route('users.index'));
+    $this->assertDatabaseHas('users', ['email' => 'new-admin@example.com', 'role' => 'administrator']);
+});
+
+it('forbids a regular administrator from creating an administrator or super administrator account', function () {
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)->post(route('users.store'), ['name' => 'New Admin', 'email' => 'new-admin@example.com', 'password' => 'password', 'password_confirmation' => 'password', 'role' => 'administrator', 'status' => 'active'])
+        ->assertSessionHasErrors('role');
+    $this->actingAs($administrator)->post(route('users.store'), ['name' => 'New Super', 'email' => 'new-super@example.com', 'password' => 'password', 'password_confirmation' => 'password', 'role' => 'super_administrator', 'status' => 'active'])
+        ->assertSessionHasErrors('role');
+    $this->assertDatabaseMissing('users', ['email' => 'new-admin@example.com']);
+    $this->assertDatabaseMissing('users', ['email' => 'new-super@example.com']);
+});
+
+it('forbids a regular administrator from editing or deleting another administrator', function () {
+    $administrator = User::factory()->administrator()->create();
+    $otherAdministrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)->get(route('users.edit', $otherAdministrator))->assertForbidden();
+    $this->actingAs($administrator)->put(route('users.update', $otherAdministrator), ['name' => 'Changed', 'email' => $otherAdministrator->email, 'role' => 'administrator', 'status' => 'active'])->assertForbidden();
+    $this->actingAs($administrator)->delete(route('users.destroy', $otherAdministrator))->assertForbidden();
+    expect($otherAdministrator->fresh()->trashed())->toBeFalse();
+});
+
+it('allows a super administrator to edit and delete another administrator', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($superAdministrator)->put(route('users.update', $administrator), ['name' => 'Renamed Admin', 'email' => $administrator->email, 'role' => 'administrator', 'status' => 'active'])
+        ->assertRedirect();
+    $this->assertDatabaseHas('users', ['id' => $administrator->id, 'name' => 'Renamed Admin']);
+
+    $this->actingAs($superAdministrator)->delete(route('users.destroy', $administrator))->assertRedirect(route('users.index'));
+    $this->assertSoftDeleted($administrator);
+});
+
+it('forbids a super administrator from deleting themselves', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+
+    $this->actingAs($superAdministrator)->delete(route('users.destroy', $superAdministrator))->assertForbidden();
+
+    expect($superAdministrator->fresh()->trashed())->toBeFalse();
+});
+
+it('lets an administrator save their own profile without tripping the self role-change guard', function () {
+    $administrator = User::factory()->administrator()->create(['name' => 'Old Name']);
+
+    $response = $this->actingAs($administrator)->put(route('users.update', $administrator), ['name' => 'New Name', 'email' => $administrator->email, 'role' => 'administrator', 'status' => 'active']);
+
+    $response->assertSessionDoesntHaveErrors();
+    $this->assertDatabaseHas('users', ['id' => $administrator->id, 'name' => 'New Name']);
+});
+
+it('blocks an administrator from changing their own role', function () {
+    $administrator = User::factory()->administrator()->create();
+
+    $response = $this->actingAs($administrator)->put(route('users.update', $administrator), ['name' => $administrator->name, 'email' => $administrator->email, 'role' => 'sub_administrator', 'status' => 'active']);
+
+    $response->assertSessionHasErrors('status');
+    $this->assertDatabaseHas('users', ['id' => $administrator->id, 'role' => 'administrator']);
+});
+
+it('allows administrators to manage sub-administrators and agents', function () {
+    $administrator = User::factory()->administrator()->create();
+    $subAdministrator = User::factory()->subAdministrator()->create();
+
+    $this->actingAs($administrator)->put(route('users.update', $subAdministrator), ['name' => 'Updated Sub', 'email' => $subAdministrator->email, 'role' => 'sub_administrator', 'status' => 'active'])
+        ->assertRedirect();
+    $this->assertDatabaseHas('users', ['id' => $subAdministrator->id, 'name' => 'Updated Sub']);
+});

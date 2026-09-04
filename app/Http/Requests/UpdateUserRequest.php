@@ -3,7 +3,7 @@
 namespace App\Http\Requests;
 
 use App\AccountStatus;
-use App\UserRole;
+use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,6 +26,12 @@ class UpdateUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->route('user'))], 'password' => ['nullable', 'confirmed', Password::defaults()], 'role' => ['required', Rule::enum(UserRole::class)], 'team' => ['nullable', 'string', 'max:100'], 'status' => ['required', Rule::enum(AccountStatus::class)]];
+        $target = $this->route('user');
+        $allowedRoles = array_map(fn ($role) => $role->value, $this->user()?->assignableRoles() ?? []);
+        if ($target instanceof User && ! in_array($target->role->value, $allowedRoles, true)) {
+            $allowedRoles[] = $target->role->value;
+        }
+
+        return ['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($target)], 'password' => ['nullable', 'confirmed', Password::defaults()], 'role' => ['required', Rule::in($allowedRoles)], 'team' => ['nullable', 'string', 'max:100'], 'status' => ['required', Rule::enum(AccountStatus::class)]];
     }
 }

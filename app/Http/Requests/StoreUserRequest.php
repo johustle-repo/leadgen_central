@@ -4,7 +4,6 @@ namespace App\Http\Requests;
 
 use App\AccountStatus;
 use App\Models\User;
-use App\UserRole;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -27,6 +26,6 @@ class StoreUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255', 'unique:users,email'], 'password' => ['required', 'confirmed', Password::defaults()], 'role' => ['required', Rule::enum(UserRole::class)], 'team' => ['nullable', 'string', 'max:100'], 'status' => ['required', Rule::enum(AccountStatus::class)]];
+        return ['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255', 'unique:users,email'], 'password' => ['required', 'confirmed', Password::defaults()], 'role' => ['required', Rule::in(array_map(fn ($role) => $role->value, $this->user()?->assignableRoles() ?? []))], 'team' => ['nullable', 'string', 'max:100'], 'status' => ['required', Rule::enum(AccountStatus::class)]];
     }
 }

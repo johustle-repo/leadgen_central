@@ -6,7 +6,6 @@ use App\AccountStatus;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
-use App\UserRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -51,11 +50,11 @@ class UserController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
         Gate::authorize('create', User::class);
 
-        return Inertia::render('users/form', ['managedUser' => null, 'roles' => UserRole::cases(), 'statuses' => AccountStatus::cases()]);
+        return Inertia::render('users/form', ['managedUser' => null, 'roles' => $request->user()->assignableRoles(), 'statuses' => AccountStatus::cases()]);
     }
 
     /**
@@ -79,11 +78,15 @@ class UserController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(User $user): Response
+    public function edit(Request $request, User $user): Response
     {
         Gate::authorize('update', $user);
+        $roles = $request->user()->assignableRoles();
+        if (! in_array($user->role, $roles, true)) {
+            $roles[] = $user->role;
+        }
 
-        return Inertia::render('users/form', ['managedUser' => $user, 'roles' => UserRole::cases(), 'statuses' => AccountStatus::cases()]);
+        return Inertia::render('users/form', ['managedUser' => $user, 'roles' => $roles, 'statuses' => AccountStatus::cases()]);
     }
 
     /**
@@ -95,8 +98,8 @@ class UserController extends Controller
         if (blank($data['password'] ?? null)) {
             unset($data['password']);
         }
-        if ($user->is($request->user()) && ($data['status'] !== 'active' || $data['role'] !== 'administrator')) {
-            return back()->withErrors(['status' => 'You cannot deactivate or demote your own administrator account.']);
+        if ($user->is($request->user()) && ($data['status'] !== 'active' || $data['role'] !== $user->role->value)) {
+            return back()->withErrors(['status' => 'You cannot deactivate or change your own role.']);
         }
         $user->update($data);
 

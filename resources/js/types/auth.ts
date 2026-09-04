@@ -3,7 +3,7 @@ export type User = {
     name: string;
     company_alias: string | null;
     email: string;
-    role: 'administrator' | 'sub_administrator' | 'agent';
+    role: 'super_administrator' | 'administrator' | 'sub_administrator' | 'agent';
     status: 'active' | 'inactive';
     team?: string | null;
     avatar?: string;

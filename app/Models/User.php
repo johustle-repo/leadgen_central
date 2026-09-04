@@ -63,12 +63,30 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     public function isAdministrator(): bool
     {
-        return $this->role === UserRole::Administrator;
+        return in_array($this->role, [UserRole::SuperAdministrator, UserRole::Administrator], true);
+    }
+
+    public function isSuperAdministrator(): bool
+    {
+        return $this->role === UserRole::SuperAdministrator;
     }
 
     public function canViewAllLeads(): bool
     {
-        return in_array($this->role, [UserRole::Administrator, UserRole::SubAdministrator], true);
+        return in_array($this->role, [UserRole::SuperAdministrator, UserRole::Administrator, UserRole::SubAdministrator], true);
+    }
+
+    /**
+     * The roles this user is allowed to assign when creating or editing another user.
+     * Only a Super Administrator can grant Administrator or Super Administrator access.
+     *
+     * @return list<UserRole>
+     */
+    public function assignableRoles(): array
+    {
+        return $this->isSuperAdministrator()
+            ? UserRole::cases()
+            : [UserRole::SubAdministrator, UserRole::Agent];
     }
 
     /** @return HasMany<Lead, $this> */
