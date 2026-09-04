@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AuditLog;
 use App\Models\EmailReply;
 use App\Models\Lead;
 use App\Models\UploadBatch;
@@ -8,6 +9,71 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 it('redirects guests from analytics to login', function () {
     $this->get(route('analytics.index'))->assertRedirect(route('login'));
+});
+
+it('redirects guests from the analytics report export to login', function () {
+    $this->get(route('analytics.export'))->assertRedirect(route('login'));
+});
+
+it('downloads a report CSV scoped to the agents own leads and logs the export', function () {
+    $this->travelTo('2026-09-01 12:00:00');
+    $agent = User::factory()->create();
+    $otherAgent = User::factory()->create();
+    Lead::factory()->for($agent, 'agent')->create([
+        'status' => 'qualified_lead',
+        'data_source' => 'Tendata',
+        'created_by' => $agent->id,
+        'created_at' => '2026-08-30 10:00:00',
+    ]);
+    Lead::factory()->for($otherAgent, 'agent')->create([
+        'status' => 'qualified_lead',
+        'data_source' => 'Lusha',
+        'created_by' => $otherAgent->id,
+        'created_at' => '2026-08-30 10:00:00',
+    ]);
+
+    $response = $this->actingAs($agent)->get(route('analytics.export', ['period' => '7_days']));
+
+    $response->assertOk()->assertDownload('Analytics-Report-2026-08-26-to-2026-09-01.csv');
+    expect($response->streamedContent())
+        ->toContain('"Report period","2026-08-26 to 2026-09-01"')
+        ->toContain('Summary')
+        ->toContain('"Leads created",1')
+        ->toContain('"Qualified leads",1')
+        ->toContain('"Lead status"')
+        ->toContain('Tendata')
+        ->not->toContain('Lusha')
+        ->not->toContain('Agent performance');
+    $this->assertDatabaseHas(AuditLog::class, [
+        'user_id' => $agent->id,
+        'action' => 'analytics.exported',
+    ]);
+});
+
+it('includes the agent performance section in an administrators report export', function () {
+    $this->travelTo('2026-09-01 12:00:00');
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create(['name' => 'Export Agent']);
+    Lead::factory()->for($agent, 'agent')->create([
+        'status' => 'qualified_lead',
+        'created_by' => $agent->id,
+        'created_at' => '2026-08-30 10:00:00',
+    ]);
+
+    $response = $this->actingAs($administrator)->get(route('analytics.export', ['period' => '7_days']));
+
+    $response->assertOk();
+    expect($response->streamedContent())
+        ->toContain('Agent performance')
+        ->toContain('Export Agent');
+});
+
+it('rejects a report export when the custom end date precedes the start date', function () {
+    $agent = User::factory()->create();
+
+    $this->actingAs($agent)
+        ->get(route('analytics.export', ['period' => 'custom', 'date_from' => '2026-09-02', 'date_to' => '2026-09-01']))
+        ->assertSessionHasErrors('date_to');
 });
 
 it('shows an agent analytics only for their owned leads and replies', function () {

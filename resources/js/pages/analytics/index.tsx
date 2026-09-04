@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import {
     BarChart3,
+    Download,
     MailCheck,
     ShieldAlert,
     SlidersHorizontal,
@@ -41,7 +42,10 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { index as analyticsIndex } from '@/routes/analytics';
+import {
+    exportMethod as analyticsExport,
+    index as analyticsIndex,
+} from '@/routes/analytics';
 
 type Distribution = { label: string; value: number };
 type DailyActivity = {
@@ -522,11 +526,32 @@ export default function Analytics({
 
     return (
         <>
-            <Head title="Analytics" />
+            <Head title="Reports" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
-                    title="Analytics"
+                    title="Reports"
                     description="Measure lead quality, reply outcomes, and team performance over time."
+                    actions={
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                        >
+                            <a
+                                href={analyticsExport.url({
+                                    query: {
+                                        period,
+                                        date_from: filters.date_from,
+                                        date_to: filters.date_to,
+                                    },
+                                })}
+                                download
+                            >
+                                <Download />
+                                Export reports
+                            </a>
+                        </Button>
+                    }
                 />
 
                 <FilterBar
@@ -928,5 +953,5 @@ export default function Analytics({
 }
 
 Analytics.layout = {
-    breadcrumbs: [{ title: 'Analytics', href: analyticsIndex() }],
+    breadcrumbs: [{ title: 'Reports', href: analyticsIndex() }],
 };

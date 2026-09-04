@@ -29,6 +29,7 @@ Route::get('email/verify/{id}/{hash}', AuthVerifyEmailController::class)
 Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('analytics', AnalyticsController::class)->name('analytics.index');
+    Route::get('analytics/report.csv', [AnalyticsController::class, 'export'])->middleware('throttle:data-exports')->name('analytics.export');
     Route::get('leads/raw.csv', [LeadController::class, 'downloadRaw'])->middleware('throttle:data-exports')->name('leads.download-raw');
     Route::get('leads/cleaned.csv', [LeadController::class, 'downloadCleaned'])->middleware('throttle:data-exports')->name('leads.download-cleaned');
     Route::delete('leads/bulk', [LeadController::class, 'bulkDestroy'])->name('leads.bulk-destroy');
