@@ -7,6 +7,8 @@ use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\AnalyticsReport;
 use App\Services\CsvCellSanitizer;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -23,19 +25,8 @@ class AnalyticsController extends Controller
 
     public function export(AnalyticsRequest $request, AnalyticsReport $analytics, CsvCellSanitizer $csv): StreamedResponse
     {
-        $user = $request->user();
-        abort_unless($user instanceof User, 401);
-        $data = $analytics->for($user, $request->validated());
-
-        AuditLog::query()->create([
-            'user_id' => $user->id,
-            'action' => 'analytics.exported',
-            'auditable_type' => 'lead',
-            'description' => 'Downloaded an analytics report export.',
-            'metadata' => $data['filters'],
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-        ]);
+        [$user, $data] = $this->reportData($request, $analytics);
+        $this->logExport($request, $user, 'analytics.exported', 'Downloaded an analytics report export.', $data['filters']);
 
         return response()->streamDownload(function () use ($data, $csv): void {
             $stream = fopen('php://output', 'wb');
@@ -80,5 +71,37 @@ class AnalyticsController extends Controller
 
             fclose($stream);
         }, "Analytics-Report-{$data['filters']['date_from']}-to-{$data['filters']['date_to']}.csv", ['Content-Type' => 'text/csv']);
+    }
+
+    public function exportPdf(AnalyticsRequest $request, AnalyticsReport $analytics): HttpResponse
+    {
+        [$user, $data] = $this->reportData($request, $analytics);
+        $this->logExport($request, $user, 'analytics.exported_pdf', 'Downloaded an analytics PDF report.', $data['filters']);
+
+        return Pdf::loadView('reports.analytics', ['data' => $data])
+            ->download("Analytics-Report-{$data['filters']['date_from']}-to-{$data['filters']['date_to']}.pdf");
+    }
+
+    /** @return array{0: User, 1: array<string, mixed>} */
+    private function reportData(AnalyticsRequest $request, AnalyticsReport $analytics): array
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        return [$user, $analytics->for($user, $request->validated())];
+    }
+
+    /** @param  array<string, mixed>  $metadata */
+    private function logExport(AnalyticsRequest $request, User $user, string $action, string $description, array $metadata): void
+    {
+        AuditLog::query()->create([
+            'user_id' => $user->id,
+            'action' => $action,
+            'auditable_type' => 'lead',
+            'description' => $description,
+            'metadata' => $metadata,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
     }
 }

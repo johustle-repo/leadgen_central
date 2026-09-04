@@ -2,6 +2,8 @@ import { Head, router } from '@inertiajs/react';
 import {
     BarChart3,
     Download,
+    FileSpreadsheet,
+    FileText,
     MailCheck,
     ShieldAlert,
     SlidersHorizontal,
@@ -10,6 +12,7 @@ import {
     TrendingUp,
     UsersRound,
 } from 'lucide-react';
+import { useState } from 'react';
 import {
     CartesianGrid,
     Cell,
@@ -29,6 +32,15 @@ import { PageHeader } from '@/components/page-header';
 import { StatTile } from '@/components/stat-tile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -37,6 +49,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
     Tooltip as UiTooltip,
     TooltipContent,
@@ -44,6 +57,7 @@ import {
 } from '@/components/ui/tooltip';
 import {
     exportMethod as analyticsExport,
+    exportPdf as analyticsExportPdf,
     index as analyticsIndex,
 } from '@/routes/analytics';
 
@@ -474,6 +488,19 @@ export default function Analytics({
             { preserveState: true, replace: true },
         );
     };
+    const [exportOpen, setExportOpen] = useState(false);
+    const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>(
+        'excel',
+    );
+    const exportQuery = {
+        period,
+        date_from: filters.date_from,
+        date_to: filters.date_to,
+    };
+    const exportHref =
+        exportFormat === 'pdf'
+            ? analyticsExportPdf.url({ query: exportQuery })
+            : analyticsExport.url({ query: exportQuery });
     const metrics = [
         {
             label: 'Leads created',
@@ -532,25 +559,76 @@ export default function Analytics({
                     title="Reports"
                     description="Measure lead quality, reply outcomes, and team performance over time."
                     actions={
-                        <Button
-                            asChild
-                            variant="outline"
-                            className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
-                        >
-                            <a
-                                href={analyticsExport.url({
-                                    query: {
-                                        period,
-                                        date_from: filters.date_from,
-                                        date_to: filters.date_to,
-                                    },
-                                })}
-                                download
-                            >
-                                <Download />
-                                Export reports
-                            </a>
-                        </Button>
+                        <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                                >
+                                    <Download />
+                                    Export reports
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Export report</DialogTitle>
+                                    <DialogDescription>
+                                        Choose a file format for the current
+                                        reporting period (
+                                        {exportQuery.date_from} to{' '}
+                                        {exportQuery.date_to}).
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <ToggleGroup
+                                    type="single"
+                                    variant="outline"
+                                    value={exportFormat}
+                                    onValueChange={(value) =>
+                                        value &&
+                                        setExportFormat(
+                                            value as 'excel' | 'pdf',
+                                        )
+                                    }
+                                    className="w-full"
+                                >
+                                    <ToggleGroupItem
+                                        value="excel"
+                                        className="h-16 flex-1 flex-col gap-1"
+                                    >
+                                        <FileSpreadsheet className="size-4" />
+                                        Excel (CSV)
+                                    </ToggleGroupItem>
+                                    <ToggleGroupItem
+                                        value="pdf"
+                                        className="h-16 flex-1 flex-col gap-1"
+                                    >
+                                        <FileText className="size-4" />
+                                        PDF
+                                    </ToggleGroupItem>
+                                </ToggleGroup>
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setExportOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button asChild>
+                                        <a
+                                            href={exportHref}
+                                            download
+                                            onClick={() =>
+                                                setExportOpen(false)
+                                            }
+                                        >
+                                            <Download />
+                                            Download
+                                        </a>
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     }
                 />
 

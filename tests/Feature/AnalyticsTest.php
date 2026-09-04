@@ -15,6 +15,30 @@ it('redirects guests from the analytics report export to login', function () {
     $this->get(route('analytics.export'))->assertRedirect(route('login'));
 });
 
+it('redirects guests from the analytics PDF export to login', function () {
+    $this->get(route('analytics.export-pdf'))->assertRedirect(route('login'));
+});
+
+it('downloads a report PDF and logs the export', function () {
+    $this->travelTo('2026-09-01 12:00:00');
+    $agent = User::factory()->create();
+    Lead::factory()->for($agent, 'agent')->create([
+        'status' => 'qualified_lead',
+        'created_by' => $agent->id,
+        'created_at' => '2026-08-30 10:00:00',
+    ]);
+
+    $response = $this->actingAs($agent)->get(route('analytics.export-pdf', ['period' => '7_days']));
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Type'))->toBe('application/pdf');
+    expect($response->headers->get('Content-Disposition'))->toContain('Analytics-Report-2026-08-26-to-2026-09-01.pdf');
+    $this->assertDatabaseHas(AuditLog::class, [
+        'user_id' => $agent->id,
+        'action' => 'analytics.exported_pdf',
+    ]);
+});
+
 it('downloads a report CSV scoped to the agents own leads and logs the export', function () {
     $this->travelTo('2026-09-01 12:00:00');
     $agent = User::factory()->create();
