@@ -7,7 +7,6 @@ import {
     FileClock,
     LayoutGrid,
     MailSearch,
-    Mails,
     Settings,
     ShieldCheck,
     Upload,
@@ -31,7 +30,6 @@ import { index as analyticsIndex } from '@/routes/analytics';
 import { index as auditLogIndex } from '@/routes/audit-logs';
 import { index as duplicateIndex } from '@/routes/duplicates';
 import { index as emailReplyIndex } from '@/routes/email-replies';
-import { index as emailSequenceIndex } from '@/routes/email-sequences';
 import { index as leadIndex } from '@/routes/leads';
 import { edit as settingsEdit } from '@/routes/system-settings';
 import { create as uploadCreate, index as uploadIndex } from '@/routes/uploads';
@@ -61,7 +59,6 @@ export function AppSidebar() {
             icon: MailSearch,
             badge: notificationCounts.unread_email_replies,
         },
-        { title: 'Email Sequences', href: emailSequenceIndex(), icon: Mails },
         { title: 'Upload Leads', href: uploadCreate(), icon: Upload },
         { title: 'Upload History', href: uploadIndex(), icon: FileClock },
     ];
