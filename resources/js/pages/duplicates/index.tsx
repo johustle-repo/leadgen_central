@@ -2,7 +2,6 @@ import { Form, Head } from '@inertiajs/react';
 import { Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
-import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -53,10 +52,6 @@ export default function DuplicateIndex({
         <>
             <Head title="Duplicate Review" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Duplicate review"
-                    description="Compare submissions while preserving original lead ownership."
-                />
                 <div className="flex flex-col gap-4">
                     {matches.data.map((match) => (
                         <Card key={match.id}>

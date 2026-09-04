@@ -1,9 +1,5 @@
-import {
-    createContext,
-    useContext,
-    useState,
-    type ReactNode,
-} from 'react';
+import { createContext, useContext, useState } from 'react';
+import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 type HeaderActionsContextValue = {
@@ -36,9 +32,7 @@ export function HeaderActionsProvider({ children }: { children: ReactNode }) {
 export function HeaderActionsSlot({ className }: { className?: string }) {
     const context = useContext(HeaderActionsContext);
 
-    return (
-        <div ref={context?.setTarget} className={className ?? 'contents'} />
-    );
+    return <div ref={context?.setTarget} className={className ?? 'contents'} />;
 }
 
 export function HeaderActionsPortal({ children }: { children: ReactNode }) {

@@ -11,8 +11,8 @@ import {
     Trash2,
     Upload,
 } from 'lucide-react';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import InputError from '@/components/input-error';
-import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -123,37 +123,28 @@ export default function VerificationShow({
         <>
             <Head title={`Verify ${lead.company_name}`} />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title={lead.company_name}
-                    description={`${lead.lead_code} · ${lead.agent?.name || 'Unassigned'} · ${lead.upload_batch?.batch_code ?? 'Manual entry'}`}
-                    actions={
-                        <div className="flex gap-2">
-                            <Button asChild variant="outline" size="sm">
-                                <Link href={index()}>Queue</Link>
-                            </Button>
-                            {previousId && (
-                                <Button asChild variant="outline" size="icon">
-                                    <Link
-                                        href={show(previousId)}
-                                        aria-label="Previous lead"
-                                    >
-                                        <ArrowLeft />
-                                    </Link>
-                                </Button>
-                            )}
-                            {nextId && (
-                                <Button asChild variant="outline" size="icon">
-                                    <Link
-                                        href={show(nextId)}
-                                        aria-label="Next lead"
-                                    >
-                                        <ArrowRight />
-                                    </Link>
-                                </Button>
-                            )}
-                        </div>
-                    }
-                />
+                <HeaderActionsPortal>
+                    <Button asChild variant="outline" size="sm">
+                        <Link href={index()}>Queue</Link>
+                    </Button>
+                    {previousId && (
+                        <Button asChild variant="outline" size="icon">
+                            <Link
+                                href={show(previousId)}
+                                aria-label="Previous lead"
+                            >
+                                <ArrowLeft />
+                            </Link>
+                        </Button>
+                    )}
+                    {nextId && (
+                        <Button asChild variant="outline" size="icon">
+                            <Link href={show(nextId)} aria-label="Next lead">
+                                <ArrowRight />
+                            </Link>
+                        </Button>
+                    )}
+                </HeaderActionsPortal>
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
                     <Form {...update.form(lead.id)}>
                         {({ errors, processing }) => (

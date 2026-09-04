@@ -28,7 +28,7 @@ import {
 } from 'recharts';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
-import { PageHeader } from '@/components/page-header';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import { StatTile } from '@/components/stat-tile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -555,20 +555,18 @@ export default function Analytics({
         <>
             <Head title="Reports" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Reports"
-                    description="Measure lead quality, reply outcomes, and team performance over time."
-                    actions={
-                        <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-                            <DialogTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
-                                >
-                                    <Download />
-                                    Export reports
-                                </Button>
-                            </DialogTrigger>
+                <HeaderActionsPortal>
+                    <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+                        <DialogTrigger asChild>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                            >
+                                <Download />
+                                Export reports
+                            </Button>
+                        </DialogTrigger>
                             <DialogContent>
                                 <DialogHeader>
                                     <DialogTitle>Export report</DialogTitle>
@@ -629,8 +627,7 @@ export default function Analytics({
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
-                    }
-                />
+                </HeaderActionsPortal>
 
                 <FilterBar
                     as="form"

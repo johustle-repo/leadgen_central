@@ -3,7 +3,6 @@ import { FileText, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import InputError from '@/components/input-error';
-import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -102,10 +101,6 @@ export default function LeadForm({
         <>
             <Head title={lead ? `Edit ${lead.company_name}` : 'Add Lead'} />
             <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title={lead ? 'Edit lead' : 'Add lead'}
-                    description="Enter the same details used in the raw lead file."
-                />
                 <Form
                     key={formVersion}
                     {...form}

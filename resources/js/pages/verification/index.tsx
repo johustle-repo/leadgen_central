@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
 import { FilterTabs } from '@/components/filter-tabs';
-import { PageHeader } from '@/components/page-header';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import { Pagination } from '@/components/pagination';
 import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
@@ -86,26 +86,20 @@ export default function VerificationIndex({
         <>
             <Head title="Verification" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Lead verification"
-                    description="Search contacts, classify opportunities, keep supporting documents, and export a sales-ready Possible Leads list."
-                    actions={
-                        <div className="flex flex-wrap gap-2">
-                            <Button asChild>
-                                <Link href={possibleLeads.create()}>
-                                    <Plus />
-                                    Add Possible Lead
-                                </Link>
-                            </Button>
-                            <Button asChild variant="outline">
-                                <a href={exportUrl}>
-                                    <Download />
-                                    Export possible leads
-                                </a>
-                            </Button>
-                        </div>
-                    }
-                />
+                <HeaderActionsPortal>
+                    <Button asChild size="sm">
+                        <Link href={possibleLeads.create()}>
+                            <Plus />
+                            Add Possible Lead
+                        </Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                        <a href={exportUrl}>
+                            <Download />
+                            Export possible leads
+                        </a>
+                    </Button>
+                </HeaderActionsPortal>
 
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     {(

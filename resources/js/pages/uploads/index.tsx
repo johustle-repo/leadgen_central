@@ -3,7 +3,7 @@ import { RotateCcw, SlidersHorizontal, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
-import { PageHeader } from '@/components/page-header';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -159,59 +159,53 @@ export default function UploadIndex({
         <>
             <Head title="Upload History" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Upload history"
-                    description="Track every CSV batch and its row-level results."
-                    actions={
-                        <div className="flex flex-wrap items-center gap-2">
-                            {isAdministrator && selectedCount > 0 && (
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="destructive"
-                                        >
-                                            <Trash2 />
-                                            Delete selected ({selectedCount})
+                <HeaderActionsPortal>
+                    {isAdministrator && selectedCount > 0 && (
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                >
+                                    <Trash2 />
+                                    Delete selected ({selectedCount})
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogTitle>
+                                    Delete {selectedCount} upload
+                                    {selectedCount === 1 ? '' : 's'}?
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Imported leads will be preserved, but the
+                                    raw files and row history will be removed.
+                                    This can't be undone.
+                                </DialogDescription>
+                                <DialogFooter>
+                                    <DialogClose asChild>
+                                        <Button variant="secondary">
+                                            Cancel
                                         </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogTitle>
-                                            Delete {selectedCount} upload
-                                            {selectedCount === 1 ? '' : 's'}?
-                                        </DialogTitle>
-                                        <DialogDescription>
-                                            Imported leads will be preserved,
-                                            but the raw files and row history
-                                            will be removed. This can't be
-                                            undone.
-                                        </DialogDescription>
-                                        <DialogFooter>
-                                            <DialogClose asChild>
-                                                <Button variant="secondary">
-                                                    Cancel
-                                                </Button>
-                                            </DialogClose>
-                                            <Button
-                                                type="button"
-                                                variant="destructive"
-                                                onClick={deleteSelectedBatches}
-                                            >
-                                                Delete
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            )}
-                            <Button asChild>
-                                <Link href={create()}>
-                                    <Upload />
-                                    Upload CSV
-                                </Link>
-                            </Button>
-                        </div>
-                    }
-                />
+                                    </DialogClose>
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        onClick={deleteSelectedBatches}
+                                    >
+                                        Delete
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
+                    <Button asChild size="sm">
+                        <Link href={create()}>
+                            <Upload />
+                            Upload CSV
+                        </Link>
+                    </Button>
+                </HeaderActionsPortal>
                 <FilterBar
                     as="div"
                     icon={SlidersHorizontal}

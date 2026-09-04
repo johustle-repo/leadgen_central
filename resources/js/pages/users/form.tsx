@@ -1,7 +1,6 @@
 import { Form, Head } from '@inertiajs/react';
 import { IdCard } from 'lucide-react';
 import InputError from '@/components/input-error';
-import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -41,10 +40,6 @@ export default function UserForm({
         <>
             <Head title={managedUser ? 'Edit User' : 'Add User'} />
             <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title={managedUser ? 'Edit user' : 'Add user'}
-                    description="Manage identity, access role, team, and account status."
-                />
                 <Form
                     {...(managedUser
                         ? update.form(managedUser.id)

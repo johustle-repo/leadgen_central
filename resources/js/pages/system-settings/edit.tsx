@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
-import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -46,11 +45,6 @@ export default function SettingsEdit({
         <>
             <Head title="System Settings" />
             <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="System settings"
-                    description="Manage upload safeguards and operational limits across LeadGen Central."
-                />
-
                 <div className="grid gap-4 sm:grid-cols-3">
                     <Card className="gap-3 py-5">
                         <CardContent className="flex items-center gap-4">

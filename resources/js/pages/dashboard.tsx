@@ -12,7 +12,6 @@ import {
     TrendingUp,
 } from 'lucide-react';
 import { useState } from 'react';
-import { PageHeader } from '@/components/page-header';
 import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -155,11 +154,6 @@ export default function Dashboard({
         <>
             <Head title="Dashboard" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Dashboard"
-                    description="A live view of lead generation activity."
-                />
-
                 <form
                     onSubmit={applyPeriod}
                     className="relative overflow-hidden rounded-xl border border-cyan-500/15 bg-card p-4 before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-cyan-400 before:to-indigo-500"

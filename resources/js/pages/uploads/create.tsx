@@ -2,7 +2,6 @@ import { Head, useForm } from '@inertiajs/react';
 import { UploadCloud } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
-import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -46,10 +45,6 @@ export default function UploadCreate({
         <>
             <Head title="Upload Leads" />
             <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Upload leads"
-                    description="Upload one raw CSV for mapping review, or select multiple compatible files to clean them together."
-                />
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();

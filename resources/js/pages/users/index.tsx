@@ -12,7 +12,7 @@ import {
 import { useState } from 'react';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
-import { PageHeader } from '@/components/page-header';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -92,18 +92,14 @@ export default function UsersIndex({
         <>
             <Head title="Users" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="User management"
-                    description="Create accounts and control roles and access status."
-                    actions={
-                        <Button asChild>
-                            <Link href={create()}>
-                                <Plus />
-                                Add user
-                            </Link>
-                        </Button>
-                    }
-                />
+                <HeaderActionsPortal>
+                    <Button asChild size="sm">
+                        <Link href={create()}>
+                            <Plus />
+                            Add user
+                        </Link>
+                    </Button>
+                </HeaderActionsPortal>
                 <FilterBar
                     as="form"
                     onSubmit={search}

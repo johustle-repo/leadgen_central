@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { EmptyState } from '@/components/empty-state';
 import { FilterTabs } from '@/components/filter-tabs';
-import { PageHeader } from '@/components/page-header';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import { Pagination } from '@/components/pagination';
 import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
@@ -78,22 +78,16 @@ export default function UploadShow({
         <>
             <Head title={batch.batch_code} />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title={batch.batch_code}
-                    description={`${batch.original_filename} · ${batch.user?.name || 'Former user'}`}
-                    actions={
-                        <div className="flex items-center gap-2">
-                            <a
-                                href={errors.url(batch.id)}
-                                download
-                                className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
-                            >
-                                Download problem CSV
-                            </a>
-                            <StatusBadge value={batch.processing_status} />
-                        </div>
-                    }
-                />
+                <HeaderActionsPortal>
+                    <a
+                        href={errors.url(batch.id)}
+                        download
+                        className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+                    >
+                        Download problem CSV
+                    </a>
+                    <StatusBadge value={batch.processing_status} />
+                </HeaderActionsPortal>
                 <section className="flex flex-col gap-3">
                     <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                         Import results

@@ -8,7 +8,6 @@ import {
     Workflow,
 } from 'lucide-react';
 import { EmptyState } from '@/components/empty-state';
-import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -114,11 +113,6 @@ export default function EmailSequencesIndex({
         <>
             <Head title="Email Sequences" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Email Sequences"
-                    description="Automate Day 1, Day 3, and Day 7 outreach and stop follow-ups as soon as a lead replies."
-                />
-
                 <div className="grid gap-4 sm:grid-cols-3">
                     {[
                         {

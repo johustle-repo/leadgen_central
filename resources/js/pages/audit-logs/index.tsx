@@ -1,7 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { History } from 'lucide-react';
 import { EmptyState } from '@/components/empty-state';
-import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import {
@@ -54,10 +53,6 @@ export default function AuditLogIndex({
         <>
             <Head title="Audit Logs" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Audit logs"
-                    description="Review sensitive administrative actions across LeadGen Central."
-                />
                 {logs.data.length ? (
                     <Table>
                         <TableHeader>

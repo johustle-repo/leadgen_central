@@ -15,8 +15,8 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import InputError from '@/components/input-error';
-import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -196,78 +196,71 @@ Regards,`;
         <>
             <Head title="Leads" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Leads"
-                    description="Search, filter, and manage authorized lead records."
-                    actions={
-                        <div className="flex flex-wrap items-center gap-2">
-                            {canBulkDelete &&
-                                selectedVisibleLeadIds.length > 0 && (
-                                    <Button
-                                        type="button"
-                                        variant="destructive"
-                                        onClick={() =>
-                                            setDeleteDialogOpen(true)
-                                        }
-                                    >
-                                        <Trash2 />
-                                        Delete selected (
-                                        {selectedVisibleLeadIds.length})
-                                    </Button>
-                                )}
-                            <Button type="submit" form="leads-filters">
-                                Apply filters
-                            </Button>
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
-                            >
-                                <a
-                                    href={downloadRaw.url({
-                                        query: {
-                                            date_from: selectedDate || undefined,
-                                            date_to: selectedDate || undefined,
-                                        },
-                                    })}
-                                    download
-                                >
-                                    <Download />
-                                    Download raw CSV
-                                </a>
-                            </Button>
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                            >
-                                <a
-                                    href={downloadCleaned.url({
-                                        query: {
-                                            date_from: selectedDate || undefined,
-                                            date_to: selectedDate || undefined,
-                                        },
-                                    })}
-                                    download
-                                    onClick={() =>
-                                        toast.success(
-                                            'Cleaned CSV download started with dataset cleaning.',
-                                        )
-                                    }
-                                >
-                                    <Download />
-                                    Download cleaned CSV
-                                </a>
-                            </Button>
-                            <Button asChild>
-                                <Link href={create()}>
-                                    <Plus />
-                                    Add lead
-                                </Link>
-                            </Button>
-                        </div>
-                    }
-                />
+                <HeaderActionsPortal>
+                    {canBulkDelete && selectedVisibleLeadIds.length > 0 && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => setDeleteDialogOpen(true)}
+                        >
+                            <Trash2 />
+                            Delete selected ({selectedVisibleLeadIds.length})
+                        </Button>
+                    )}
+                    <Button type="submit" size="sm" form="leads-filters">
+                        Apply filters
+                    </Button>
+                    <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                    >
+                        <a
+                            href={downloadRaw.url({
+                                query: {
+                                    date_from: selectedDate || undefined,
+                                    date_to: selectedDate || undefined,
+                                },
+                            })}
+                            download
+                        >
+                            <Download />
+                            Download raw CSV
+                        </a>
+                    </Button>
+                    <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                    >
+                        <a
+                            href={downloadCleaned.url({
+                                query: {
+                                    date_from: selectedDate || undefined,
+                                    date_to: selectedDate || undefined,
+                                },
+                            })}
+                            download
+                            onClick={() =>
+                                toast.success(
+                                    'Cleaned CSV download started with dataset cleaning.',
+                                )
+                            }
+                        >
+                            <Download />
+                            Download cleaned CSV
+                        </a>
+                    </Button>
+                    <Button asChild size="sm">
+                        <Link href={create()}>
+                            <Plus />
+                            Add lead
+                        </Link>
+                    </Button>
+                </HeaderActionsPortal>
                 <FilterBar
                     as="form"
                     id="leads-filters"

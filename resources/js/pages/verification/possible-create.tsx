@@ -2,7 +2,7 @@ import { Form, Head, Link } from '@inertiajs/react';
 import { Building2, Save, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/page-header';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,21 +42,17 @@ export default function PossibleLeadCreate({
         <>
             <Head title="Add Possible Lead" />
             <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Add possible lead"
-                    description="Create a sales opportunity directly in the Possible Leads workspace and assign it to an active agent."
-                    actions={
-                        <Button asChild variant="outline">
-                            <Link
-                                href={index({
-                                    query: { status: 'possible_lead' },
-                                })}
-                            >
-                                Back to possible leads
-                            </Link>
-                        </Button>
-                    }
-                />
+                <HeaderActionsPortal>
+                    <Button asChild size="sm" variant="outline">
+                        <Link
+                            href={index({
+                                query: { status: 'possible_lead' },
+                            })}
+                        >
+                            Back to possible leads
+                        </Link>
+                    </Button>
+                </HeaderActionsPortal>
 
                 <Form
                     {...possibleLeads.store.form()}

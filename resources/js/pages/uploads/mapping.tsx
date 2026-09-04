@@ -1,7 +1,6 @@
 import { Form, Head } from '@inertiajs/react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
-import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import {
     Select,
@@ -79,10 +78,6 @@ export default function UploadMapping({
         <>
             <Head title="Map CSV Columns" />
             <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Map CSV columns"
-                    description={`${batch.original_filename} · ${batch.batch_code}`}
-                />
                 <Form {...process.form(batch.id)}>
                     {({ errors, processing }) => (
                         <div className="flex flex-col gap-4">
