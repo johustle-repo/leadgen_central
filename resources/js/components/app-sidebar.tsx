@@ -48,7 +48,7 @@ export function AppSidebar() {
     const mainNavItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
         {
-            title: 'Analytics',
+            title: 'Reports',
             href: analyticsIndex(),
             icon: ChartNoAxesCombined,
         },
