@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\EmailReply;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -57,6 +58,14 @@ class HandleInertiaRequests extends Middleware
                 },
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'impersonator' => function () use ($request): ?array {
+                $impersonatorId = $request->session()->get('impersonator_id');
+                if (! $impersonatorId) {
+                    return null;
+                }
+
+                return User::query()->find((int) $impersonatorId)?->only(['id', 'name']);
+            },
         ];
     }
 }

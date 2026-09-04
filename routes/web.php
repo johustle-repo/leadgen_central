@@ -8,6 +8,7 @@ use App\Http\Controllers\DuplicateReviewController;
 use App\Http\Controllers\EmailReplyController;
 use App\Http\Controllers\EmailSequenceController;
 use App\Http\Controllers\GmailConnectionController;
+use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\LeadAttachmentController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadForwardingController;
@@ -64,6 +65,8 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::put('duplicates/{duplicateMatch}', [DuplicateReviewController::class, 'update'])->name('duplicates.update');
     Route::resource('users', UserController::class);
     Route::patch('users/{user}/email-sequence', [EmailSequenceController::class, 'toggleForUser'])->name('users.email-sequence.toggle');
+    Route::post('users/{user}/impersonate', [ImpersonationController::class, 'store'])->name('users.impersonate');
+    Route::delete('impersonate', [ImpersonationController::class, 'destroy'])->name('impersonate.stop');
     Route::get('system-settings', [SystemSettingController::class, 'edit'])->name('system-settings.edit');
     Route::put('system-settings', [SystemSettingController::class, 'update'])->middleware(['can:manage-settings', 'password.confirm'])->name('system-settings.update');
     Route::get('audit-logs', AuditLogController::class)->name('audit-logs.index');

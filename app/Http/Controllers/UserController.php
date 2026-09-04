@@ -42,6 +42,7 @@ class UserController extends Controller
                 ? true
                 : $user->emailSequences->first()->is_active,
             'can_delete' => $request->user()->can('delete', $user),
+            'can_impersonate' => $request->user()->can('impersonate', $user),
         ]);
 
         return Inertia::render('users/index', ['users' => $users, 'filters' => $request->only(['search', 'role', 'status'])]);

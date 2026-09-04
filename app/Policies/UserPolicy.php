@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\AccountStatus;
 use App\Models\User;
 
 class UserPolicy
@@ -63,6 +64,20 @@ class UserPolicy
         }
 
         return $user->isAdministrator() && ! $model->isAdministrator();
+    }
+
+    /**
+     * Determine whether the user can log in as the model.
+     *
+     * Exclusive to Super Administrators. They cannot impersonate themselves,
+     * another Super Administrator, or an inactive account.
+     */
+    public function impersonate(User $user, User $model): bool
+    {
+        return $user->isSuperAdministrator()
+            && ! $user->is($model)
+            && ! $model->isSuperAdministrator()
+            && $model->status === AccountStatus::Active;
     }
 
     /**

@@ -14,6 +14,7 @@ declare module '@inertiajs/core' {
             auth: Auth;
             notificationCounts: { unread_email_replies: number };
             sidebarOpen: boolean;
+            impersonator: { id: number; name: string } | null;
             [key: string]: unknown;
         };
     }

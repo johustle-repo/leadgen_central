@@ -1,10 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    Crown,
     Pencil,
     Plus,
     Search,
     SlidersHorizontal,
     Trash2,
+    UserRoundCog,
     UsersRound,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -39,7 +41,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { create, destroy, edit, index } from '@/routes/users';
+import { create, destroy, edit, impersonate, index } from '@/routes/users';
 
 const ALL_ROLES = '__all__';
 import { toggle } from '@/routes/users/email-sequence';
@@ -55,6 +57,7 @@ type User = {
     email_replies_count: number;
     email_sequence_enabled: boolean;
     can_delete: boolean;
+    can_impersonate: boolean;
 };
 export default function UsersIndex({
     users,
@@ -197,7 +200,13 @@ export default function UsersIndex({
                                         </div>
                                     </TableCell>
                                     <TableCell className="capitalize">
-                                        {user.role.replaceAll('_', ' ')}
+                                        <span className="inline-flex items-center gap-1.5">
+                                            {user.role ===
+                                                'super_administrator' && (
+                                                <Crown className="size-3.5 shrink-0 fill-amber-500 text-amber-500" />
+                                            )}
+                                            {user.role.replaceAll('_', ' ')}
+                                        </span>
                                     </TableCell>
                                     <TableCell>{user.team || '—'}</TableCell>
                                     <TableCell>
@@ -253,6 +262,60 @@ export default function UsersIndex({
                                                     Edit
                                                 </Link>
                                             </Button>
+                                            {user.can_impersonate && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
+                                                        >
+                                                            <UserRoundCog />
+                                                            Log in as
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogTitle>
+                                                            Log in as{' '}
+                                                            {user.name}?
+                                                        </DialogTitle>
+                                                        <DialogDescription>
+                                                            You&apos;ll see the
+                                                            app exactly as they
+                                                            do. A banner lets
+                                                            you return to your
+                                                            own account at any
+                                                            time. This is
+                                                            recorded in the
+                                                            audit log.
+                                                        </DialogDescription>
+                                                        <DialogFooter>
+                                                            <DialogClose
+                                                                asChild
+                                                            >
+                                                                <Button variant="secondary">
+                                                                    Cancel
+                                                                </Button>
+                                                            </DialogClose>
+                                                            <Button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    router.post(
+                                                                        impersonate.url(
+                                                                            user.id,
+                                                                        ),
+                                                                    )
+                                                                }
+                                                            >
+                                                                <UserRoundCog />
+                                                                Log in as{' '}
+                                                                {user.name}
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
                                             {user.can_delete && (
                                                 <Dialog>
                                                     <DialogTrigger asChild>
