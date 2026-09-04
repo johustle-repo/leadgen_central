@@ -15,7 +15,6 @@ import {
 import { useState } from 'react';
 import { FilterBar } from '@/components/filter-bar';
 import { HeaderActionsPortal } from '@/components/header-actions';
-import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
@@ -169,16 +168,8 @@ export default function EmailRepliesIndex({
         <>
             <Head title="Email Replies" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader
-                    title="Email Replies"
-                    description={
-                        connection
-                            ? `Review Gmail replies matched securely to existing lead email addresses. Connected: ${connection.gmail_address} — ${connection.status.replaceAll('_', ' ')}${connection.last_synced_at ? `, last synced ${formatManilaDateTime(connection.last_synced_at)}` : ''}.`
-                            : 'Review Gmail replies matched securely to existing lead email addresses. No Gmail mailbox connected yet — only messages from email addresses belonging to your leads are saved.'
-                    }
-                />
                 {connection?.last_error && (
-                    <p className="-mt-4 text-sm text-destructive">
+                    <p className="text-sm text-destructive">
                         {connection.last_error}
                     </p>
                 )}
