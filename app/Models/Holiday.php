@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property int $id
- * @property \Carbon\CarbonInterface $holiday_date
+ * @property CarbonInterface $holiday_date
  * @property string $name
  * @property string $country_code
  * @property string $type
