@@ -62,6 +62,24 @@ import type {
 
 const ALL_ENTRY_TYPES = '__all__';
 
+function describeCameraError(error: unknown): string {
+    const name = error instanceof Error ? error.name : '';
+
+    if (name === 'NotAllowedError') {
+        return 'Camera access was blocked. Allow camera permission for this site in your browser settings, then try again.';
+    }
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        return 'No camera was found on this device.';
+    }
+    if (name === 'NotReadableError') {
+        return 'The camera is already in use by another app or browser tab.';
+    }
+
+    return error instanceof Error && error.message
+        ? `Could not start the camera: ${error.message}`
+        : 'Could not start the camera.';
+}
+
 type Props = {
     users: AttendanceUser[];
     records: {
@@ -96,6 +114,7 @@ export default function AttendanceIndex({
     const videoRef = useRef<HTMLVideoElement>(null);
     const scannerRef = useRef<QrScanner | null>(null);
     const [scanning, setScanning] = useState(false);
+    const [cameraError, setCameraError] = useState<string | null>(null);
 
     useEffect(
         () => () => {
@@ -110,6 +129,24 @@ export default function AttendanceIndex({
             return;
         }
 
+        if (!window.isSecureContext) {
+            setCameraError(
+                'The camera requires a secure connection (HTTPS). This page was loaded over plain HTTP.',
+            );
+
+            return;
+        }
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setCameraError(
+                'This browser does not support camera access.',
+            );
+
+            return;
+        }
+
+        setCameraError(null);
+
         const scanner = new QrScanner(
             videoRef.current,
             (result) => {
@@ -123,7 +160,10 @@ export default function AttendanceIndex({
         scanner
             .start()
             .then(() => setScanning(true))
-            .catch(() => setScanning(false));
+            .catch((error: unknown) => {
+                setScanning(false);
+                setCameraError(describeCameraError(error));
+            });
     }
 
     function stopCamera() {
@@ -262,6 +302,11 @@ export default function AttendanceIndex({
                                     <Camera />
                                     {scanning ? 'Stop camera' : 'Start camera'}
                                 </Button>
+                                {cameraError && (
+                                    <p className="text-sm text-destructive">
+                                        {cameraError}
+                                    </p>
+                                )}
 
                                 <div className="grid gap-2">
                                     <Label htmlFor="code">QR code value</Label>

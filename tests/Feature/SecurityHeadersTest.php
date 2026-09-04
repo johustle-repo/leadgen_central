@@ -10,7 +10,7 @@ it('adds browser security headers to application responses', function () {
         ->assertHeader('X-Content-Type-Options', 'nosniff')
         ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
         ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
-        ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+        ->assertHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()')
         ->assertHeader('Cross-Origin-Opener-Policy', 'same-origin')
         ->assertHeader('Cross-Origin-Resource-Policy', 'same-origin')
         ->assertHeader('Content-Security-Policy', "base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'")
