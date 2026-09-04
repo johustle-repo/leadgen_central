@@ -231,7 +231,7 @@ class AttendanceImportService
      * letter, with or without a trailing period) so e.g. "Jonathan F.
      * Quiles" matches an existing user stored as "Jonathan Quiles".
      */
-    private function normalizeNameForMatch(string $name): string
+    public static function normalizeNameForMatch(string $name): string
     {
         $tokens = preg_split('/\s+/', trim($name)) ?: [];
         $tokens = array_filter(
