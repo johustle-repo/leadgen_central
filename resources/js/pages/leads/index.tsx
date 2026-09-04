@@ -274,7 +274,7 @@ Regards,`;
                     onSubmit={search}
                     icon={SlidersHorizontal}
                     label="Filters"
-                    gridClassName="sm:grid-cols-2 lg:grid-cols-7"
+                    gridClassName="sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]"
                     hint="Search matches company, contact, and email. Lead date filters by the date recorded on each lead, not when it was uploaded."
                 >
                     <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
