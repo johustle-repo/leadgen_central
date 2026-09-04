@@ -15,7 +15,7 @@ class DuplicateReviewController extends Controller
     public function index(Request $request): Response
     {
         abort_unless($request->user()->canViewAllLeads(), 403);
-        $matches = DuplicateMatch::query()->with(['incomingLead.agent:id,name', 'existingLead.agent:id,name', 'uploadRow:id,raw_data'])->latest()->paginate(20);
+        $matches = DuplicateMatch::query()->where('status', 'pending')->with(['incomingLead.agent:id,name', 'existingLead.agent:id,name', 'uploadRow:id,raw_data'])->latest()->paginate(20);
 
         return Inertia::render('duplicates/index', ['matches' => $matches]);
     }

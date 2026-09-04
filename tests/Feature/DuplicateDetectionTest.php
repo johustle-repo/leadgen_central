@@ -181,6 +181,20 @@ it('restricts duplicate review to administrators and sub-administrators', functi
     $this->actingAs($reviewer)->get(route('duplicates.index'))->assertOk();
 });
 
+it('excludes already resolved duplicate matches from the review queue', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $existingLead = Lead::factory()->create();
+    $pending = DuplicateMatch::factory()->for($existingLead, 'existingLead')->create(['status' => 'pending']);
+    DuplicateMatch::factory()->for($existingLead, 'existingLead')->create(['match_type' => 'exact', 'status' => 'confirmed']);
+    DuplicateMatch::factory()->for($existingLead, 'existingLead')->create(['status' => 'cleared']);
+    DuplicateMatch::factory()->for($existingLead, 'existingLead')->create(['status' => 'keep_both']);
+
+    $this->actingAs($reviewer)->get(route('duplicates.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('duplicates/index')
+        ->has('matches.data', 1)
+        ->where('matches.data.0.id', $pending->id));
+});
+
 it('returns historical duplicate matches when a related lead was deleted', function () {
     $reviewer = User::factory()->subAdministrator()->create();
     $existingLead = Lead::factory()->create();
