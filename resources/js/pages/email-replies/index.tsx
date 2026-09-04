@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { FilterBar } from '@/components/filter-bar';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { StatTile } from '@/components/stat-tile';
@@ -170,96 +171,79 @@ export default function EmailRepliesIndex({
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title="Email Replies"
-                    description="Review Gmail replies matched securely to existing lead email addresses."
+                    description={
+                        connection
+                            ? `Review Gmail replies matched securely to existing lead email addresses. Connected: ${connection.gmail_address} — ${connection.status.replaceAll('_', ' ')}${connection.last_synced_at ? `, last synced ${formatManilaDateTime(connection.last_synced_at)}` : ''}.`
+                            : 'Review Gmail replies matched securely to existing lead email addresses. No Gmail mailbox connected yet — only messages from email addresses belonging to your leads are saved.'
+                    }
                 />
+                {connection?.last_error && (
+                    <p className="-mt-4 text-sm text-destructive">
+                        {connection.last_error}
+                    </p>
+                )}
 
-                <Card className="overflow-hidden border-cyan-500/20 bg-gradient-to-br from-card to-cyan-500/5">
-                    <CardContent className="flex flex-col justify-between gap-5 p-5 md:flex-row md:items-center">
-                        <div className="flex items-start gap-4">
-                            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/12 text-cyan-600 dark:text-cyan-300">
-                                <Mail className="size-5" />
-                            </div>
-                            <div>
-                                <p className="font-semibold">
-                                    {connection
-                                        ? connection.gmail_address
-                                        : 'Connect an agent Gmail mailbox'}
-                                </p>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    {connection
-                                        ? `Status: ${connection.status.replaceAll('_', ' ')}${connection.last_synced_at ? ` · Last synced ${formatManilaDateTime(connection.last_synced_at)}` : ''}`
-                                        : 'Only messages from email addresses belonging to your leads are saved.'}
-                                </p>
-                                {connection?.last_error && (
-                                    <p className="mt-2 text-sm text-destructive">
-                                        {connection.last_error}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Form {...markAllRead.form()}>
+                <HeaderActionsPortal>
+                    <Form {...markAllRead.form()}>
+                        {({ processing }) => (
+                            <Button
+                                type="submit"
+                                size="sm"
+                                variant="outline"
+                                disabled={processing || summary.unread === 0}
+                            >
+                                <CheckCheck />
+                                Mark all as read
+                            </Button>
+                        )}
+                    </Form>
+                    {connection ? (
+                        <>
+                            <Form {...sync.form()}>
                                 {({ processing }) => (
                                     <Button
                                         type="submit"
-                                        variant="outline"
-                                        disabled={
-                                            processing || summary.unread === 0
-                                        }
+                                        size="sm"
+                                        disabled={processing}
                                     >
-                                        <CheckCheck />
-                                        Mark all as read
+                                        <RefreshCw
+                                            className={
+                                                processing ? 'animate-spin' : ''
+                                            }
+                                        />
+                                        Sync now
                                     </Button>
                                 )}
                             </Form>
-                            {connection ? (
-                                <>
-                                    <Form {...sync.form()}>
-                                        {({ processing }) => (
-                                            <Button
-                                                type="submit"
-                                                disabled={processing}
-                                            >
-                                                <RefreshCw
-                                                    className={
-                                                        processing
-                                                            ? 'animate-spin'
-                                                            : ''
-                                                    }
-                                                />
-                                                Sync now
-                                            </Button>
-                                        )}
-                                    </Form>
-                                    <Form {...disconnect.form()}>
-                                        {({ processing }) => (
-                                            <Button
-                                                type="submit"
-                                                variant="outline"
-                                                disabled={processing}
-                                            >
-                                                <Unplug />
-                                                Disconnect
-                                            </Button>
-                                        )}
-                                    </Form>
-                                </>
-                            ) : (
-                                <Form {...connect.form()}>
-                                    {({ processing }) => (
-                                        <Button
-                                            type="submit"
-                                            disabled={processing}
-                                        >
-                                            <Mail />
-                                            Connect Gmail
-                                        </Button>
-                                    )}
-                                </Form>
+                            <Form {...disconnect.form()}>
+                                {({ processing }) => (
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={processing}
+                                    >
+                                        <Unplug />
+                                        Disconnect
+                                    </Button>
+                                )}
+                            </Form>
+                        </>
+                    ) : (
+                        <Form {...connect.form()}>
+                            {({ processing }) => (
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    disabled={processing}
+                                >
+                                    <Mail />
+                                    Connect Gmail
+                                </Button>
                             )}
-                        </div>
-                    </CardContent>
-                </Card>
+                        </Form>
+                    )}
+                </HeaderActionsPortal>
 
                 <div className="grid gap-4 sm:grid-cols-3">
                     <StatTile
