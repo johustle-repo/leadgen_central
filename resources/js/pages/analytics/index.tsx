@@ -593,14 +593,14 @@ export default function Analytics({
                                 >
                                     <ToggleGroupItem
                                         value="excel"
-                                        className="h-16 flex-1 flex-col gap-1"
+                                        className="h-16 flex-1 flex-col gap-1 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 data-[state=on]:border-emerald-500/60 data-[state=on]:bg-emerald-500/15 data-[state=on]:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200 dark:data-[state=on]:bg-emerald-500/20 dark:data-[state=on]:text-emerald-200"
                                     >
                                         <FileSpreadsheet className="size-4" />
                                         Excel (CSV)
                                     </ToggleGroupItem>
                                     <ToggleGroupItem
                                         value="pdf"
-                                        className="h-16 flex-1 flex-col gap-1"
+                                        className="h-16 flex-1 flex-col gap-1 border-rose-500/30 text-rose-700 hover:bg-rose-500/10 hover:text-rose-800 data-[state=on]:border-rose-500/60 data-[state=on]:bg-rose-500/15 data-[state=on]:text-rose-800 dark:text-rose-300 dark:hover:text-rose-200 dark:data-[state=on]:bg-rose-500/20 dark:data-[state=on]:text-rose-200"
                                     >
                                         <FileText className="size-4" />
                                         PDF
