@@ -162,10 +162,12 @@ export default function Dashboard({
 
                 <form
                     onSubmit={applyPeriod}
-                    className="rounded-xl border bg-card p-4"
+                    className="relative overflow-hidden rounded-xl border border-cyan-500/15 bg-card p-4 before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-cyan-400 before:to-indigo-500"
                 >
-                    <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                        <CalendarRange className="size-3.5" />
+                    <div className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-wide text-cyan-700 uppercase dark:text-cyan-300">
+                        <span className="flex size-5 items-center justify-center rounded-md bg-cyan-500/12 text-cyan-600 dark:text-cyan-300">
+                            <CalendarRange className="size-3.5" />
+                        </span>
                         Reporting period
                     </div>
                     <div className="grid gap-3 sm:grid-cols-4">
@@ -236,9 +238,7 @@ export default function Dashboard({
                             />
                         </div>
                         <div className="flex flex-col justify-end">
-                            <Button type="submit" variant="secondary">
-                                Apply period
-                            </Button>
+                            <Button type="submit">Apply period</Button>
                         </div>
                     </div>
                     <p className="mt-3 text-xs text-muted-foreground">
