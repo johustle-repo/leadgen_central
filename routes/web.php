@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\VerifyEmailController as AuthVerifyEmailController;
 use App\Http\Controllers\DashboardController;
@@ -81,6 +82,12 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::get('integrations/gmail/callback', [GmailConnectionController::class, 'callback'])->name('gmail.callback');
     Route::post('integrations/gmail/sync', [GmailConnectionController::class, 'sync'])->middleware('throttle:integrations')->name('gmail.sync');
     Route::delete('integrations/gmail/disconnect', [GmailConnectionController::class, 'disconnect'])->middleware(['password.confirm', 'throttle:integrations'])->name('gmail.disconnect');
+
+    Route::middleware('can:manage-attendance')->group(function () {
+        Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+        Route::post('attendance/scan', [AttendanceController::class, 'scan'])->name('attendance.scan');
+        Route::get('attendance/export.pdf', [AttendanceController::class, 'exportPdf'])->middleware('throttle:data-exports')->name('attendance.export-pdf');
+    });
 });
 
 require __DIR__.'/settings.php';

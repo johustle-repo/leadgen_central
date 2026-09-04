@@ -43,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('integrations', fn (Request $request) => Limit::perMinute(15)->by((string) $request->user()?->id));
         Model::preventLazyLoading(! app()->isProduction());
         Gate::define('manage-settings', fn (User $user): bool => $user->isAdministrator());
+        Gate::define('manage-attendance', fn (User $user): bool => $user->isSuperAdministrator());
     }
 
     /**

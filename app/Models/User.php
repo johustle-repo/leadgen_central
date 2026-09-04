@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -29,6 +30,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property UserRole $role
  * @property AccountStatus $status
  * @property string|null $team
+ * @property string|null $qr_token
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
@@ -44,6 +46,24 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     use HasFactory, Notifiable, PasskeyAuthenticatable, SoftDeletes, TwoFactorAuthenticatable;
 
     protected $attributes = ['role' => 'agent', 'status' => 'active'];
+
+    /**
+     * Bootstrap the model and its traits.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (User $user): void {
+            $user->qr_token ??= (string) Str::uuid();
+        });
+    }
+
+    /**
+     * The literal value encoded into the user's attendance QR code.
+     */
+    public function getQrValueAttribute(): string
+    {
+        return "attendance:{$this->qr_token}";
+    }
 
     /**
      * Get the attributes that should be cast.

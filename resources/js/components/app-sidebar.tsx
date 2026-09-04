@@ -7,6 +7,7 @@ import {
     FileClock,
     LayoutGrid,
     MailSearch,
+    QrCode,
     Settings,
     ShieldCheck,
     Upload,
@@ -28,6 +29,7 @@ import {
 import { isAdministratorRole } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
+import { index as attendanceIndex } from '@/routes/attendance';
 import { index as auditLogIndex } from '@/routes/audit-logs';
 import { index as duplicateIndex } from '@/routes/duplicates';
 import { index as emailReplyIndex } from '@/routes/email-replies';
@@ -89,6 +91,14 @@ export function AppSidebar() {
             },
             { title: 'Settings', href: settingsEdit(), icon: Settings },
         );
+    }
+
+    if (auth.user.role === 'super_administrator') {
+        mainNavItems.push({
+            title: 'Attendance',
+            href: attendanceIndex(),
+            icon: QrCode,
+        });
     }
 
     return (
