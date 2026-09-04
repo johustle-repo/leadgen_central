@@ -9,8 +9,12 @@ type FilterBarProps = {
     gridClassName?: string;
     children: ReactNode;
 } & (
-    | { as?: 'form'; onSubmit?: (event: FormEvent<HTMLFormElement>) => void }
-    | { as: 'div'; onSubmit?: never }
+    | {
+          as?: 'form';
+          id?: string;
+          onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
+      }
+    | { as: 'div'; id?: never; onSubmit?: never }
 );
 
 /**
@@ -46,6 +50,7 @@ export function FilterBar(props: FilterBarProps) {
 
     return (
         <form
+            id={props.id}
             onSubmit={props.onSubmit}
             className="rounded-xl border bg-card p-4"
         >

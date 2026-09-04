@@ -215,6 +215,50 @@ Regards,`;
                                         {selectedVisibleLeadIds.length})
                                     </Button>
                                 )}
+                            <Button type="submit" form="leads-filters">
+                                Apply filters
+                            </Button>
+                            <Button
+                                asChild
+                                variant="outline"
+                                className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                            >
+                                <a
+                                    href={downloadRaw.url({
+                                        query: {
+                                            date_from: selectedDate || undefined,
+                                            date_to: selectedDate || undefined,
+                                        },
+                                    })}
+                                    download
+                                >
+                                    <Download />
+                                    Download raw CSV
+                                </a>
+                            </Button>
+                            <Button
+                                asChild
+                                variant="outline"
+                                className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                            >
+                                <a
+                                    href={downloadCleaned.url({
+                                        query: {
+                                            date_from: selectedDate || undefined,
+                                            date_to: selectedDate || undefined,
+                                        },
+                                    })}
+                                    download
+                                    onClick={() =>
+                                        toast.success(
+                                            'Cleaned CSV download started with dataset cleaning.',
+                                        )
+                                    }
+                                >
+                                    <Download />
+                                    Download cleaned CSV
+                                </a>
+                            </Button>
                             <Button asChild>
                                 <Link href={create()}>
                                     <Plus />
@@ -226,13 +270,14 @@ Regards,`;
                 />
                 <FilterBar
                     as="form"
+                    id="leads-filters"
                     onSubmit={search}
                     icon={SlidersHorizontal}
                     label="Filters"
-                    gridClassName="sm:grid-cols-2 lg:grid-cols-4"
+                    gridClassName="sm:grid-cols-2 lg:grid-cols-7"
                     hint="Search matches company, contact, and email. Lead date filters by the date recorded on each lead, not when it was uploaded."
                 >
-                    <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-3">
+                    <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
                         <label
                             htmlFor="leads-search"
                             className="text-xs text-muted-foreground"
@@ -405,50 +450,6 @@ Regards,`;
                                 setSelectedDate(event.target.value)
                             }
                         />
-                    </div>
-                    <div className="flex flex-col justify-end gap-1.5 sm:col-span-2 lg:col-span-4 lg:flex-row">
-                        <Button type="submit">Apply filters</Button>
-                        <Button
-                            asChild
-                            variant="outline"
-                            className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
-                        >
-                            <a
-                                href={downloadRaw.url({
-                                    query: {
-                                        date_from: selectedDate || undefined,
-                                        date_to: selectedDate || undefined,
-                                    },
-                                })}
-                                download
-                            >
-                                <Download />
-                                Download raw CSV
-                            </a>
-                        </Button>
-                        <Button
-                            asChild
-                            variant="outline"
-                            className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
-                        >
-                            <a
-                                href={downloadCleaned.url({
-                                    query: {
-                                        date_from: selectedDate || undefined,
-                                        date_to: selectedDate || undefined,
-                                    },
-                                })}
-                                download
-                                onClick={() =>
-                                    toast.success(
-                                        'Cleaned CSV download started with dataset cleaning.',
-                                    )
-                                }
-                            >
-                                <Download />
-                                Download cleaned CSV
-                            </a>
-                        </Button>
                     </div>
                 </FilterBar>
                 {leads.data.length ? (
