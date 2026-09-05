@@ -16,10 +16,6 @@ export function AppSidebarHeader({
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
                 <HeaderActionsSlot className="hidden flex-wrap items-center gap-2 md:flex" />
-                <div className="hidden items-center gap-2 rounded-full border border-cyan-500/15 bg-cyan-500/7 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-cyan-700 uppercase md:flex dark:text-cyan-300">
-                    <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_var(--color-emerald-400)]" />
-                    Lead intelligence workspace
-                </div>
             </div>
         </header>
     );
