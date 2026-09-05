@@ -233,7 +233,7 @@ export default function AttendanceScanner({
                             </div>
                         </CardHeader>
                         <CardContent className="grid gap-4">
-                            <div className="overflow-hidden rounded-lg border bg-muted/30">
+                            <div className="mx-auto w-full max-w-64 overflow-hidden rounded-lg border bg-muted/30">
                                 <video
                                     ref={videoRef}
                                     className="aspect-square w-full object-cover"
