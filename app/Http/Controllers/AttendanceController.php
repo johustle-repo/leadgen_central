@@ -15,6 +15,7 @@ use App\Services\HolidayService;
 use App\UserRole;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -71,7 +72,7 @@ class AttendanceController extends Controller
         ]);
 
         $monitorDateInput = $request->string('monitor_date')->toString();
-        $monitorDate = $monitorDateInput !== '' ? Carbon::parse($monitorDateInput) : now();
+        $monitorDate = $monitorDateInput !== '' ? Carbon::parse($monitorDateInput) : Attendance::now();
         $monitorSearch = $request->string('monitor_search')->trim()->toString();
 
         $activeUsers = User::query()->where('status', 'active')->where('role', UserRole::Agent)->orderBy('name')->get(['id', 'name', 'email', 'employee_code', 'role', 'night_shift_eligible']);
@@ -197,18 +198,13 @@ class AttendanceController extends Controller
     {
         Gate::authorize('manage-attendance');
 
-        $recentCheckIns = Attendance::query()
-            ->with('user:id,name,employee_code')
-            ->orderByDesc('recorded_at')
-            ->limit(8)
-            ->get()
-            ->map(fn (Attendance $attendance): array => [
-                'id' => $attendance->id,
-                'user_name' => $attendance->user?->name,
-                'employee_code' => $attendance->user?->employee_code,
-                'entry_type' => $attendance->entry_type,
-                'recorded_at' => $attendance->recorded_at->toIso8601String(),
-            ]);
+        $recentCheckIns = self::mapCheckIns(
+            Attendance::query()
+                ->with('user:id,name,employee_code')
+                ->orderByDesc('recorded_at')
+                ->limit(8)
+                ->get(),
+        );
 
         return Inertia::render('attendance/scanner', [
             'registeredUsers' => User::query()->where('status', 'active')->where('role', UserRole::Agent)->count(),
@@ -216,11 +212,51 @@ class AttendanceController extends Controller
         ]);
     }
 
+    /**
+     * Self-service QR scanner page (Settings > QR Attendance): any
+     * authenticated user can scan their own printed badge to record their
+     * own time in/out, without the `manage-attendance` gate the shared
+     * scanning station requires.
+     */
+    public function qrAttendance(Request $request): Response
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        $recentCheckIns = self::mapCheckIns(
+            Attendance::query()
+                ->where('user_id', $user->id)
+                ->orderByDesc('recorded_at')
+                ->limit(8)
+                ->get()
+                ->each->setRelation('user', $user),
+        );
+
+        return Inertia::render('settings/qr-attendance', [
+            'recentCheckIns' => $recentCheckIns,
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, Attendance>  $attendances
+     * @return array<int, array{id: int, user_name: string|null, employee_code: string|null, entry_type: AttendanceEntryType, recorded_at: string}>
+     */
+    private static function mapCheckIns(Collection $attendances): array
+    {
+        return $attendances->map(fn (Attendance $attendance): array => [
+            'id' => $attendance->id,
+            'user_name' => $attendance->user?->name,
+            'employee_code' => $attendance->user?->employee_code,
+            'entry_type' => $attendance->entry_type,
+            'recorded_at' => $attendance->recorded_at->toIso8601String(),
+        ])->all();
+    }
+
     public function summary(Request $request, AttendanceDaySummaryService $summaryService): Response
     {
         Gate::authorize('manage-attendance');
 
-        $today = now()->startOfDay();
+        $today = Attendance::now()->startOfDay();
         $summary = [
             'total_records' => Attendance::query()->count(),
             'time_ins_today' => Attendance::query()->where('entry_type', AttendanceEntryType::TimeIn)->whereDate('recorded_at', $today)->count(),
@@ -235,7 +271,7 @@ class AttendanceController extends Controller
 
         $monthStart = $this->resolveMonthStart($request);
         $calendarMonthEnd = $monthStart->copy()->endOfMonth();
-        $endOfToday = now()->endOfDay();
+        $endOfToday = Attendance::now()->endOfDay();
         $monthEnd = $calendarMonthEnd->greaterThan($endOfToday) ? $endOfToday : $calendarMonthEnd;
         $activeUsers = User::query()->where('status', 'active')->where('role', UserRole::Agent)->orderBy('name')->get();
 
@@ -270,7 +306,7 @@ class AttendanceController extends Controller
     {
         $month = $request->string('month')->toString();
 
-        return $month !== '' ? Carbon::parse($month)->startOfMonth() : now()->startOfMonth();
+        return $month !== '' ? Carbon::parse($month)->startOfMonth() : Attendance::now()->startOfMonth();
     }
 
     public function scan(Request $request, AttendanceScanService $service): RedirectResponse
@@ -296,6 +332,34 @@ class AttendanceController extends Controller
         return back()->with('toast', [
             'type' => 'success',
             'message' => "{$attendance->entry_type->label()} recorded for {$attendance->user?->name}.",
+        ]);
+    }
+
+    /**
+     * Self-service counterpart to `scan()`: any authenticated user may
+     * record their own attendance, but the scanned badge must resolve back
+     * to themselves.
+     */
+    public function selfScan(Request $request, AttendanceScanService $service): RedirectResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string'],
+            'entry_type' => ['required', 'string', 'in:time_in,time_out'],
+        ]);
+
+        $performedBy = $request->user();
+        abort_unless($performedBy instanceof User, 401);
+
+        $attendance = $service->record(
+            $validated['code'],
+            AttendanceEntryType::from($validated['entry_type']),
+            $performedBy,
+            restrictToSelf: $performedBy,
+        );
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'message' => "{$attendance->entry_type->label()} recorded.",
         ]);
     }
 

@@ -188,6 +188,62 @@ it('rejects a time out without an open time in', function () {
     expect(Attendance::where('user_id', $staff->id)->count())->toBe(0);
 });
 
+it('records a scan using the Philippine wall-clock time, not the raw UTC instant', function () {
+    Carbon\Carbon::setTestNow(Carbon\Carbon::parse('2026-01-15 22:30:00', 'UTC'));
+
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $staff = User::factory()->create();
+
+    $this->actingAs($superAdministrator)
+        ->post(route('attendance.scan'), ['code' => $staff->qr_value, 'entry_type' => 'time_in'])
+        ->assertSessionHas('toast.type', 'success');
+
+    $attendance = Attendance::where('user_id', $staff->id)->first();
+
+    // 22:30 UTC is 06:30 the next day in Asia/Manila (UTC+8) - the stored
+    // digits must reflect that local wall clock, not the raw UTC instant.
+    expect($attendance->recorded_at->format('Y-m-d H:i'))->toBe('2026-01-16 06:30');
+
+    Carbon\Carbon::setTestNow();
+});
+
+it('lets any authenticated user view their own self-service QR attendance page', function () {
+    $agent = User::factory()->create();
+    Attendance::factory()->for($agent)->create(['entry_type' => 'time_in', 'recorded_at' => now()]);
+
+    $other = User::factory()->create();
+    Attendance::factory()->for($other)->create(['entry_type' => 'time_in', 'recorded_at' => now()]);
+
+    $response = $this->actingAs($agent)->get(route('qr-attendance.edit'));
+
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('settings/qr-attendance')
+        ->has('recentCheckIns', 1)
+        ->where('recentCheckIns.0.user_name', $agent->name));
+});
+
+it('lets an agent self-scan their own badge to record their own attendance', function () {
+    $agent = User::factory()->create();
+
+    $this->actingAs($agent)
+        ->post(route('qr-attendance.scan'), ['code' => $agent->qr_value, 'entry_type' => 'time_in'])
+        ->assertRedirect()
+        ->assertSessionHas('toast.type', 'success');
+
+    expect(Attendance::where('user_id', $agent->id)->count())->toBe(1);
+});
+
+it('forbids an agent from self-scanning someone else\'s badge', function () {
+    $agent = User::factory()->create();
+    $otherStaff = User::factory()->create();
+
+    $this->actingAs($agent)
+        ->post(route('qr-attendance.scan'), ['code' => $otherStaff->qr_value, 'entry_type' => 'time_in'])
+        ->assertSessionHasErrors('code');
+
+    expect(Attendance::where('user_id', $otherStaff->id)->count())->toBe(0);
+});
+
 it('exports attendance records as a pdf', function () {
     $superAdministrator = User::factory()->superAdministrator()->create();
     $staff = User::factory()->create();

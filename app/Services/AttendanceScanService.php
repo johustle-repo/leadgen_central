@@ -7,7 +7,7 @@ use App\AttendanceEntryType;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\User;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Validation\ValidationException;
 
 class AttendanceScanService
@@ -18,13 +18,20 @@ class AttendanceScanService
 
     /**
      * Resolve a scanned QR value to a user and record the requested entry type,
-     * enforcing time in/out sequencing for the current day.
+     * enforcing time in/out sequencing for the current day. When
+     * `$restrictToSelf` is given (self-service scanning), the scanned badge
+     * must belong to that same user - it cannot be used to record someone
+     * else's attendance.
      */
-    public function record(string $scannedValue, AttendanceEntryType $entryType, User $performedBy): Attendance
+    public function record(string $scannedValue, AttendanceEntryType $entryType, User $performedBy, ?User $restrictToSelf = null): Attendance
     {
         $user = $this->resolveUser($scannedValue);
 
-        $now = Carbon::now();
+        if ($restrictToSelf instanceof User && $user->isNot($restrictToSelf)) {
+            throw ValidationException::withMessages(['code' => 'That QR code is not yours to scan.']);
+        }
+
+        $now = Attendance::now();
 
         $this->assertNoRecentDuplicate($user, $entryType, $now);
         $this->assertSequenceIsValid($user, $entryType, $now);
@@ -67,7 +74,7 @@ class AttendanceScanService
         return $user;
     }
 
-    private function assertNoRecentDuplicate(User $user, AttendanceEntryType $entryType, Carbon $now): void
+    private function assertNoRecentDuplicate(User $user, AttendanceEntryType $entryType, CarbonInterface $now): void
     {
         $recentDuplicate = Attendance::query()
             ->where('user_id', $user->id)
@@ -80,7 +87,7 @@ class AttendanceScanService
         }
     }
 
-    private function assertSequenceIsValid(User $user, AttendanceEntryType $entryType, Carbon $now): void
+    private function assertSequenceIsValid(User $user, AttendanceEntryType $entryType, CarbonInterface $now): void
     {
         $today = $now->copy()->startOfDay();
 

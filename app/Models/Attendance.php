@@ -8,6 +8,7 @@ use Database\Factories\AttendanceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -53,6 +54,17 @@ class Attendance extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The current moment expressed as Philippine wall-clock digits, stored
+     * under the app's UTC-labeled `recorded_at` column verbatim - the same
+     * "raw digits = local time" convention used for manually-typed entries,
+     * so QR scans and manual edits land on the same clock and calendar day.
+     */
+    public static function now(): CarbonInterface
+    {
+        return Carbon::parse(Carbon::now('Asia/Manila')->format('Y-m-d H:i:s'));
     }
 
     /**

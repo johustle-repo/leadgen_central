@@ -1,12 +1,10 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Download,
     Mail,
-    Paperclip,
     Pencil,
     Plus,
     Search,
-    Send,
     SlidersHorizontal,
     Trash2,
     Users,
@@ -16,7 +14,6 @@ import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
 import { HeaderActionsPortal } from '@/components/header-actions';
-import InputError from '@/components/input-error';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -30,7 +27,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -54,7 +50,6 @@ import {
     edit,
     index,
 } from '@/routes/leads';
-import { sendEmail } from '@/routes/leads';
 type Lead = {
     id: number;
     lead_code: string;
@@ -70,7 +65,6 @@ type Lead = {
     upload_batch: { batch_code: string } | null;
     agent: { name: string } | null;
     can_update: boolean;
-    can_send_email: boolean;
     email_replies_count: number;
     unread_email_replies_count: number;
 };
@@ -90,7 +84,6 @@ export default function LeadsIndex({
     canBulkDelete,
     agents,
 }: Props) {
-    const [composeLead, setComposeLead] = useState<Lead | null>(null);
     const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -99,7 +92,6 @@ export default function LeadsIndex({
     const [agentFilter, setAgentFilter] = useState(
         filters.agent_id || ALL_AGENTS,
     );
-    const emailForm = useForm({ subject: '', body: '' });
     const visibleLeadIds = leads.data.map((lead) => lead.id);
     const selectedVisibleLeadIds = selectedLeadIds.filter((id) =>
         visibleLeadIds.includes(id),
@@ -133,53 +125,6 @@ export default function LeadsIndex({
                 setDeleteDialogOpen(false);
             },
             onFinish: () => setDeleting(false),
-        });
-    };
-
-    const emailBody = (lead: Lead) => `Hi ${lead.contact_person || 'there'},
-
-I can help you improve your cost efficiency in scaffolding materials by offering competitive pricing without compromising on quality and standards.
-
-Duscaff is a global scaffolding manufacturer headquartered in Dubai, with production facilities across the Middle East, Europe, Central Asia, and China. We currently supply hundreds of clients worldwide and are ready to support your business as well.
-
-We manufacture and export a full range of scaffolding products, including components for the following systems:
-
-• Ringlock System
-• Tube & Fitting System
-• Frame System
-• Kwikstage System
-• Cuplock System
-• Aluminium Towers and Ladders
-
-All products are manufactured in compliance with American Standards, British Standards, and European Norms.
-
-Our materials are backed by the trust and consistency of a global brand that has helped develop key projects in the Oil & Gas sector and civil construction across the Middle East and around the world.
-
-Please find our brochure attached for your reference. If you don’t see a particular item you’re looking for, there’s a good chance we still manufacture it. Feel free to reach out with your specific requirements.
-
-We look forward to the opportunity to support your upcoming projects.
-
-Regards,`;
-
-    const openComposer = (lead: Lead) => {
-        setComposeLead(lead);
-        emailForm.setData({
-            subject: 'Competitive Scaffolding Materials from DUSCAFF',
-            body: emailBody(lead),
-        });
-        emailForm.clearErrors();
-    };
-
-    const sendLeadEmail = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-
-        if (!composeLead) {
-            return;
-        }
-
-        emailForm.post(sendEmail.url(composeLead.id), {
-            preserveScroll: true,
-            onSuccess: () => setComposeLead(null),
         });
     };
 
@@ -547,18 +492,6 @@ Regards,`;
                                     </TableCell>
                                     <TableCell align="right">
                                         <div className="flex justify-end gap-2">
-                                            {lead.can_send_email && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        openComposer(lead)
-                                                    }
-                                                >
-                                                    <Send className="size-3.5" />
-                                                    Send email
-                                                </Button>
-                                            )}
                                             {lead.can_update && (
                                                 <Button
                                                     asChild
@@ -620,92 +553,6 @@ Regards,`;
                             {deleting ? 'Deleting…' : 'Delete leads'}
                         </Button>
                     </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog
-                open={composeLead !== null}
-                onOpenChange={(open) => !open && setComposeLead(null)}
-            >
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Send DUSCAFF introduction</DialogTitle>
-                        <DialogDescription>
-                            Review the message before sending it through your
-                            connected Gmail account.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form onSubmit={sendLeadEmail} className="grid gap-5">
-                        <div className="grid gap-2">
-                            <Label>Recipient</Label>
-                            <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-                                {composeLead?.contact_person || 'Lead'} &lt;
-                                {composeLead?.email}&gt;
-                            </div>
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="email-subject">Subject</Label>
-                            <Input
-                                id="email-subject"
-                                value={emailForm.data.subject}
-                                onChange={(event) =>
-                                    emailForm.setData(
-                                        'subject',
-                                        event.target.value,
-                                    )
-                                }
-                                maxLength={150}
-                                required
-                            />
-                            <InputError message={emailForm.errors.subject} />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="email-body">Message</Label>
-                            <textarea
-                                id="email-body"
-                                value={emailForm.data.body}
-                                onChange={(event) =>
-                                    emailForm.setData(
-                                        'body',
-                                        event.target.value,
-                                    )
-                                }
-                                rows={18}
-                                maxLength={15000}
-                                required
-                                className="min-h-80 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            />
-                            <InputError message={emailForm.errors.body} />
-                        </div>
-
-                        <div className="flex items-center gap-2 rounded-lg border border-info/20 bg-info/5 px-3 py-2 text-sm text-muted-foreground">
-                            <Paperclip className="size-4 text-info" />
-                            DUSCAFF Scaffolding Products brochure 2026.pdf
-                        </div>
-
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setComposeLead(null)}
-                                disabled={emailForm.processing}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={emailForm.processing}
-                            >
-                                <Send />
-                                {emailForm.processing
-                                    ? 'Sending…'
-                                    : 'Send email'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
                 </DialogContent>
             </Dialog>
         </>
