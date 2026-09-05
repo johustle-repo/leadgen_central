@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Attendance;
+use App\Models\AuditLog;
 use App\Models\Holiday;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -251,20 +252,23 @@ it('forbids a regular administrator from importing attendance', function () {
     $this->actingAs($administrator)->post(route('attendance.import'), ['files' => [$file]])->assertForbidden();
 });
 
-it('marks the daily summary as a holiday on an automatic Sunday rest day', function () {
+it('organizes attendance by month and agent, marking an automatic Sunday rest day', function () {
     // Named so `orderBy('name')` puts the Sunday staff member at a known index.
     $superAdministrator = User::factory()->superAdministrator()->create(['name' => 'AAA Admin']);
     User::factory()->create(['name' => 'ZZZ Sunday Staff', 'status' => 'active']);
 
-    $response = $this->actingAs($superAdministrator)->get(route('attendance.index', ['date' => '2026-04-05'])); // a Sunday
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.index', ['month' => '2026-04']));
 
     $response->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('attendance/index')
-        ->where('dailySummaryDate', '2026-04-05')
-        ->has('dailySummary', 2)
-        ->where('dailySummary.1.user_name', 'ZZZ Sunday Staff')
-        ->where('dailySummary.1.status', 'holiday')
-        ->where('dailySummary.1.holiday_label', 'Sunday Rest Day'));
+        ->where('selectedMonth', '2026-04')
+        ->has('monthlyAttendance', 2)
+        ->where('monthlyAttendance.1.user_name', 'ZZZ Sunday Staff')
+        ->has('monthlyAttendance.1.days', 30)
+        // 2026-04-05 (index 4) is a Sunday with no seeded holiday row.
+        ->where('monthlyAttendance.1.days.4.date', '2026-04-05')
+        ->where('monthlyAttendance.1.days.4.status', 'holiday')
+        ->where('monthlyAttendance.1.days.4.holiday_label', 'Sunday Rest Day'));
 });
 
 it('exports the attendance backup workbook for the super administrator only', function () {
@@ -279,4 +283,90 @@ it('exports the attendance backup workbook for the super administrator only', fu
 
     $response->assertOk();
     expect($response->headers->get('Content-Type'))->toContain('spreadsheet');
+});
+
+it('lets the super administrator fill in a missing time in', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $staff = User::factory()->create();
+
+    $response = $this->actingAs($superAdministrator)->put(route('attendance.update-entry', [
+        'user' => $staff->id,
+        'date' => '2026-04-01',
+        'entryType' => 'time_in',
+    ]), ['recorded_at' => '2026-04-01 08:05:00']);
+
+    $response->assertRedirect()->assertSessionHas('toast.type', 'success');
+    $this->assertDatabaseHas('attendances', [
+        'user_id' => $staff->id,
+        'entry_type' => 'time_in',
+        'source' => 'manual_adjustment',
+    ]);
+    expect(AuditLog::query()->where('action', 'attendance.manual_edit')->exists())->toBeTrue();
+});
+
+it('lets the super administrator edit an existing time out', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $staff = User::factory()->create();
+    Attendance::factory()->for($staff)->create(['recorded_at' => '2026-04-01 08:00:00', 'entry_type' => 'time_in']);
+    $timeOut = Attendance::factory()->for($staff)->create(['recorded_at' => '2026-04-01 17:00:00', 'entry_type' => 'time_out']);
+
+    $this->actingAs($superAdministrator)->put(route('attendance.update-entry', [
+        'user' => $staff->id,
+        'date' => '2026-04-01',
+        'entryType' => 'time_out',
+    ]), ['recorded_at' => '2026-04-01 18:30:00'])->assertRedirect();
+
+    $timeOut->refresh();
+    expect($timeOut->recorded_at->format('H:i'))->toBe('18:30');
+    expect($timeOut->source)->toBe('manual_adjustment');
+});
+
+it('rejects a time out with no time in yet', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $staff = User::factory()->create();
+
+    $this->actingAs($superAdministrator)->put(route('attendance.update-entry', [
+        'user' => $staff->id,
+        'date' => '2026-04-01',
+        'entryType' => 'time_out',
+    ]), ['recorded_at' => '2026-04-01 17:00:00'])->assertSessionHasErrors('recorded_at');
+
+    $this->assertDatabaseMissing('attendances', ['user_id' => $staff->id]);
+});
+
+it('rejects a time in set after the existing time out', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $staff = User::factory()->create();
+    Attendance::factory()->for($staff)->create(['recorded_at' => '2026-04-01 17:00:00', 'entry_type' => 'time_out']);
+
+    $this->actingAs($superAdministrator)->put(route('attendance.update-entry', [
+        'user' => $staff->id,
+        'date' => '2026-04-01',
+        'entryType' => 'time_in',
+    ]), ['recorded_at' => '2026-04-01 18:00:00'])->assertSessionHasErrors('recorded_at');
+});
+
+it('clears an attendance entry when recorded_at is submitted empty', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $staff = User::factory()->create();
+    Attendance::factory()->for($staff)->create(['recorded_at' => '2026-04-01 08:00:00', 'entry_type' => 'time_in']);
+
+    $this->actingAs($superAdministrator)->put(route('attendance.update-entry', [
+        'user' => $staff->id,
+        'date' => '2026-04-01',
+        'entryType' => 'time_in',
+    ]), ['recorded_at' => ''])->assertRedirect()->assertSessionHas('toast.type', 'success');
+
+    $this->assertDatabaseMissing('attendances', ['user_id' => $staff->id]);
+});
+
+it('forbids a regular administrator from editing attendance entries', function () {
+    $administrator = User::factory()->administrator()->create();
+    $staff = User::factory()->create();
+
+    $this->actingAs($administrator)->put(route('attendance.update-entry', [
+        'user' => $staff->id,
+        'date' => '2026-04-01',
+        'entryType' => 'time_in',
+    ]), ['recorded_at' => '2026-04-01 08:00:00'])->assertForbidden();
 });

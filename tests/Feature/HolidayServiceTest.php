@@ -77,3 +77,31 @@ it('never marks a holiday as late, no matter the clock-in time', function () {
     expect($day['status'])->toBe('holiday');
     expect($day['late_minutes'])->toBe(0);
 });
+
+it('batches a whole period for multiple users without losing per-day accuracy', function () {
+    $alice = User::factory()->create(['name' => 'Alice']);
+    $bob = User::factory()->create(['name' => 'Bob']);
+
+    Attendance::factory()->for($alice)->create(['recorded_at' => '2026-04-01 08:00:00', 'entry_type' => 'time_in']);
+    Attendance::factory()->for($alice)->create(['recorded_at' => '2026-04-01 17:00:00', 'entry_type' => 'time_out']);
+    Attendance::factory()->for($bob)->create(['recorded_at' => '2026-04-02 09:00:00', 'entry_type' => 'time_in']);
+
+    $periods = app(AttendanceDaySummaryService::class)->buildForPeriod(
+        Carbon::parse('2026-04-01'),
+        Carbon::parse('2026-04-03'),
+        collect([$alice, $bob]),
+    );
+
+    expect($periods)->toHaveCount(2);
+
+    $alicePeriod = collect($periods)->firstWhere('user.id', $alice->id);
+    $alicePeriod['days'] = collect($alicePeriod['days'])->keyBy(fn (array $day): string => $day['date']->toDateString());
+    expect($alicePeriod['days']['2026-04-01']['time_in'])->not->toBeNull();
+    expect($alicePeriod['days']['2026-04-01']['worked_minutes'])->toBe(8 * 60);
+    expect($alicePeriod['days']['2026-04-02']['time_in'])->toBeNull();
+
+    $bobPeriod = collect($periods)->firstWhere('user.id', $bob->id);
+    $bobPeriod['days'] = collect($bobPeriod['days'])->keyBy(fn (array $day): string => $day['date']->toDateString());
+    expect($bobPeriod['days']['2026-04-02']['time_in'])->not->toBeNull();
+    expect($bobPeriod['days']['2026-04-01']['time_in'])->toBeNull();
+});

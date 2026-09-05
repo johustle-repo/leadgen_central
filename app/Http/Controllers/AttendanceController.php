@@ -12,11 +12,13 @@ use App\Services\AttendanceImportService;
 use App\Services\AttendanceScanService;
 use App\Services\HolidayService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -78,26 +80,42 @@ class AttendanceController extends Controller
             'active_staff' => User::query()->where('status', 'active')->count(),
         ];
 
-        $summaryDate = $date ? Carbon::parse($date) : now();
+        $monthStart = $this->resolveMonthStart($request);
+        $calendarMonthEnd = $monthStart->copy()->endOfMonth();
+        $endOfToday = now()->endOfDay();
+        $monthEnd = $calendarMonthEnd->greaterThan($endOfToday) ? $endOfToday : $calendarMonthEnd;
         $activeUsers = User::query()->where('status', 'active')->orderBy('name')->get();
-        $dailySummary = array_map(fn (array $row): array => [
-            'user_id' => $row['user_id'],
-            'user_name' => $row['user_name'],
-            'time_in' => $row['time_in']?->toIso8601String(),
-            'time_out' => $row['time_out']?->toIso8601String(),
-            'worked_minutes_label' => Attendance::formatMinutes($row['worked_minutes']),
-            'status' => $row['status'],
-            'holiday_label' => $row['holiday_label'],
-        ], $summaryService->buildForDate($summaryDate, $activeUsers));
+
+        $monthlyAttendance = array_map(fn (array $period): array => [
+            'user_id' => $period['user']->id,
+            'user_name' => $period['user']->name,
+            'role_label' => $period['user']->role->label(),
+            'days' => array_map(fn (array $day): array => [
+                'date' => $day['date']->toDateString(),
+                'time_in' => $day['time_in']?->toIso8601String(),
+                'time_out' => $day['time_out']?->toIso8601String(),
+                'worked_minutes' => $day['worked_minutes'],
+                'worked_minutes_label' => Attendance::formatMinutes($day['worked_minutes']),
+                'status' => $day['status'],
+                'holiday_label' => $day['holiday_label'],
+            ], $period['days']),
+        ], $summaryService->buildForPeriod($monthStart, $monthEnd, $activeUsers));
 
         return Inertia::render('attendance/index', [
             'users' => $users,
             'records' => $records,
             'summary' => $summary,
-            'dailySummary' => $dailySummary,
-            'dailySummaryDate' => $summaryDate->toDateString(),
+            'monthlyAttendance' => $monthlyAttendance,
+            'selectedMonth' => $monthStart->format('Y-m'),
             'filters' => $request->only(['search', 'entry_type', 'date']),
         ]);
+    }
+
+    private function resolveMonthStart(Request $request): CarbonInterface
+    {
+        $month = $request->string('month')->toString();
+
+        return $month !== '' ? Carbon::parse($month)->startOfMonth() : now()->startOfMonth();
     }
 
     public function scan(Request $request, AttendanceScanService $service): RedirectResponse
@@ -187,8 +205,12 @@ class AttendanceController extends Controller
     {
         Gate::authorize('manage-attendance');
 
+        $monthStart = $this->resolveMonthStart($request);
+        $monthEnd = $monthStart->copy()->endOfMonth();
+
         $attendances = Attendance::query()
             ->with('user:id,name,role')
+            ->whereBetween('recorded_at', [$monthStart, $monthEnd])
             ->orderByDesc('recorded_at')
             ->limit(500)
             ->get();
@@ -242,8 +264,7 @@ class AttendanceController extends Controller
     {
         Gate::authorize('manage-attendance');
 
-        $month = $request->string('month')->toString();
-        $period = $month !== '' ? Carbon::parse($month)->startOfMonth() : now()->startOfMonth();
+        $period = $this->resolveMonthStart($request);
 
         $performedBy = $request->user();
         abort_unless($performedBy instanceof User, 401);
@@ -261,5 +282,94 @@ class AttendanceController extends Controller
             new AttendanceBackupExport($period->copy()->startOfMonth(), $period->copy()->endOfMonth()),
             'Attendance_'.$period->format('F_Y').'.xlsx',
         );
+    }
+
+    /**
+     * Super-admin correction of a single Time In/Out slot for one user on
+     * one day: creates it if missing, updates it if present, or deletes it
+     * when `recorded_at` is submitted empty. Keyed by (user, date,
+     * entry type) rather than an attendance ID so the UI can offer an
+     * editable cell even for a day with no record yet.
+     */
+    public function updateEntry(Request $request, User $user, string $date, string $entryType): RedirectResponse
+    {
+        Gate::authorize('manage-attendance');
+
+        $validated = $request->validate([
+            'recorded_at' => ['nullable', 'date'],
+        ]);
+
+        $entryTypeEnum = AttendanceEntryType::from($entryType);
+        $day = Carbon::parse($date)->startOfDay();
+
+        $performedBy = $request->user();
+        abort_unless($performedBy instanceof User, 401);
+
+        $existing = Attendance::query()
+            ->where('user_id', $user->id)
+            ->where('entry_type', $entryTypeEnum)
+            ->whereBetween('recorded_at', [$day, $day->copy()->endOfDay()])
+            ->first();
+
+        if ($validated['recorded_at'] === null) {
+            $existing?->delete();
+
+            AuditLog::query()->create([
+                'user_id' => $performedBy->id,
+                'action' => 'attendance.manual_edit',
+                'auditable_type' => 'attendance',
+                'auditable_id' => null,
+                'description' => "Cleared {$entryTypeEnum->label()} for {$user->name} on {$day->toDateString()}.",
+                'metadata' => ['target_user_id' => $user->id, 'date' => $day->toDateString(), 'entry_type' => $entryTypeEnum->value, 'action' => 'cleared'],
+            ]);
+
+            return back()->with('toast', ['type' => 'success', 'message' => "{$entryTypeEnum->label()} cleared for {$user->name}."]);
+        }
+
+        $recordedAt = Carbon::parse($validated['recorded_at']);
+
+        if (! $recordedAt->isSameDay($day)) {
+            throw ValidationException::withMessages(['recorded_at' => "The time must fall on {$day->toDateString()}."]);
+        }
+
+        $counterpartType = $entryTypeEnum === AttendanceEntryType::TimeIn ? AttendanceEntryType::TimeOut : AttendanceEntryType::TimeIn;
+        $counterpart = Attendance::query()
+            ->where('user_id', $user->id)
+            ->where('entry_type', $counterpartType)
+            ->whereBetween('recorded_at', [$day, $day->copy()->endOfDay()])
+            ->first();
+
+        if ($entryTypeEnum === AttendanceEntryType::TimeOut) {
+            if (! $counterpart instanceof Attendance) {
+                throw ValidationException::withMessages(['recorded_at' => "{$user->name} must have a Time In before a Time Out."]);
+            }
+            if ($recordedAt->lessThanOrEqualTo($counterpart->recorded_at)) {
+                throw ValidationException::withMessages(['recorded_at' => 'Time Out must be after Time In.']);
+            }
+        } elseif ($counterpart instanceof Attendance && $recordedAt->greaterThanOrEqualTo($counterpart->recorded_at)) {
+            throw ValidationException::withMessages(['recorded_at' => 'Time In must be before Time Out.']);
+        }
+
+        if ($existing instanceof Attendance) {
+            $existing->update(['recorded_at' => $recordedAt, 'source' => 'manual_adjustment']);
+        } else {
+            Attendance::query()->create([
+                'user_id' => $user->id,
+                'recorded_at' => $recordedAt,
+                'entry_type' => $entryTypeEnum,
+                'source' => 'manual_adjustment',
+            ]);
+        }
+
+        AuditLog::query()->create([
+            'user_id' => $performedBy->id,
+            'action' => 'attendance.manual_edit',
+            'auditable_type' => 'attendance',
+            'auditable_id' => null,
+            'description' => "Set {$entryTypeEnum->label()} for {$user->name} on {$day->toDateString()} to {$recordedAt->format('H:i')}.",
+            'metadata' => ['target_user_id' => $user->id, 'date' => $day->toDateString(), 'entry_type' => $entryTypeEnum->value, 'action' => $existing instanceof Attendance ? 'updated' : 'created'],
+        ]);
+
+        return back()->with('toast', ['type' => 'success', 'message' => "{$entryTypeEnum->label()} saved for {$user->name}."]);
     }
 }

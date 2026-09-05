@@ -21,12 +21,21 @@ export type AttendanceRecord = {
     late_minutes: number;
 };
 
-export type AttendanceDailySummary = {
-    user_id: number;
-    user_name: string;
+export type AttendanceDayStatus = 'no_time_in' | 'on_time' | 'late' | 'holiday';
+
+export type AttendanceMonthDay = {
+    date: string;
     time_in: string | null;
     time_out: string | null;
+    worked_minutes: number;
     worked_minutes_label: string;
-    status: 'no_time_in' | 'on_time' | 'late' | 'holiday';
+    status: AttendanceDayStatus;
     holiday_label: string | null;
+};
+
+export type AttendanceMonthlyAgent = {
+    user_id: number;
+    user_name: string;
+    role_label: string;
+    days: AttendanceMonthDay[];
 };
