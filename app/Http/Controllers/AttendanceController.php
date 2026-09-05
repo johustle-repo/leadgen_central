@@ -26,7 +26,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AttendanceController extends Controller
 {
-    public function index(Request $request, AttendanceDaySummaryService $summaryService): Response
+    public function index(Request $request): Response
     {
         Gate::authorize('manage-attendance');
 
@@ -67,6 +67,17 @@ class AttendanceController extends Controller
             ),
         ]);
 
+        return Inertia::render('attendance/index', [
+            'users' => $users,
+            'records' => $records,
+            'filters' => $request->only(['search', 'entry_type', 'date']),
+        ]);
+    }
+
+    public function summary(Request $request, AttendanceDaySummaryService $summaryService): Response
+    {
+        Gate::authorize('manage-attendance');
+
         $today = now()->startOfDay();
         $summary = [
             'total_records' => Attendance::query()->count(),
@@ -101,13 +112,10 @@ class AttendanceController extends Controller
             ], $period['days']),
         ], $summaryService->buildForPeriod($monthStart, $monthEnd, $activeUsers));
 
-        return Inertia::render('attendance/index', [
-            'users' => $users,
-            'records' => $records,
+        return Inertia::render('attendance/summary', [
             'summary' => $summary,
             'monthlyAttendance' => $monthlyAttendance,
             'selectedMonth' => $monthStart->format('Y-m'),
-            'filters' => $request->only(['search', 'entry_type', 'date']),
         ]);
     }
 

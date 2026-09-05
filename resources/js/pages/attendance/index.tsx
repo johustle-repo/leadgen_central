@@ -2,26 +2,21 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Camera,
-    ChevronDown,
-    ChevronRight,
-    Clock3,
     Download,
-    FileDown,
     FileJson,
     LogIn,
     LogOut,
     QrCode as QrCodeIcon,
     SlidersHorizontal,
-    Users as UsersIcon,
+    UserPlus,
     X,
 } from 'lucide-react';
 import QrScanner from 'qr-scanner';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
 import InputError from '@/components/input-error';
 import { Pagination } from '@/components/pagination';
-import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +30,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
+    DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -58,16 +53,12 @@ import {
 import { downloadDataUrl, drawIdentityCard } from '@/lib/qr';
 import { cn } from '@/lib/utils';
 import {
-    exportExcel,
-    exportPdf,
     importMethod as importAttendance,
     index,
     scan,
-    updateEntry,
 } from '@/routes/attendance';
 import type {
     AttendanceEntryType,
-    AttendanceMonthlyAgent,
     AttendanceRecord,
     AttendanceUser,
 } from '@/types';
@@ -92,85 +83,27 @@ function describeCameraError(error: unknown): string {
         : 'Could not start the camera.';
 }
 
-function formatMinutes(minutes: number): string {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-
-    return `${hours}h ${String(mins).padStart(2, '0')}m`;
-}
-
-function formatTime(iso: string | null): string {
-    return iso
-        ? new Date(iso).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-          })
-        : '—';
-}
-
-function toDatetimeLocalValue(iso: string | null): string {
-    if (!iso) {
-        return '';
-    }
-
-    const date = new Date(iso);
-    const pad = (value: number) => String(value).padStart(2, '0');
-
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function monthLabel(month: string): string {
-    return new Date(`${month}-01T00:00:00`).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'long',
-    });
-}
-
-type EditingCell = {
-    userId: number;
-    userName: string;
-    date: string;
-    entryType: AttendanceEntryType;
-};
-
 type Props = {
     users: AttendanceUser[];
     records: {
         data: AttendanceRecord[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
-    summary: {
-        total_records: number;
-        time_ins_today: number;
-        late_today: number;
-        active_staff: number;
-    };
-    monthlyAttendance: AttendanceMonthlyAgent[];
-    selectedMonth: string;
     filters: { search?: string; entry_type?: string; date?: string };
 };
 
-export default function AttendanceIndex({
-    users,
-    records,
-    summary,
-    monthlyAttendance,
-    selectedMonth,
-    filters,
-}: Props) {
+export default function AttendanceIndex({ users, records, filters }: Props) {
     const { flash } = usePage().props;
     const form = useForm<{ code: string; entry_type: AttendanceEntryType }>({
         code: '',
         entry_type: 'time_in',
     });
     const importForm = useForm<{ files: File[] }>({ files: [] });
-    const editForm = useForm<{ recorded_at: string }>({ recorded_at: '' });
     const [entryTypeFilter, setEntryTypeFilter] = useState(
         filters.entry_type || ALL_ENTRY_TYPES,
     );
     const [importErrorsDismissed, setImportErrorsDismissed] = useState(false);
-    const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
-    const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+    const [recordDialogOpen, setRecordDialogOpen] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const scannerRef = useRef<QrScanner | null>(null);
     const [scanning, setScanning] = useState(false);
@@ -198,9 +131,7 @@ export default function AttendanceIndex({
         }
 
         if (!navigator.mediaDevices?.getUserMedia) {
-            setCameraError(
-                'This browser does not support camera access.',
-            );
+            setCameraError('This browser does not support camera access.');
 
             return;
         }
@@ -229,6 +160,14 @@ export default function AttendanceIndex({
     function stopCamera() {
         scannerRef.current?.stop();
         setScanning(false);
+    }
+
+    function closeRecordDialog(open: boolean) {
+        if (!open) {
+            stopCamera();
+        }
+
+        setRecordDialogOpen(open);
     }
 
     function submit() {
@@ -273,106 +212,26 @@ export default function AttendanceIndex({
         );
     }
 
-    function changeMonth(month: string) {
-        router.get(
-            index.url(),
-            { month },
-            { preserveState: true, preserveScroll: true },
-        );
-    }
-
-    function openEditor(
-        userId: number,
-        userName: string,
-        date: string,
-        entryType: AttendanceEntryType,
-        currentValue: string | null,
-    ) {
-        editForm.clearErrors();
-        editForm.setData('recorded_at', toDatetimeLocalValue(currentValue));
-        setEditingCell({ userId, userName, date, entryType });
-    }
-
-    function submitEdit(event: React.FormEvent) {
-        event.preventDefault();
-
-        if (!editingCell) {
-            return;
-        }
-
-        editForm.put(
-            updateEntry.url({
-                user: editingCell.userId,
-                date: editingCell.date,
-                entryType: editingCell.entryType,
-            }),
-            { preserveScroll: true, onSuccess: () => setEditingCell(null) },
-        );
-    }
-
-    function clearEntry() {
-        if (!editingCell) {
-            return;
-        }
-
-        router.put(
-            updateEntry.url({
-                user: editingCell.userId,
-                date: editingCell.date,
-                entryType: editingCell.entryType,
-            }),
-            { recorded_at: '' },
-            { preserveScroll: true, onSuccess: () => setEditingCell(null) },
-        );
-    }
-
     const importErrors =
         !importErrorsDismissed && flash.importErrors
             ? flash.importErrors
             : [];
 
-    const teamSummary = monthlyAttendance.map((agent) => {
-        const attendanceDays = agent.days.filter(
-            (day) => day.time_in !== null,
-        ).length;
-        const logCount = agent.days.reduce(
-            (sum, day) =>
-                sum + (day.time_in ? 1 : 0) + (day.time_out ? 1 : 0),
-            0,
-        );
-
-        return { ...agent, attendanceDays, logCount };
-    });
-
     return (
         <>
             <Head title="Attendance" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatTile
-                        label="Total records"
-                        value={summary.total_records}
-                        icon={QrCodeIcon}
-                        tone="text-info"
-                    />
-                    <StatTile
-                        label="Time-ins today"
-                        value={summary.time_ins_today}
-                        icon={LogIn}
-                        tone="text-success"
-                    />
-                    <StatTile
-                        label="Late today"
-                        value={summary.late_today}
-                        icon={Clock3}
-                        tone="text-warning"
-                    />
-                    <StatTile
-                        label="Active staff"
-                        value={summary.active_staff}
-                        icon={UsersIcon}
-                        tone="text-primary"
-                    />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h1 className="text-xl font-semibold">Attendance</h1>
+                        <p className="text-sm text-muted-foreground">
+                            Staff QR profiles and the recent scan log.
+                        </p>
+                    </div>
+                    <Button onClick={() => setRecordDialogOpen(true)}>
+                        <UserPlus />
+                        Record Attendance
+                    </Button>
                 </div>
 
                 {importErrors.length > 0 && (
@@ -401,682 +260,349 @@ export default function AttendanceIndex({
                     </div>
                 )}
 
-                <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_1fr]">
-                    <div className="grid gap-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Scan attendance</CardTitle>
-                                <CardDescription>
-                                    Scan a staff member&apos;s QR code, or
-                                    enter their code manually.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="grid gap-4">
-                                <div className="overflow-hidden rounded-lg border bg-muted/30">
-                                    <video
-                                        ref={videoRef}
-                                        className="aspect-square w-full object-cover"
-                                        muted
-                                        playsInline
-                                    />
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={scanning ? stopCamera : startCamera}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Agent profiles</CardTitle>
+                        <CardDescription>
+                            Download a printable identity card for each user.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {users.length ? (
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                {users.map((user) => (
+                                    <div
+                                        key={user.id}
+                                        className={cn(
+                                            'flex items-center justify-between gap-3 rounded-lg border p-3',
+                                            user.status !== 'active' &&
+                                                'opacity-60',
+                                        )}
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="truncate font-medium">
+                                                {user.name}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {user.role.replaceAll(
+                                                    '_',
+                                                    ' ',
+                                                )}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() =>
+                                                handleDownloadCard(user)
+                                            }
+                                        >
+                                            <Download />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState
+                                icon={QrCodeIcon}
+                                title="No staff yet"
+                            />
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Recent scans</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-4">
+                        <FilterBar
+                            as="form"
+                            onSubmit={filterRecords}
+                            icon={SlidersHorizontal}
+                            label="Filters"
+                            gridClassName="sm:grid-cols-3"
+                        >
+                            <div className="flex flex-col gap-1.5">
+                                <label
+                                    htmlFor="attendance-search"
+                                    className="text-xs text-muted-foreground"
                                 >
-                                    <Camera />
-                                    {scanning ? 'Stop camera' : 'Start camera'}
-                                </Button>
-                                {cameraError && (
-                                    <p className="text-sm text-destructive">
-                                        {cameraError}
-                                    </p>
-                                )}
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="code">QR code value</Label>
-                                    <Input
-                                        id="code"
-                                        name="code"
-                                        value={form.data.code}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'code',
-                                                event.target.value,
-                                            )
-                                        }
-                                        placeholder="attendance:..."
-                                        aria-invalid={
-                                            form.errors.code
-                                                ? true
-                                                : undefined
-                                        }
-                                    />
-                                    <InputError message={form.errors.code} />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button
-                                        type="button"
-                                        variant={
-                                            form.data.entry_type === 'time_in'
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                        onClick={() =>
-                                            form.setData(
-                                                'entry_type',
-                                                'time_in',
-                                            )
-                                        }
-                                    >
-                                        <LogIn />
-                                        Time In
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant={
-                                            form.data.entry_type ===
-                                            'time_out'
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                        onClick={() =>
-                                            form.setData(
-                                                'entry_type',
-                                                'time_out',
-                                            )
-                                        }
-                                    >
-                                        <LogOut />
-                                        Time Out
-                                    </Button>
-                                </div>
-
-                                <Button
-                                    type="button"
-                                    disabled={
-                                        form.processing ||
-                                        !form.data.code.trim()
+                                    Staff
+                                </label>
+                                <Input
+                                    id="attendance-search"
+                                    name="search"
+                                    defaultValue={filters.search}
+                                    placeholder="Search staff…"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label
+                                    htmlFor="attendance-entry-type"
+                                    className="text-xs text-muted-foreground"
+                                >
+                                    Entry
+                                </label>
+                                <input
+                                    type="hidden"
+                                    name="entry_type"
+                                    value={
+                                        entryTypeFilter === ALL_ENTRY_TYPES
+                                            ? ''
+                                            : entryTypeFilter
                                     }
-                                    onClick={submit}
+                                />
+                                <Select
+                                    value={entryTypeFilter}
+                                    onValueChange={setEntryTypeFilter}
                                 >
-                                    Record scan
+                                    <SelectTrigger id="attendance-entry-type">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ALL_ENTRY_TYPES}>
+                                            All entries
+                                        </SelectItem>
+                                        <SelectItem value="time_in">
+                                            Time In
+                                        </SelectItem>
+                                        <SelectItem value="time_out">
+                                            Time Out
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label
+                                    htmlFor="attendance-date"
+                                    className="text-xs text-muted-foreground"
+                                >
+                                    Date
+                                </label>
+                                <Input
+                                    id="attendance-date"
+                                    type="date"
+                                    name="date"
+                                    defaultValue={filters.date}
+                                />
+                            </div>
+                            <div className="flex flex-col justify-end sm:col-span-3">
+                                <Button
+                                    type="submit"
+                                    variant="secondary"
+                                    className="sm:w-fit"
+                                >
+                                    Apply filters
                                 </Button>
-                            </CardContent>
-                        </Card>
+                            </div>
+                        </FilterBar>
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Import attendance history</CardTitle>
-                                <CardDescription>
+                        {records.data.length ? (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="hover:bg-transparent">
+                                        <TableHead>Staff</TableHead>
+                                        <TableHead>Entry</TableHead>
+                                        <TableHead>Recorded at</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {records.data.map((record) => (
+                                        <TableRow key={record.id}>
+                                            <TableCell>
+                                                {record.user_name ??
+                                                    'Deleted user'}
+                                            </TableCell>
+                                            <TableCell>
+                                                <StatusBadge
+                                                    value={record.entry_type}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap text-muted-foreground">
+                                                {new Date(
+                                                    record.recorded_at,
+                                                ).toLocaleString()}
+                                            </TableCell>
+                                            <TableCell>
+                                                {record.status && (
+                                                    <StatusBadge
+                                                        value={record.status}
+                                                    />
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <EmptyState
+                                icon={QrCodeIcon}
+                                title="No attendance recorded yet"
+                            />
+                        )}
+                        <Pagination links={records.links} />
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Dialog open={recordDialogOpen} onOpenChange={closeRecordDialog}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Record attendance</DialogTitle>
+                        <DialogDescription>
+                            Scan a QR code, enter a code manually, or import a
+                            history file.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-6 sm:grid-cols-2">
+                        <div className="grid gap-4">
+                            <div className="overflow-hidden rounded-lg border bg-muted/30">
+                                <video
+                                    ref={videoRef}
+                                    className="aspect-square w-full object-cover"
+                                    muted
+                                    playsInline
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={scanning ? stopCamera : startCamera}
+                            >
+                                <Camera />
+                                {scanning ? 'Stop camera' : 'Start camera'}
+                            </Button>
+                            {cameraError && (
+                                <p className="text-sm text-destructive">
+                                    {cameraError}
+                                </p>
+                            )}
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="code">QR code value</Label>
+                                <Input
+                                    id="code"
+                                    name="code"
+                                    value={form.data.code}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'code',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="attendance:..."
+                                    aria-invalid={
+                                        form.errors.code ? true : undefined
+                                    }
+                                />
+                                <InputError message={form.errors.code} />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    type="button"
+                                    variant={
+                                        form.data.entry_type === 'time_in'
+                                            ? 'default'
+                                            : 'outline'
+                                    }
+                                    onClick={() =>
+                                        form.setData('entry_type', 'time_in')
+                                    }
+                                >
+                                    <LogIn />
+                                    Time In
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={
+                                        form.data.entry_type === 'time_out'
+                                            ? 'default'
+                                            : 'outline'
+                                    }
+                                    onClick={() =>
+                                        form.setData('entry_type', 'time_out')
+                                    }
+                                >
+                                    <LogOut />
+                                    Time Out
+                                </Button>
+                            </div>
+
+                            <Button
+                                type="button"
+                                disabled={
+                                    form.processing || !form.data.code.trim()
+                                }
+                                onClick={submit}
+                            >
+                                Record scan
+                            </Button>
+                        </div>
+
+                        <div className="grid gap-4">
+                            <div>
+                                <h3 className="text-sm font-medium">
+                                    Import attendance history
+                                </h3>
+                                <p className="text-xs text-muted-foreground">
                                     Upload one or more JSON exports from a
                                     previous system. Rows are matched to
                                     staff by email or name; re-importing the
                                     same file is safe.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <form
-                                    onSubmit={submitImport}
-                                    className="grid gap-3"
+                                </p>
+                            </div>
+                            <form
+                                onSubmit={submitImport}
+                                className="grid gap-3"
+                            >
+                                <Input
+                                    type="file"
+                                    accept="application/json,.json"
+                                    multiple
+                                    onChange={(event) =>
+                                        importForm.setData(
+                                            'files',
+                                            Array.from(
+                                                event.target.files ?? [],
+                                            ),
+                                        )
+                                    }
+                                />
+                                {importForm.data.files.length > 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                        {importForm.data.files.length} file
+                                        {importForm.data.files.length === 1
+                                            ? ''
+                                            : 's'}{' '}
+                                        selected:{' '}
+                                        {importForm.data.files
+                                            .map((file) => file.name)
+                                            .join(', ')}
+                                    </p>
+                                )}
+                                <InputError
+                                    message={importForm.errors.files}
+                                />
+                                <Button
+                                    type="submit"
+                                    variant="outline"
+                                    disabled={
+                                        importForm.processing ||
+                                        importForm.data.files.length === 0
+                                    }
                                 >
-                                    <Input
-                                        type="file"
-                                        accept="application/json,.json"
-                                        multiple
-                                        onChange={(event) =>
-                                            importForm.setData(
-                                                'files',
-                                                Array.from(
-                                                    event.target.files ?? [],
-                                                ),
-                                            )
-                                        }
-                                    />
-                                    {importForm.data.files.length > 0 && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {importForm.data.files.length}{' '}
-                                            file
-                                            {importForm.data.files.length ===
-                                            1
-                                                ? ''
-                                                : 's'}{' '}
-                                            selected:{' '}
-                                            {importForm.data.files
-                                                .map((file) => file.name)
-                                                .join(', ')}
-                                        </p>
-                                    )}
-                                    <InputError
-                                        message={importForm.errors.files}
-                                    />
-                                    <Button
-                                        type="submit"
-                                        variant="outline"
-                                        disabled={
-                                            importForm.processing ||
-                                            importForm.data.files.length === 0
-                                        }
-                                    >
-                                        <FileJson />
-                                        {importForm.processing
-                                            ? 'Importing…'
-                                            : 'Import records'}
-                                    </Button>
-                                </form>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <div className="grid gap-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Staff QR identities</CardTitle>
-                                <CardDescription>
-                                    Download a printable identity card for
-                                    each user.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {users.length ? (
-                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                        {users.map((user) => (
-                                            <div
-                                                key={user.id}
-                                                className={cn(
-                                                    'flex items-center justify-between gap-3 rounded-lg border p-3',
-                                                    user.status !== 'active' &&
-                                                        'opacity-60',
-                                                )}
-                                            >
-                                                <div className="min-w-0">
-                                                    <p className="truncate font-medium">
-                                                        {user.name}
-                                                    </p>
-                                                    <p className="truncate text-xs text-muted-foreground">
-                                                        {user.role.replaceAll(
-                                                            '_',
-                                                            ' ',
-                                                        )}
-                                                    </p>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    onClick={() =>
-                                                        handleDownloadCard(
-                                                            user,
-                                                        )
-                                                    }
-                                                >
-                                                    <Download />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <EmptyState
-                                        icon={QrCodeIcon}
-                                        title="No staff yet"
-                                    />
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0">
-                                <div>
-                                    <CardTitle>Team attendance</CardTitle>
-                                    <CardDescription>
-                                        {monthLabel(selectedMonth)} &mdash;
-                                        click a staff row to see their daily
-                                        log, and a Time In/Out cell to correct
-                                        it.
-                                    </CardDescription>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <Input
-                                        type="month"
-                                        value={selectedMonth}
-                                        onChange={(event) =>
-                                            changeMonth(event.target.value)
-                                        }
-                                        className="w-auto"
-                                    />
-                                    <Button asChild variant="outline">
-                                        <a
-                                            href={exportPdf.url({
-                                                query: { month: selectedMonth },
-                                            })}
-                                        >
-                                            <FileDown />
-                                            Export PDF
-                                        </a>
-                                    </Button>
-                                    <Button asChild variant="outline">
-                                        <a
-                                            href={exportExcel.url({
-                                                query: { month: selectedMonth },
-                                            })}
-                                        >
-                                            <FileDown />
-                                            Export Excel
-                                        </a>
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {teamSummary.length ? (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="hover:bg-transparent">
-                                                <TableHead />
-                                                <TableHead>Staff</TableHead>
-                                                <TableHead>Role</TableHead>
-                                                <TableHead>
-                                                    Attendance Days
-                                                </TableHead>
-                                                <TableHead>Logs</TableHead>
-                                                <TableHead>
-                                                    Total Hours
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {teamSummary.map((agent) => {
-                                                const expanded =
-                                                    expandedUserId ===
-                                                    agent.user_id;
-                                                const totalMinutes =
-                                                    agent.days.reduce(
-                                                        (sum, day) =>
-                                                            sum +
-                                                            day.worked_minutes,
-                                                        0,
-                                                    );
-
-                                                return (
-                                                    <Fragment
-                                                        key={agent.user_id}
-                                                    >
-                                                        <TableRow
-                                                            className="cursor-pointer"
-                                                            onClick={() =>
-                                                                setExpandedUserId(
-                                                                    expanded
-                                                                        ? null
-                                                                        : agent.user_id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <TableCell>
-                                                                {expanded ? (
-                                                                    <ChevronDown className="size-4 text-muted-foreground" />
-                                                                ) : (
-                                                                    <ChevronRight className="size-4 text-muted-foreground" />
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {
-                                                                    agent.user_name
-                                                                }
-                                                            </TableCell>
-                                                            <TableCell className="text-muted-foreground">
-                                                                {
-                                                                    agent.role_label
-                                                                }
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {
-                                                                    agent.attendanceDays
-                                                                }
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {
-                                                                    agent.logCount
-                                                                }
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {formatMinutes(
-                                                                    totalMinutes,
-                                                                )}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                        {expanded && (
-                                                            <TableRow key={`${agent.user_id}-detail`}>
-                                                                <TableCell
-                                                                    colSpan={6}
-                                                                    className="bg-muted/20 p-0"
-                                                                >
-                                                                    <Table>
-                                                                        <TableHeader>
-                                                                            <TableRow className="hover:bg-transparent">
-                                                                                <TableHead>
-                                                                                    Date
-                                                                                </TableHead>
-                                                                                <TableHead>
-                                                                                    Day
-                                                                                </TableHead>
-                                                                                <TableHead>
-                                                                                    Time
-                                                                                    In
-                                                                                </TableHead>
-                                                                                <TableHead>
-                                                                                    Time
-                                                                                    Out
-                                                                                </TableHead>
-                                                                                <TableHead>
-                                                                                    Total
-                                                                                    Hours
-                                                                                </TableHead>
-                                                                                <TableHead>
-                                                                                    Status
-                                                                                </TableHead>
-                                                                            </TableRow>
-                                                                        </TableHeader>
-                                                                        <TableBody>
-                                                                            {agent.days.map(
-                                                                                (
-                                                                                    day,
-                                                                                ) => (
-                                                                                    <TableRow
-                                                                                        key={
-                                                                                            day.date
-                                                                                        }
-                                                                                    >
-                                                                                        <TableCell className="whitespace-nowrap">
-                                                                                            {
-                                                                                                day.date
-                                                                                            }
-                                                                                        </TableCell>
-                                                                                        <TableCell className="text-muted-foreground">
-                                                                                            {new Date(
-                                                                                                `${day.date}T00:00:00`,
-                                                                                            ).toLocaleDateString(
-                                                                                                undefined,
-                                                                                                {
-                                                                                                    weekday:
-                                                                                                        'short',
-                                                                                                },
-                                                                                            )}
-                                                                                        </TableCell>
-                                                                                        <TableCell>
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                className="hover:underline"
-                                                                                                onClick={(
-                                                                                                    event,
-                                                                                                ) => {
-                                                                                                    event.stopPropagation();
-                                                                                                    openEditor(
-                                                                                                        agent.user_id,
-                                                                                                        agent.user_name,
-                                                                                                        day.date,
-                                                                                                        'time_in',
-                                                                                                        day.time_in,
-                                                                                                    );
-                                                                                                }}
-                                                                                            >
-                                                                                                {formatTime(
-                                                                                                    day.time_in,
-                                                                                                )}
-                                                                                            </button>
-                                                                                        </TableCell>
-                                                                                        <TableCell>
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                className="hover:underline"
-                                                                                                onClick={(
-                                                                                                    event,
-                                                                                                ) => {
-                                                                                                    event.stopPropagation();
-                                                                                                    openEditor(
-                                                                                                        agent.user_id,
-                                                                                                        agent.user_name,
-                                                                                                        day.date,
-                                                                                                        'time_out',
-                                                                                                        day.time_out,
-                                                                                                    );
-                                                                                                }}
-                                                                                            >
-                                                                                                {formatTime(
-                                                                                                    day.time_out,
-                                                                                                )}
-                                                                                            </button>
-                                                                                        </TableCell>
-                                                                                        <TableCell>
-                                                                                            {
-                                                                                                day.worked_minutes_label
-                                                                                            }
-                                                                                        </TableCell>
-                                                                                        <TableCell>
-                                                                                            <StatusBadge
-                                                                                                value={
-                                                                                                    day.holiday_label ??
-                                                                                                    day.status
-                                                                                                }
-                                                                                            />
-                                                                                        </TableCell>
-                                                                                    </TableRow>
-                                                                                ),
-                                                                            )}
-                                                                        </TableBody>
-                                                                    </Table>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        )}
-                                                    </Fragment>
-                                                );
-                                            })}
-                                        </TableBody>
-                                    </Table>
-                                ) : (
-                                    <EmptyState
-                                        icon={UsersIcon}
-                                        title="No active staff yet"
-                                    />
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Recent records</CardTitle>
-                            </CardHeader>
-                            <CardContent className="flex flex-col gap-4">
-                                <FilterBar
-                                    as="form"
-                                    onSubmit={filterRecords}
-                                    icon={SlidersHorizontal}
-                                    label="Filters"
-                                    gridClassName="sm:grid-cols-3"
-                                >
-                                    <div className="flex flex-col gap-1.5">
-                                        <label
-                                            htmlFor="attendance-search"
-                                            className="text-xs text-muted-foreground"
-                                        >
-                                            Staff
-                                        </label>
-                                        <Input
-                                            id="attendance-search"
-                                            name="search"
-                                            defaultValue={filters.search}
-                                            placeholder="Search staff…"
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <label
-                                            htmlFor="attendance-entry-type"
-                                            className="text-xs text-muted-foreground"
-                                        >
-                                            Entry
-                                        </label>
-                                        <input
-                                            type="hidden"
-                                            name="entry_type"
-                                            value={
-                                                entryTypeFilter ===
-                                                ALL_ENTRY_TYPES
-                                                    ? ''
-                                                    : entryTypeFilter
-                                            }
-                                        />
-                                        <Select
-                                            value={entryTypeFilter}
-                                            onValueChange={setEntryTypeFilter}
-                                        >
-                                            <SelectTrigger id="attendance-entry-type">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem
-                                                    value={ALL_ENTRY_TYPES}
-                                                >
-                                                    All entries
-                                                </SelectItem>
-                                                <SelectItem value="time_in">
-                                                    Time In
-                                                </SelectItem>
-                                                <SelectItem value="time_out">
-                                                    Time Out
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <label
-                                            htmlFor="attendance-date"
-                                            className="text-xs text-muted-foreground"
-                                        >
-                                            Date
-                                        </label>
-                                        <Input
-                                            id="attendance-date"
-                                            type="date"
-                                            name="date"
-                                            defaultValue={filters.date}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col justify-end sm:col-span-3">
-                                        <Button
-                                            type="submit"
-                                            variant="secondary"
-                                            className="sm:w-fit"
-                                        >
-                                            Apply filters
-                                        </Button>
-                                    </div>
-                                </FilterBar>
-
-                                {records.data.length ? (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="hover:bg-transparent">
-                                                <TableHead>Staff</TableHead>
-                                                <TableHead>Entry</TableHead>
-                                                <TableHead>
-                                                    Recorded at
-                                                </TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {records.data.map((record) => (
-                                                <TableRow key={record.id}>
-                                                    <TableCell>
-                                                        {record.user_name ??
-                                                            'Deleted user'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <StatusBadge
-                                                            value={
-                                                                record.entry_type
-                                                            }
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                                                        {new Date(
-                                                            record.recorded_at,
-                                                        ).toLocaleString()}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {record.status && (
-                                                            <StatusBadge
-                                                                value={
-                                                                    record.status
-                                                                }
-                                                            />
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                ) : (
-                                    <EmptyState
-                                        icon={QrCodeIcon}
-                                        title="No attendance recorded yet"
-                                    />
-                                )}
-                                <Pagination links={records.links} />
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
-            </div>
-
-            <Dialog
-                open={editingCell !== null}
-                onOpenChange={(open) => !open && setEditingCell(null)}
-            >
-                <DialogContent>
-                    <DialogTitle>
-                        {editingCell?.entryType === 'time_in'
-                            ? 'Edit Time In'
-                            : 'Edit Time Out'}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {editingCell?.userName} &mdash; {editingCell?.date}
-                    </DialogDescription>
-                    <form onSubmit={submitEdit} className="grid gap-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="recorded-at">Time</Label>
-                            <Input
-                                id="recorded-at"
-                                type="datetime-local"
-                                value={editForm.data.recorded_at}
-                                onChange={(event) =>
-                                    editForm.setData(
-                                        'recorded_at',
-                                        event.target.value,
-                                    )
-                                }
-                            />
-                            <InputError
-                                message={editForm.errors.recorded_at}
-                            />
+                                    <FileJson />
+                                    {importForm.processing
+                                        ? 'Importing…'
+                                        : 'Import records'}
+                                </Button>
+                            </form>
                         </div>
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={clearEntry}
-                                disabled={editForm.processing}
-                            >
-                                Clear
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={editForm.processing}
-                            >
-                                Save
-                            </Button>
-                        </DialogFooter>
-                    </form>
+                    </div>
                 </DialogContent>
             </Dialog>
         </>

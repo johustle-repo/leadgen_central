@@ -85,6 +85,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
 
     Route::middleware('can:manage-attendance')->group(function () {
         Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+        Route::get('attendance/summary', [AttendanceController::class, 'summary'])->name('attendance.summary');
         Route::post('attendance/scan', [AttendanceController::class, 'scan'])->name('attendance.scan');
         Route::get('attendance/export.pdf', [AttendanceController::class, 'exportPdf'])->middleware('throttle:data-exports')->name('attendance.export-pdf');
         Route::get('attendance/export.xlsx', [AttendanceController::class, 'exportExcel'])->middleware('throttle:data-exports')->name('attendance.export-excel');

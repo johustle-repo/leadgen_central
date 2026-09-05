@@ -17,6 +17,16 @@ it('allows only the super administrator to view attendance', function () {
     $this->actingAs($agent)->get(route('attendance.index'))->assertForbidden();
 });
 
+it('allows only the super administrator to view the attendance summary', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create();
+
+    $this->actingAs($superAdministrator)->get(route('attendance.summary'))->assertOk();
+    $this->actingAs($administrator)->get(route('attendance.summary'))->assertForbidden();
+    $this->actingAs($agent)->get(route('attendance.summary'))->assertForbidden();
+});
+
 it('records a time in then time out scan in sequence', function () {
     $superAdministrator = User::factory()->superAdministrator()->create();
     $staff = User::factory()->create();
@@ -69,7 +79,7 @@ it('exports attendance records as a pdf', function () {
     expect($response->headers->get('Content-Type'))->toBe('application/pdf');
 });
 
-it('filters and paginates attendance records and reports summary stats', function () {
+it('filters and paginates attendance records', function () {
     $superAdministrator = User::factory()->superAdministrator()->create();
     $matchingStaff = User::factory()->create(['name' => 'Filter Target']);
     $otherStaff = User::factory()->create(['name' => 'Someone Else']);
@@ -81,7 +91,20 @@ it('filters and paginates attendance records and reports summary stats', functio
     $response->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('attendance/index')
         ->has('records.data', 1)
-        ->where('records.data.0.user_name', 'Filter Target')
+        ->where('records.data.0.user_name', 'Filter Target'));
+});
+
+it('reports summary stats on the attendance summary page', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $matchingStaff = User::factory()->create(['name' => 'Filter Target']);
+    $otherStaff = User::factory()->create(['name' => 'Someone Else']);
+    Attendance::factory()->for($matchingStaff)->create(['entry_type' => 'time_in', 'recorded_at' => now()->startOfDay()->addHours(8)]);
+    Attendance::factory()->for($otherStaff)->create(['entry_type' => 'time_in', 'recorded_at' => now()->startOfDay()->addHours(8)]);
+
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.summary'));
+
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('attendance/summary')
         ->where('summary.total_records', 2)
         ->where('summary.time_ins_today', 2));
 });
@@ -257,10 +280,10 @@ it('organizes attendance by month and agent, marking an automatic Sunday rest da
     $superAdministrator = User::factory()->superAdministrator()->create(['name' => 'AAA Admin']);
     User::factory()->create(['name' => 'ZZZ Sunday Staff', 'status' => 'active']);
 
-    $response = $this->actingAs($superAdministrator)->get(route('attendance.index', ['month' => '2026-04']));
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.summary', ['month' => '2026-04']));
 
     $response->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('attendance/index')
+        ->component('attendance/summary')
         ->where('selectedMonth', '2026-04')
         ->has('monthlyAttendance', 2)
         ->where('monthlyAttendance.1.user_name', 'ZZZ Sunday Staff')
