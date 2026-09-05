@@ -86,7 +86,10 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::middleware('can:manage-attendance')->group(function () {
         Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
         Route::get('attendance/summary', [AttendanceController::class, 'summary'])->name('attendance.summary');
+        Route::get('attendance/scanner', [AttendanceController::class, 'scanner'])->name('attendance.scanner');
         Route::post('attendance/scan', [AttendanceController::class, 'scan'])->name('attendance.scan');
+        Route::post('attendance/date-status', [AttendanceController::class, 'storeDateStatus'])->name('attendance.date-status.store');
+        Route::delete('attendance/date-status/{date}', [AttendanceController::class, 'destroyDateStatus'])->name('attendance.date-status.destroy');
         Route::get('attendance/export.pdf', [AttendanceController::class, 'exportPdf'])->middleware('throttle:data-exports')->name('attendance.export-pdf');
         Route::get('attendance/export.xlsx', [AttendanceController::class, 'exportExcel'])->middleware('throttle:data-exports')->name('attendance.export-excel');
         Route::post('attendance/import', [AttendanceController::class, 'importJson'])->middleware('throttle:data-imports')->name('attendance.import');

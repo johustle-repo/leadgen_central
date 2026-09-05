@@ -26,6 +26,6 @@ class StoreUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255', 'unique:users,email'], 'password' => ['required', 'confirmed', Password::defaults()], 'role' => ['required', Rule::in(array_map(fn ($role) => $role->value, $this->user()?->assignableRoles() ?? []))], 'team' => ['nullable', 'string', 'max:100'], 'status' => ['required', Rule::enum(AccountStatus::class)]];
+        return ['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255', 'unique:users,email'], 'password' => ['required', 'confirmed', Password::defaults()], 'role' => ['required', Rule::in(array_map(fn ($role) => $role->value, $this->user()?->assignableRoles() ?? []))], 'team' => ['nullable', 'string', 'max:100'], 'status' => ['required', Rule::enum(AccountStatus::class)], 'employee_code' => ['nullable', 'string', 'max:50', 'unique:users,employee_code'], 'alias_name' => ['nullable', 'string', 'max:255'], 'alias_email' => ['nullable', 'email', 'max:255']];
     }
 }

@@ -32,6 +32,6 @@ class UpdateUserRequest extends FormRequest
             $allowedRoles[] = $target->role->value;
         }
 
-        return ['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($target)], 'password' => ['nullable', 'confirmed', Password::defaults()], 'role' => ['required', Rule::in($allowedRoles)], 'team' => ['nullable', 'string', 'max:100'], 'status' => ['required', Rule::enum(AccountStatus::class)]];
+        return ['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($target)], 'password' => ['nullable', 'confirmed', Password::defaults()], 'role' => ['required', Rule::in($allowedRoles)], 'team' => ['nullable', 'string', 'max:100'], 'status' => ['required', Rule::enum(AccountStatus::class)], 'employee_code' => ['nullable', 'string', 'max:50', Rule::unique('users', 'employee_code')->ignore($target)], 'alias_name' => ['nullable', 'string', 'max:255'], 'alias_email' => ['nullable', 'email', 'max:255']];
     }
 }

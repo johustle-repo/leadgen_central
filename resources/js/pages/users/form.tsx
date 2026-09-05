@@ -26,6 +26,9 @@ type User = {
     role: string;
     team: string | null;
     status: string;
+    employee_code: string | null;
+    alias_name: string | null;
+    alias_email: string | null;
 };
 export default function UserForm({
     managedUser,
@@ -175,6 +178,60 @@ export default function UserForm({
                                         message={errors.status}
                                     />
                                 </div>
+
+                                <div className="sm:col-span-2">
+                                    <p className="text-sm font-medium">
+                                        Attendance profile
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Optional — shown on the attendance
+                                        summary for this staff member.
+                                    </p>
+                                </div>
+                                {[
+                                    [
+                                        'employee_code',
+                                        'Employee code (optional)',
+                                        'text',
+                                    ],
+                                    [
+                                        'alias_name',
+                                        'Alias name (optional)',
+                                        'text',
+                                    ],
+                                    [
+                                        'alias_email',
+                                        'Alias email (optional)',
+                                        'email',
+                                    ],
+                                ].map(([name, label, type]) => (
+                                    <div
+                                        key={name}
+                                        className={
+                                            name === 'alias_email'
+                                                ? 'sm:col-span-2'
+                                                : ''
+                                        }
+                                    >
+                                        <Label htmlFor={name}>{label}</Label>
+                                        <Input
+                                            id={name}
+                                            name={name}
+                                            type={type}
+                                            defaultValue={String(
+                                                managedUser?.[
+                                                    name as keyof User
+                                                ] ?? '',
+                                            )}
+                                            className="mt-2"
+                                        />
+                                        <InputError
+                                            className="mt-1"
+                                            message={errors[name]}
+                                        />
+                                    </div>
+                                ))}
+
                                 <Button
                                     type="submit"
                                     disabled={processing}

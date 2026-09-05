@@ -27,6 +27,102 @@ it('allows only the super administrator to view the attendance summary', functio
     $this->actingAs($agent)->get(route('attendance.summary'))->assertForbidden();
 });
 
+it('allows only the super administrator to view the QR scanner station', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)->get(route('attendance.scanner'))->assertForbidden();
+
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.scanner'));
+
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('attendance/scanner')
+        ->has('registeredUsers')
+        ->has('recentCheckIns'));
+});
+
+it('reports the last check-ins on the scanner station', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $staff = User::factory()->create(['name' => 'Scanner Staff', 'employee_code' => 'DUS-099']);
+    Attendance::factory()->for($staff)->create(['entry_type' => 'time_in', 'recorded_at' => now()]);
+
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.scanner'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('recentCheckIns.0.user_name', 'Scanner Staff')
+        ->where('recentCheckIns.0.employee_code', 'DUS-099'));
+});
+
+it('lets the super administrator mark a date as a rest day or holiday', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+
+    $this->actingAs($superAdministrator)->post(route('attendance.date-status.store'), [
+        'date' => '2026-04-08', // a Wednesday
+        'type' => 'rest_day',
+    ])->assertRedirect()->assertSessionHas('toast.type', 'success');
+
+    expect(Holiday::query()->whereDate('holiday_date', '2026-04-08')->where('country_code', 'PH')->where('type', 'rest_day')->where('name', 'Wednesday Rest Day')->exists())->toBeTrue();
+    expect(AuditLog::query()->where('action', 'attendance.date_status.set')->exists())->toBeTrue();
+});
+
+it('lets the super administrator mark then clear a holiday', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+
+    $this->actingAs($superAdministrator)->post(route('attendance.date-status.store'), [
+        'date' => '2026-04-08',
+        'type' => 'regular',
+    ]);
+    expect(Holiday::query()->whereDate('holiday_date', '2026-04-08')->where('name', 'Company Holiday')->exists())->toBeTrue();
+
+    $this->actingAs($superAdministrator)
+        ->delete(route('attendance.date-status.destroy', ['date' => '2026-04-08']))
+        ->assertRedirect()
+        ->assertSessionHas('toast.type', 'success');
+
+    expect(Holiday::query()->whereDate('holiday_date', '2026-04-08')->exists())->toBeFalse();
+    expect(AuditLog::query()->where('action', 'attendance.date_status.clear')->exists())->toBeTrue();
+});
+
+it('forbids a regular administrator from marking a rest day or holiday', function () {
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)->post(route('attendance.date-status.store'), [
+        'date' => '2026-04-08',
+        'type' => 'rest_day',
+    ])->assertForbidden();
+});
+
+it('shows the calendar week, daily monitor, and stats on the attendance index', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create(['name' => 'AAA Admin']);
+    $staff = User::factory()->create(['name' => 'ZZZ Monitor Staff', 'employee_code' => 'DUS-050', 'status' => 'active']);
+    Attendance::factory()->for($staff)->create(['entry_type' => 'time_in', 'recorded_at' => '2026-04-08 08:00:00']);
+
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.index', ['monitor_date' => '2026-04-08']));
+
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('attendance/index')
+        ->has('calendarWeek', 7)
+        ->has('dailyMonitor', 2)
+        ->where('monitorDate', '2026-04-08')
+        ->where('monitorStats.team_size', 2)
+        ->where('monitorStats.unique_users', 1)
+        ->where('dailyMonitor.1.user_name', 'ZZZ Monitor Staff')
+        ->where('dailyMonitor.1.employee_code', 'DUS-050')
+        ->has('agentsForManualEntry', 2));
+});
+
+it('filters the daily monitor by search term', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create(['name' => 'AAA Admin']);
+    User::factory()->create(['name' => 'Findable Person', 'status' => 'active']);
+    User::factory()->create(['name' => 'Someone Else', 'status' => 'active']);
+
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.index', ['monitor_search' => 'Findable']));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->has('dailyMonitor', 1)
+        ->where('dailyMonitor.0.user_name', 'Findable Person'));
+});
+
 it('records a time in then time out scan in sequence', function () {
     $superAdministrator = User::factory()->superAdministrator()->create();
     $staff = User::factory()->create();

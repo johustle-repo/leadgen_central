@@ -12,6 +12,33 @@ it('allows administrators to create users', function () {
     $this->assertDatabaseHas('users', ['email' => 'agent@example.com', 'role' => 'agent', 'status' => 'active']);
 });
 
+it('saves an employee code and alias name/email when creating a user', function () {
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)->post(route('users.store'), [
+        'name' => 'Lead Agent', 'email' => 'agent@example.com', 'password' => 'password', 'password_confirmation' => 'password',
+        'role' => 'agent', 'status' => 'active',
+        'employee_code' => 'DUS-010', 'alias_name' => 'Alex Bennett', 'alias_email' => 'a.bennett@example.com',
+    ])->assertRedirect(route('users.index'));
+
+    $this->assertDatabaseHas('users', [
+        'email' => 'agent@example.com',
+        'employee_code' => 'DUS-010',
+        'alias_name' => 'Alex Bennett',
+        'alias_email' => 'a.bennett@example.com',
+    ]);
+});
+
+it('rejects a duplicate employee code', function () {
+    $administrator = User::factory()->administrator()->create();
+    User::factory()->create(['employee_code' => 'DUS-020']);
+
+    $this->actingAs($administrator)->post(route('users.store'), [
+        'name' => 'Lead Agent', 'email' => 'agent2@example.com', 'password' => 'password', 'password_confirmation' => 'password',
+        'role' => 'agent', 'status' => 'active', 'employee_code' => 'DUS-020',
+    ])->assertSessionHasErrors('employee_code');
+});
+
 it('shows each users total leads and replies', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create(['created_at' => now()->addMinute()]);

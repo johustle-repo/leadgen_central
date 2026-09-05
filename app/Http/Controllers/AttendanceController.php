@@ -6,6 +6,7 @@ use App\AttendanceEntryType;
 use App\Exports\AttendanceBackupExport;
 use App\Models\Attendance;
 use App\Models\AuditLog;
+use App\Models\Holiday;
 use App\Models\User;
 use App\Services\AttendanceDaySummaryService;
 use App\Services\AttendanceImportService;
@@ -26,7 +27,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AttendanceController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, AttendanceDaySummaryService $summaryService, HolidayService $holidayService): Response
     {
         Gate::authorize('manage-attendance');
 
@@ -67,10 +68,149 @@ class AttendanceController extends Controller
             ),
         ]);
 
+        $monitorDateInput = $request->string('monitor_date')->toString();
+        $monitorDate = $monitorDateInput !== '' ? Carbon::parse($monitorDateInput) : now();
+        $monitorSearch = $request->string('monitor_search')->trim()->toString();
+
+        $activeUsers = User::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'email', 'employee_code', 'role', 'night_shift_eligible']);
+        $filteredUsers = $monitorSearch === ''
+            ? $activeUsers
+            : $activeUsers->filter(fn (User $user): bool => str_contains(strtolower($user->name), strtolower($monitorSearch))
+                || str_contains(strtolower($user->email), strtolower($monitorSearch))
+                || str_contains(strtolower((string) $user->employee_code), strtolower($monitorSearch)))->values();
+
+        $dailyMonitor = array_map(fn (array $period): array => [
+            'user_id' => $period['user']->id,
+            'user_name' => $period['user']->name,
+            'employee_code' => $period['user']->employee_code,
+            'time_in' => $period['days'][0]['time_in']?->toIso8601String(),
+            'time_out' => $period['days'][0]['time_out']?->toIso8601String(),
+            'worked_minutes_label' => Attendance::formatMinutes($period['days'][0]['worked_minutes']),
+            'status' => $period['days'][0]['status'],
+            'holiday_label' => $period['days'][0]['holiday_label'],
+        ], $summaryService->buildForPeriod($monitorDate, $monitorDate, $filteredUsers));
+
+        $monitorStats = [
+            'summary_rows' => count($dailyMonitor),
+            'unique_users' => count(array_filter($dailyMonitor, fn (array $row): bool => $row['time_in'] !== null || $row['time_out'] !== null)),
+            'team_size' => $activeUsers->count(),
+        ];
+
+        $weekStart = $monitorDate->copy()->startOfWeek(Carbon::SUNDAY);
+        $weekDates = [];
+        for ($i = 0; $i < 7; $i++) {
+            $weekDates[] = $weekStart->copy()->addDays($i);
+        }
+        $holidaysByDate = $holidayService->forDates(array_map(fn (CarbonInterface $date): string => $date->toDateString(), $weekDates));
+        $calendarWeek = array_map(function (CarbonInterface $date) use ($holidaysByDate): array {
+            $holiday = $holidaysByDate[$date->toDateString()] ?? null;
+
+            return [
+                'date' => $date->toDateString(),
+                'label' => $holiday === null ? 'Work day' : ($holiday->type === 'rest_day' ? 'Rest Day' : 'Holiday'),
+                'holiday_name' => $holiday?->name,
+                'is_real' => $holiday !== null && ! ($holiday->is_automatic ?? false),
+            ];
+        }, $weekDates);
+
         return Inertia::render('attendance/index', [
             'users' => $users,
             'records' => $records,
             'filters' => $request->only(['search', 'entry_type', 'date']),
+            'calendarWeek' => $calendarWeek,
+            'dailyMonitor' => $dailyMonitor,
+            'monitorStats' => $monitorStats,
+            'monitorDate' => $monitorDate->toDateString(),
+            'monitorSearch' => $monitorSearch,
+            'agentsForManualEntry' => $activeUsers->map(fn (User $user): array => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'employee_code' => $user->employee_code,
+            ])->values(),
+        ]);
+    }
+
+    public function storeDateStatus(Request $request, HolidayService $holidayService): RedirectResponse
+    {
+        Gate::authorize('manage-attendance');
+
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'type' => ['required', 'in:rest_day,regular'],
+        ]);
+
+        $date = Carbon::parse($validated['date']);
+        $defaultName = $validated['type'] === 'rest_day' ? "{$date->format('l')} Rest Day" : 'Company Holiday';
+
+        $holiday = Holiday::query()->updateOrCreate(
+            ['holiday_date' => $date->toDateString(), 'country_code' => 'PH'],
+            ['name' => $defaultName, 'type' => $validated['type']],
+        );
+
+        $performedBy = $request->user();
+        abort_unless($performedBy instanceof User, 401);
+
+        AuditLog::query()->create([
+            'user_id' => $performedBy->id,
+            'action' => 'attendance.date_status.set',
+            'auditable_type' => 'holiday',
+            'auditable_id' => $holiday->id,
+            'description' => "Marked {$date->toDateString()} as {$holiday->name}.",
+            'metadata' => ['date' => $date->toDateString(), 'type' => $validated['type']],
+        ]);
+
+        return back()->with('toast', ['type' => 'success', 'message' => "{$date->toDateString()} marked as {$holiday->name}."]);
+    }
+
+    public function destroyDateStatus(Request $request, string $date): RedirectResponse
+    {
+        Gate::authorize('manage-attendance');
+
+        $parsedDate = Carbon::parse($date);
+        $holiday = Holiday::query()
+            ->whereDate('holiday_date', $parsedDate->toDateString())
+            ->where('country_code', 'PH')
+            ->first();
+
+        $performedBy = $request->user();
+        abort_unless($performedBy instanceof User, 401);
+
+        if ($holiday instanceof Holiday) {
+            $holiday->delete();
+
+            AuditLog::query()->create([
+                'user_id' => $performedBy->id,
+                'action' => 'attendance.date_status.clear',
+                'auditable_type' => 'holiday',
+                'auditable_id' => null,
+                'description' => "Cleared the rest day/holiday mark on {$parsedDate->toDateString()}.",
+                'metadata' => ['date' => $parsedDate->toDateString()],
+            ]);
+        }
+
+        return back()->with('toast', ['type' => 'success', 'message' => "{$parsedDate->toDateString()} is back to a work day."]);
+    }
+
+    public function scanner(Request $request): Response
+    {
+        Gate::authorize('manage-attendance');
+
+        $recentCheckIns = Attendance::query()
+            ->with('user:id,name,employee_code')
+            ->orderByDesc('recorded_at')
+            ->limit(8)
+            ->get()
+            ->map(fn (Attendance $attendance): array => [
+                'id' => $attendance->id,
+                'user_name' => $attendance->user?->name,
+                'employee_code' => $attendance->user?->employee_code,
+                'entry_type' => $attendance->entry_type,
+                'recorded_at' => $attendance->recorded_at->toIso8601String(),
+            ]);
+
+        return Inertia::render('attendance/scanner', [
+            'registeredUsers' => User::query()->where('status', 'active')->count(),
+            'recentCheckIns' => $recentCheckIns,
         ]);
     }
 
@@ -101,6 +241,11 @@ class AttendanceController extends Controller
             'user_id' => $period['user']->id,
             'user_name' => $period['user']->name,
             'role_label' => $period['user']->role->label(),
+            'employee_code' => $period['user']->employee_code,
+            'alias_name' => $period['user']->alias_name,
+            'alias_email' => $period['user']->alias_email,
+            'status' => $period['user']->status,
+            'added_at' => $period['user']->created_at?->format('M j, Y'),
             'days' => array_map(fn (array $day): array => [
                 'date' => $day['date']->toDateString(),
                 'time_in' => $day['time_in']?->toIso8601String(),

@@ -32,6 +32,7 @@ import { dashboard } from '@/routes';
 import { index as analyticsIndex } from '@/routes/analytics';
 import {
     index as attendanceIndex,
+    scanner as attendanceScanner,
     summary as attendanceSummary,
 } from '@/routes/attendance';
 import { index as auditLogIndex } from '@/routes/audit-logs';
@@ -100,9 +101,14 @@ export function AppSidebar() {
     if (auth.user.role === 'super_administrator') {
         mainNavItems.push(
             {
+                title: 'QR Scanner',
+                href: attendanceScanner(),
+                icon: QrCode,
+            },
+            {
                 title: 'Attendance',
                 href: attendanceIndex(),
-                icon: QrCode,
+                icon: FileClock,
             },
             {
                 title: 'Attendance Summary',
