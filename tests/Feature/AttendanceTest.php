@@ -102,13 +102,37 @@ it('shows the calendar week, daily monitor, and stats on the attendance index', 
     $response->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('attendance/index')
         ->has('calendarWeek', 7)
-        ->has('dailyMonitor', 2)
+        // Only the agent shows up here - the acting super administrator is excluded.
+        ->has('dailyMonitor', 1)
         ->where('monitorDate', '2026-04-08')
-        ->where('monitorStats.team_size', 2)
+        ->where('monitorStats.team_size', 1)
         ->where('monitorStats.unique_users', 1)
-        ->where('dailyMonitor.1.user_name', 'ZZZ Monitor Staff')
-        ->where('dailyMonitor.1.employee_code', 'DUS-050')
-        ->has('agentsForManualEntry', 2));
+        ->where('dailyMonitor.0.user_name', 'ZZZ Monitor Staff')
+        ->where('dailyMonitor.0.employee_code', 'DUS-050')
+        ->has('agentsForManualEntry', 1));
+});
+
+it('excludes administrators, sub-administrators, and super administrators from attendance staff lists', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    User::factory()->administrator()->create(['name' => 'Some Administrator']);
+    User::factory()->subAdministrator()->create(['name' => 'Some Sub Administrator']);
+    User::factory()->create(['name' => 'Only Agent']);
+
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.index'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->has('users', 1)
+        ->where('users.0.name', 'Only Agent')
+        ->has('agentsForManualEntry', 1)
+        ->where('agentsForManualEntry.0.name', 'Only Agent')
+        ->where('monitorStats.team_size', 1));
+
+    $summaryResponse = $this->actingAs($superAdministrator)->get(route('attendance.summary'));
+
+    $summaryResponse->assertInertia(fn (Assert $page) => $page
+        ->has('monthlyAttendance', 1)
+        ->where('monthlyAttendance.0.user_name', 'Only Agent')
+        ->where('summary.active_staff', 1));
 });
 
 it('filters the daily monitor by search term', function () {
@@ -372,22 +396,22 @@ it('forbids a regular administrator from importing attendance', function () {
 });
 
 it('organizes attendance by month and agent, marking an automatic Sunday rest day', function () {
-    // Named so `orderBy('name')` puts the Sunday staff member at a known index.
-    $superAdministrator = User::factory()->superAdministrator()->create(['name' => 'AAA Admin']);
-    User::factory()->create(['name' => 'ZZZ Sunday Staff', 'status' => 'active']);
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    User::factory()->create(['name' => 'Sunday Staff', 'status' => 'active']);
 
     $response = $this->actingAs($superAdministrator)->get(route('attendance.summary', ['month' => '2026-04']));
 
     $response->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('attendance/summary')
         ->where('selectedMonth', '2026-04')
-        ->has('monthlyAttendance', 2)
-        ->where('monthlyAttendance.1.user_name', 'ZZZ Sunday Staff')
-        ->has('monthlyAttendance.1.days', 30)
+        // Only the agent shows up here - the acting super administrator is excluded.
+        ->has('monthlyAttendance', 1)
+        ->where('monthlyAttendance.0.user_name', 'Sunday Staff')
+        ->has('monthlyAttendance.0.days', 30)
         // 2026-04-05 (index 4) is a Sunday with no seeded holiday row.
-        ->where('monthlyAttendance.1.days.4.date', '2026-04-05')
-        ->where('monthlyAttendance.1.days.4.status', 'holiday')
-        ->where('monthlyAttendance.1.days.4.holiday_label', 'Sunday Rest Day'));
+        ->where('monthlyAttendance.0.days.4.date', '2026-04-05')
+        ->where('monthlyAttendance.0.days.4.status', 'holiday')
+        ->where('monthlyAttendance.0.days.4.holiday_label', 'Sunday Rest Day'));
 });
 
 it('exports the attendance backup workbook for the super administrator only', function () {

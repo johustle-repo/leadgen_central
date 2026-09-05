@@ -6,6 +6,7 @@ use App\AccountStatus;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
+use App\UserRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +23,7 @@ class UserController extends Controller
         Gate::authorize('viewAny', User::class);
         $query = User::query()
             ->select(['id', 'name', 'email', 'role', 'team', 'status', 'created_at'])
+            ->where('role', '!=', UserRole::SuperAdministrator)
             ->with(['emailSequences:id,user_id,is_active'])
             ->withCount(['leads', 'emailReplies']);
         if ($search = $request->string('search')->trim()->toString()) {

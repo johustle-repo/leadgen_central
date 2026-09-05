@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\User;
 use App\Services\AttendanceDaySummaryService;
+use App\UserRole;
 use Carbon\CarbonInterface;
 use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
@@ -18,7 +19,7 @@ class AttendanceBackupExport implements Export, WithMultipleSheets
 
     public function sheets(): array
     {
-        $users = User::query()->where('status', 'active')->orderBy('name')->get();
+        $users = User::query()->where('status', 'active')->where('role', UserRole::Agent)->orderBy('name')->get();
         $periods = app(AttendanceDaySummaryService::class)->buildForPeriod($this->start, $this->end, $users);
 
         $sheets = [new AttendanceSummarySheet($periods, $this->start, $this->end)];

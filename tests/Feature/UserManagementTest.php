@@ -39,6 +39,18 @@ it('rejects a duplicate employee code', function () {
     ])->assertSessionHasErrors('employee_code');
 });
 
+it('excludes super administrators from the user list', function () {
+    $administrator = User::factory()->administrator()->create();
+    $superAdministrator = User::factory()->superAdministrator()->create(['name' => 'Hidden Super Admin']);
+    $agent = User::factory()->create(['name' => 'Visible Agent']);
+
+    $response = $this->actingAs($administrator)->get(route('users.index'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('users.data', fn ($data) => collect($data)->pluck('name')->doesntContain('Hidden Super Admin')
+            && collect($data)->pluck('name')->contains('Visible Agent')));
+});
+
 it('shows each users total leads and replies', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create(['created_at' => now()->addMinute()]);

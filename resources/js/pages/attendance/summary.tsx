@@ -32,6 +32,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useAttendanceEntryEditor } from '@/hooks/use-attendance-entry-editor';
+import { formatAttendanceTime } from '@/lib/attendance-time';
 import {
     exportExcel,
     exportPdf,
@@ -45,15 +46,6 @@ function formatMinutes(minutes: number): string {
     const mins = minutes % 60;
 
     return `${hours}h ${String(mins).padStart(2, '0')}m`;
-}
-
-function formatTime(iso: string | null): string {
-    return iso
-        ? new Date(iso).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-          })
-        : '—';
 }
 
 function monthLabel(month: string): string {
@@ -460,7 +452,7 @@ export default function AttendanceSummary({
                                                                                             }}
                                                                                         >
                                                                                             {placeholder ??
-                                                                                                formatTime(
+                                                                                                formatAttendanceTime(
                                                                                                     day.time_in,
                                                                                                 )}
                                                                                         </button>
@@ -483,7 +475,7 @@ export default function AttendanceSummary({
                                                                                             }}
                                                                                         >
                                                                                             {placeholder ??
-                                                                                                formatTime(
+                                                                                                formatAttendanceTime(
                                                                                                     day.time_out,
                                                                                                 )}
                                                                                         </button>
@@ -503,12 +495,12 @@ export default function AttendanceSummary({
                                                                                                 <>
                                                                                                     {day.time_in && (
                                                                                                         <StatusBadge
-                                                                                                            value={`Time In - ${formatTime(day.time_in)}`}
+                                                                                                            value={`Time In - ${formatAttendanceTime(day.time_in)}`}
                                                                                                         />
                                                                                                     )}
                                                                                                     {day.time_out && (
                                                                                                         <StatusBadge
-                                                                                                            value={`Time Out - ${formatTime(day.time_out)}`}
+                                                                                                            value={`Time Out - ${formatAttendanceTime(day.time_out)}`}
                                                                                                         />
                                                                                                     )}
                                                                                                 </>

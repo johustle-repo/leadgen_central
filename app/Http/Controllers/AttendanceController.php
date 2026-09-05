@@ -12,6 +12,7 @@ use App\Services\AttendanceDaySummaryService;
 use App\Services\AttendanceImportService;
 use App\Services\AttendanceScanService;
 use App\Services\HolidayService;
+use App\UserRole;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
@@ -32,6 +33,7 @@ class AttendanceController extends Controller
         Gate::authorize('manage-attendance');
 
         $users = User::query()
+            ->where('role', UserRole::Agent)
             ->orderBy('name')
             ->get(['id', 'name', 'role', 'team', 'status', 'qr_token'])
             ->map(fn (User $user): array => [
@@ -72,7 +74,7 @@ class AttendanceController extends Controller
         $monitorDate = $monitorDateInput !== '' ? Carbon::parse($monitorDateInput) : now();
         $monitorSearch = $request->string('monitor_search')->trim()->toString();
 
-        $activeUsers = User::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'email', 'employee_code', 'role', 'night_shift_eligible']);
+        $activeUsers = User::query()->where('status', 'active')->where('role', UserRole::Agent)->orderBy('name')->get(['id', 'name', 'email', 'employee_code', 'role', 'night_shift_eligible']);
         $filteredUsers = $monitorSearch === ''
             ? $activeUsers
             : $activeUsers->filter(fn (User $user): bool => str_contains(strtolower($user->name), strtolower($monitorSearch))
@@ -209,7 +211,7 @@ class AttendanceController extends Controller
             ]);
 
         return Inertia::render('attendance/scanner', [
-            'registeredUsers' => User::query()->where('status', 'active')->count(),
+            'registeredUsers' => User::query()->where('status', 'active')->where('role', UserRole::Agent)->count(),
             'recentCheckIns' => $recentCheckIns,
         ]);
     }
@@ -228,14 +230,14 @@ class AttendanceController extends Controller
                 ->get()
                 ->filter(fn (Attendance $attendance): bool => Attendance::lateStatusFor($attendance->recorded_at)['status'] === 'late')
                 ->count(),
-            'active_staff' => User::query()->where('status', 'active')->count(),
+            'active_staff' => User::query()->where('status', 'active')->where('role', UserRole::Agent)->count(),
         ];
 
         $monthStart = $this->resolveMonthStart($request);
         $calendarMonthEnd = $monthStart->copy()->endOfMonth();
         $endOfToday = now()->endOfDay();
         $monthEnd = $calendarMonthEnd->greaterThan($endOfToday) ? $endOfToday : $calendarMonthEnd;
-        $activeUsers = User::query()->where('status', 'active')->orderBy('name')->get();
+        $activeUsers = User::query()->where('status', 'active')->where('role', UserRole::Agent)->orderBy('name')->get();
 
         $monthlyAttendance = array_map(fn (array $period): array => [
             'user_id' => $period['user']->id,

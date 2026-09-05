@@ -22,6 +22,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { formatAttendanceDateTime } from '@/lib/attendance-time';
 import { dashboard } from '@/routes';
 import { index, scan, scanner } from '@/routes/attendance';
 import type {
@@ -433,9 +434,9 @@ export default function AttendanceScanner({
                                                 </div>
                                             </div>
                                             <p className="shrink-0 text-right text-xs text-muted-foreground">
-                                                {new Date(
+                                                {formatAttendanceDateTime(
                                                     checkIn.recorded_at,
-                                                ).toLocaleString()}
+                                                )}
                                             </p>
                                         </div>
                                     ))

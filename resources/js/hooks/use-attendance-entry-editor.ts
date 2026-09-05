@@ -1,5 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { toAttendanceDatetimeLocalValue } from '@/lib/attendance-time';
 import { updateEntry } from '@/routes/attendance';
 import type { AttendanceEntryType } from '@/types';
 
@@ -9,17 +10,6 @@ export type EditingAttendanceCell = {
     date: string;
     entryType: AttendanceEntryType;
 };
-
-function toDatetimeLocalValue(iso: string | null): string {
-    if (!iso) {
-        return '';
-    }
-
-    const date = new Date(iso);
-    const pad = (value: number) => String(value).padStart(2, '0');
-
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 /**
  * Shared create/correct/clear behavior for a single Time In/Out cell,
@@ -41,7 +31,10 @@ export function useAttendanceEntryEditor() {
         currentValue: string | null,
     ) {
         editForm.clearErrors();
-        editForm.setData('recorded_at', toDatetimeLocalValue(currentValue));
+        editForm.setData(
+            'recorded_at',
+            toAttendanceDatetimeLocalValue(currentValue),
+        );
         setEditingCell({ userId, userName, date, entryType });
     }
 

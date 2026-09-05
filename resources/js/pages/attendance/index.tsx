@@ -42,6 +42,10 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useAttendanceEntryEditor } from '@/hooks/use-attendance-entry-editor';
+import {
+    formatAttendanceDateTime,
+    formatAttendanceTime,
+} from '@/lib/attendance-time';
 import { downloadDataUrl, drawIdentityCard } from '@/lib/qr';
 import { cn } from '@/lib/utils';
 import {
@@ -61,15 +65,6 @@ import type {
 } from '@/types';
 
 const ALL_ENTRY_TYPES = '__all__';
-
-function formatTime(iso: string | null): string {
-    return iso
-        ? new Date(iso).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-          })
-        : '—';
-}
 
 type Props = {
     users: AttendanceUser[];
@@ -518,7 +513,7 @@ export default function AttendanceIndex({
                                                                 )
                                                             }
                                                         >
-                                                            {formatTime(
+                                                            {formatAttendanceTime(
                                                                 row.time_in,
                                                             )}
                                                         </button>
@@ -537,7 +532,7 @@ export default function AttendanceIndex({
                                                                 )
                                                             }
                                                         >
-                                                            {formatTime(
+                                                            {formatAttendanceTime(
                                                                 row.time_out,
                                                             )}
                                                         </button>
@@ -966,9 +961,9 @@ export default function AttendanceIndex({
                                                 />
                                             </TableCell>
                                             <TableCell className="whitespace-nowrap text-muted-foreground">
-                                                {new Date(
+                                                {formatAttendanceDateTime(
                                                     record.recorded_at,
-                                                ).toLocaleString()}
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 {record.status && (
