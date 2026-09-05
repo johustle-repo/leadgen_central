@@ -9,7 +9,6 @@ import {
     LayoutGrid,
     MailSearch,
     QrCode,
-    Settings,
     ShieldCheck,
     Upload,
     Users,
@@ -39,7 +38,6 @@ import { index as auditLogIndex } from '@/routes/audit-logs';
 import { index as duplicateIndex } from '@/routes/duplicates';
 import { index as emailReplyIndex } from '@/routes/email-replies';
 import { index as leadIndex } from '@/routes/leads';
-import { edit as settingsEdit } from '@/routes/system-settings';
 import { create as uploadCreate, index as uploadIndex } from '@/routes/uploads';
 import { index as userIndex } from '@/routes/users';
 import { index as verificationIndex } from '@/routes/verification';
@@ -94,7 +92,6 @@ export function AppSidebar() {
                 href: auditLogIndex(),
                 icon: ClipboardList,
             },
-            { title: 'Settings', href: settingsEdit(), icon: Settings },
         );
     }
 

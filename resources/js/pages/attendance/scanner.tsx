@@ -1,5 +1,14 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Camera, ImageUp, LogIn, LogOut, RotateCcw, Video, VideoOff } from 'lucide-react';
+import {
+    Camera,
+    ImageUp,
+    LogIn,
+    LogOut,
+    RotateCcw,
+    Send,
+    Video,
+    VideoOff,
+} from 'lucide-react';
 import QrScanner from 'qr-scanner';
 import { useEffect, useRef, useState } from 'react';
 import { EmptyState } from '@/components/empty-state';
@@ -65,6 +74,7 @@ export default function AttendanceScanner({
     });
     const videoRef = useRef<HTMLVideoElement>(null);
     const scannerRef = useRef<QrScanner | null>(null);
+    const submittingRef = useRef(false);
     const [scanning, setScanning] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [cameras, setCameras] = useState<QrScanner.Camera[]>([]);
@@ -107,9 +117,7 @@ export default function AttendanceScanner({
 
         const scanner = new QrScanner(
             videoRef.current,
-            (result) => {
-                form.setData('code', result.data);
-            },
+            (result) => recordScan(result.data),
             {
                 highlightScanRegion: true,
                 highlightCodeOutline: true,
@@ -179,18 +187,49 @@ export default function AttendanceScanner({
             const result = await QrScanner.scanImage(file, {
                 returnDetailedScanResult: true,
             });
-            form.setData('code', result.data);
             setCameraError(null);
+            recordScan(result.data);
         } catch {
             setCameraError('Could not read a QR code from that image.');
         }
     }
 
-    function submit() {
+    /**
+     * Auto-records the instant a code is detected (camera or image
+     * upload) or a manual value is submitted - no separate "confirm"
+     * step. `submittingRef` guards synchronously against the camera's
+     * continuous scan loop firing several times for the same still-
+     * visible badge before React state (`form.processing`) catches up.
+     */
+    function recordScan(code: string) {
+        const trimmed = code.trim();
+
+        if (!trimmed || submittingRef.current) {
+            return;
+        }
+
+        submittingRef.current = true;
+        form.setData('code', trimmed);
+        form.transform((data) => ({ ...data, code: trimmed }));
         form.post(scan.url(), {
             preserveScroll: true,
             onSuccess: () => form.reset('code'),
+            onFinish: () => {
+                submittingRef.current = false;
+                // Briefly pause the camera after any attempt (success or
+                // rejected duplicate) so the same badge lingering in view
+                // doesn't immediately trigger another submission.
+                scannerRef.current?.pause();
+                window.setTimeout(() => {
+                    scannerRef.current?.start().catch(() => {});
+                }, 2000);
+            },
         });
+    }
+
+    function submitManualCode(event: React.FormEvent) {
+        event.preventDefault();
+        recordScan(form.data.code);
     }
 
     return (
@@ -319,30 +358,8 @@ export default function AttendanceScanner({
 
                             <div className="grid content-start gap-4 border-t pt-6 md:border-t-0 md:border-l md:pt-0 md:pl-6">
                                 <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                                    Manual entry &amp; recording
+                                    Entry type &amp; manual fallback
                                 </p>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="code">QR code value</Label>
-                                    <Input
-                                        id="code"
-                                        name="code"
-                                        value={form.data.code}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'code',
-                                                event.target.value,
-                                            )
-                                        }
-                                        placeholder="attendance:..."
-                                        aria-invalid={
-                                            form.errors.code
-                                                ? true
-                                                : undefined
-                                        }
-                                    />
-                                    <InputError message={form.errors.code} />
-                                </div>
 
                                 <div className="grid gap-2">
                                     <Label>Entry type</Label>
@@ -386,24 +403,52 @@ export default function AttendanceScanner({
                                     </div>
                                 </div>
 
-                                <Button
-                                    type="button"
-                                    size="lg"
-                                    disabled={
-                                        form.processing ||
-                                        !form.data.code.trim()
-                                    }
-                                    onClick={submit}
+                                <form
+                                    onSubmit={submitManualCode}
+                                    className="grid gap-2"
                                 >
-                                    <Camera />
-                                    Record scan
-                                </Button>
+                                    <Label htmlFor="code">
+                                        Or type/paste a QR value
+                                    </Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id="code"
+                                            name="code"
+                                            value={form.data.code}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'code',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="attendance:..."
+                                            aria-invalid={
+                                                form.errors.code
+                                                    ? true
+                                                    : undefined
+                                            }
+                                        />
+                                        <Button
+                                            type="submit"
+                                            size="icon"
+                                            disabled={
+                                                form.processing ||
+                                                !form.data.code.trim()
+                                            }
+                                            aria-label="Submit code"
+                                        >
+                                            <Send />
+                                        </Button>
+                                    </div>
+                                    <InputError message={form.errors.code} />
+                                </form>
 
                                 <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
-                                    Scan a code with the camera or an image
-                                    upload to fill this field automatically,
-                                    or paste/type a code by hand - then pick
-                                    Time In or Time Out and record.
+                                    Attendance is recorded the instant a QR
+                                    code is detected by the camera or an
+                                    uploaded image - there's no separate
+                                    confirm step. Pick Time In or Time Out
+                                    first.
                                 </div>
                             </div>
                         </CardContent>
