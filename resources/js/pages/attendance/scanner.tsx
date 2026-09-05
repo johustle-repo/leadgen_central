@@ -233,22 +233,26 @@ export default function AttendanceScanner({
                                 </p>
                             </div>
                         </CardHeader>
-                        <CardContent className="grid gap-4">
-                            <div className="mx-auto w-full max-w-64 overflow-hidden rounded-lg border bg-muted/30">
-                                <video
-                                    ref={videoRef}
-                                    className="aspect-square w-full object-cover"
-                                    muted
-                                    playsInline
-                                />
-                            </div>
+                        <CardContent className="grid gap-6 md:grid-cols-2">
+                            <div className="grid gap-4">
+                                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                    Camera
+                                </p>
 
-                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="mx-auto w-full max-w-72 overflow-hidden rounded-lg border bg-muted/30">
+                                    <video
+                                        ref={videoRef}
+                                        className="aspect-square w-full object-cover"
+                                        muted
+                                        playsInline
+                                    />
+                                </div>
+
                                 <Select
                                     value={selectedCameraId}
                                     onValueChange={changeCamera}
                                 >
-                                    <SelectTrigger className="min-w-56 flex-1">
+                                    <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Select a camera" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -263,118 +267,145 @@ export default function AttendanceScanner({
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => void refreshCameras()}
-                                >
-                                    <RotateCcw />
-                                    Refresh webcams
-                                </Button>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={restartCamera}
-                                >
-                                    <Video />
-                                    Restart scanner
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={stopCamera}
-                                    disabled={!scanning}
-                                >
-                                    <VideoOff />
-                                    Stop scanner
-                                </Button>
-                            </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => void refreshCameras()}
+                                    >
+                                        <RotateCcw />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={restartCamera}
+                                    >
+                                        <Video />
+                                        Restart
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={stopCamera}
+                                        disabled={!scanning}
+                                    >
+                                        <VideoOff />
+                                        Stop
+                                    </Button>
+                                </div>
 
-                            {cameraError && (
-                                <p className="text-sm text-destructive">
-                                    {cameraError}
-                                </p>
-                            )}
+                                {cameraError && (
+                                    <p className="text-sm text-destructive">
+                                        {cameraError}
+                                    </p>
+                                )}
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="qr-image-upload">
-                                    Or upload a QR image
-                                </Label>
-                                <div className="flex items-center gap-2">
-                                    <ImageUp className="size-4 shrink-0 text-muted-foreground" />
-                                    <Input
-                                        id="qr-image-upload"
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageUpload}
-                                    />
+                                <div className="grid gap-2">
+                                    <Label htmlFor="qr-image-upload">
+                                        Or upload a QR image
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                        <ImageUp className="size-4 shrink-0 text-muted-foreground" />
+                                        <Input
+                                            id="qr-image-upload"
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="code">QR code value</Label>
-                                <Input
-                                    id="code"
-                                    name="code"
-                                    value={form.data.code}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'code',
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder="attendance:..."
-                                    aria-invalid={
-                                        form.errors.code ? true : undefined
-                                    }
-                                />
-                                <InputError message={form.errors.code} />
-                            </div>
+                            <div className="grid content-start gap-4 border-t pt-6 md:border-t-0 md:border-l md:pt-0 md:pl-6">
+                                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                    Manual entry &amp; recording
+                                </p>
 
-                            <div className="grid grid-cols-2 gap-2">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="code">QR code value</Label>
+                                    <Input
+                                        id="code"
+                                        name="code"
+                                        value={form.data.code}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'code',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="attendance:..."
+                                        aria-invalid={
+                                            form.errors.code
+                                                ? true
+                                                : undefined
+                                        }
+                                    />
+                                    <InputError message={form.errors.code} />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label>Entry type</Label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Button
+                                            type="button"
+                                            variant={
+                                                form.data.entry_type ===
+                                                'time_in'
+                                                    ? 'default'
+                                                    : 'outline'
+                                            }
+                                            onClick={() =>
+                                                form.setData(
+                                                    'entry_type',
+                                                    'time_in',
+                                                )
+                                            }
+                                        >
+                                            <LogIn />
+                                            Time In
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant={
+                                                form.data.entry_type ===
+                                                'time_out'
+                                                    ? 'default'
+                                                    : 'outline'
+                                            }
+                                            onClick={() =>
+                                                form.setData(
+                                                    'entry_type',
+                                                    'time_out',
+                                                )
+                                            }
+                                        >
+                                            <LogOut />
+                                            Time Out
+                                        </Button>
+                                    </div>
+                                </div>
+
                                 <Button
                                     type="button"
-                                    variant={
-                                        form.data.entry_type === 'time_in'
-                                            ? 'default'
-                                            : 'outline'
+                                    size="lg"
+                                    disabled={
+                                        form.processing ||
+                                        !form.data.code.trim()
                                     }
-                                    onClick={() =>
-                                        form.setData('entry_type', 'time_in')
-                                    }
+                                    onClick={submit}
                                 >
-                                    <LogIn />
-                                    Time In
+                                    <Camera />
+                                    Record scan
                                 </Button>
-                                <Button
-                                    type="button"
-                                    variant={
-                                        form.data.entry_type === 'time_out'
-                                            ? 'default'
-                                            : 'outline'
-                                    }
-                                    onClick={() =>
-                                        form.setData('entry_type', 'time_out')
-                                    }
-                                >
-                                    <LogOut />
-                                    Time Out
-                                </Button>
-                            </div>
 
-                            <Button
-                                type="button"
-                                disabled={
-                                    form.processing || !form.data.code.trim()
-                                }
-                                onClick={submit}
-                            >
-                                <Camera />
-                                Record scan
-                            </Button>
+                                <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+                                    Scan a code with the camera or an image
+                                    upload to fill this field automatically,
+                                    or paste/type a code by hand - then pick
+                                    Time In or Time Out and record.
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
 
