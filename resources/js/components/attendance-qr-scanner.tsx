@@ -321,21 +321,6 @@ export function AttendanceQrScanner({
                                 {cameraError}
                             </p>
                         )}
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="code">
-                                Or upload a QR image
-                            </Label>
-                            <div className="flex items-center gap-2">
-                                <ImageUp className="size-4 shrink-0 text-muted-foreground" />
-                                <Input
-                                    id="qr-image-upload"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageUpload}
-                                />
-                            </div>
-                        </div>
                     </div>
 
                     <div className="grid content-start gap-4 border-t pt-6 md:border-t-0 md:border-l md:pt-0 md:pl-6">
@@ -414,6 +399,21 @@ export function AttendanceQrScanner({
                             </div>
                             <InputError message={form.errors.code} />
                         </form>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="qr-image-upload">
+                                Or upload a QR image
+                            </Label>
+                            <div className="flex items-center gap-2">
+                                <ImageUp className="size-4 shrink-0 text-muted-foreground" />
+                                <Input
+                                    id="qr-image-upload"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                />
+                            </div>
+                        </div>
 
                         <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
                             Attendance is recorded the instant a QR code is

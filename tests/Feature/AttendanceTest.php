@@ -244,6 +244,18 @@ it('forbids an agent from self-scanning someone else\'s badge', function () {
     expect(Attendance::where('user_id', $otherStaff->id)->count())->toBe(0);
 });
 
+it('keeps the self-service QR attendance page and self-scan agent-only', function () {
+    $administrator = User::factory()->administrator()->create();
+    $superAdministrator = User::factory()->superAdministrator()->create();
+
+    $this->actingAs($administrator)->get(route('qr-attendance.edit'))->assertForbidden();
+    $this->actingAs($superAdministrator)->get(route('qr-attendance.edit'))->assertForbidden();
+
+    $this->actingAs($administrator)
+        ->post(route('qr-attendance.scan'), ['code' => $administrator->qr_value, 'entry_type' => 'time_in'])
+        ->assertForbidden();
+});
+
 it('exports attendance records as a pdf', function () {
     $superAdministrator = User::factory()->superAdministrator()->create();
     $staff = User::factory()->create();

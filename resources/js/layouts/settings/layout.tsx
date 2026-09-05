@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
@@ -9,33 +9,40 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { edit as editQrAttendance } from '@/routes/qr-attendance';
 import { edit as editSecurity } from '@/routes/security';
-import type { NavItem } from '@/types';
-
-const sidebarNavItems: NavItem[] = [
-    {
-        title: 'Profile',
-        href: edit(),
-        icon: null,
-    },
-    {
-        title: 'Security',
-        href: editSecurity(),
-        icon: null,
-    },
-    {
-        title: 'Appearance',
-        href: editAppearance(),
-        icon: null,
-    },
-    {
-        title: 'QR Attendance',
-        href: editQrAttendance(),
-        icon: null,
-    },
-];
+import type { Auth, NavItem } from '@/types';
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
+    const { auth } = usePage<{ auth: Auth }>().props;
+
+    const sidebarNavItems: NavItem[] = [
+        {
+            title: 'Profile',
+            href: edit(),
+            icon: null,
+        },
+        {
+            title: 'Security',
+            href: editSecurity(),
+            icon: null,
+        },
+        {
+            title: 'Appearance',
+            href: editAppearance(),
+            icon: null,
+        },
+        // Self-service badge scanning is an agent-only convenience -
+        // administrators already have the full scanner station.
+        ...(auth.user.role === 'agent'
+            ? [
+                  {
+                      title: 'QR Attendance',
+                      href: editQrAttendance(),
+                      icon: null,
+                  },
+              ]
+            : []),
+    ];
 
     return (
         <div className="px-4 py-6">

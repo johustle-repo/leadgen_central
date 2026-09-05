@@ -222,6 +222,7 @@ class AttendanceController extends Controller
     {
         $user = $request->user();
         abort_unless($user instanceof User, 401);
+        abort_unless($user->role === UserRole::Agent, 403);
 
         $recentCheckIns = self::mapCheckIns(
             Attendance::query()
@@ -349,6 +350,7 @@ class AttendanceController extends Controller
 
         $performedBy = $request->user();
         abort_unless($performedBy instanceof User, 401);
+        abort_unless($performedBy->role === UserRole::Agent, 403);
 
         $attendance = $service->record(
             $validated['code'],
