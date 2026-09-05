@@ -250,3 +250,33 @@ it('forbids a regular administrator from importing attendance', function () {
 
     $this->actingAs($administrator)->post(route('attendance.import'), ['files' => [$file]])->assertForbidden();
 });
+
+it('marks the daily summary as a holiday on an automatic Sunday rest day', function () {
+    // Named so `orderBy('name')` puts the Sunday staff member at a known index.
+    $superAdministrator = User::factory()->superAdministrator()->create(['name' => 'AAA Admin']);
+    User::factory()->create(['name' => 'ZZZ Sunday Staff', 'status' => 'active']);
+
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.index', ['date' => '2026-04-05'])); // a Sunday
+
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('attendance/index')
+        ->where('dailySummaryDate', '2026-04-05')
+        ->has('dailySummary', 2)
+        ->where('dailySummary.1.user_name', 'ZZZ Sunday Staff')
+        ->where('dailySummary.1.status', 'holiday')
+        ->where('dailySummary.1.holiday_label', 'Sunday Rest Day'));
+});
+
+it('exports the attendance backup workbook for the super administrator only', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $administrator = User::factory()->administrator()->create();
+    $staff = User::factory()->create();
+    Attendance::factory()->for($staff)->create();
+
+    $this->actingAs($administrator)->get(route('attendance.export-excel'))->assertForbidden();
+
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.export-excel'));
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Type'))->toContain('spreadsheet');
+});

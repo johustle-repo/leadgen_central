@@ -49,12 +49,14 @@ import {
 import { downloadDataUrl, drawIdentityCard } from '@/lib/qr';
 import { cn } from '@/lib/utils';
 import {
+    exportExcel,
     exportPdf,
     importMethod as importAttendance,
     index,
     scan,
 } from '@/routes/attendance';
 import type {
+    AttendanceDailySummary,
     AttendanceEntryType,
     AttendanceRecord,
     AttendanceUser,
@@ -92,6 +94,8 @@ type Props = {
         late_today: number;
         active_staff: number;
     };
+    dailySummary: AttendanceDailySummary[];
+    dailySummaryDate: string;
     filters: { search?: string; entry_type?: string; date?: string };
 };
 
@@ -99,6 +103,8 @@ export default function AttendanceIndex({
     users,
     records,
     summary,
+    dailySummary,
+    dailySummaryDate,
     filters,
 }: Props) {
     const { flash } = usePage().props;
@@ -454,12 +460,20 @@ export default function AttendanceIndex({
                                         each user.
                                     </CardDescription>
                                 </div>
-                                <Button asChild variant="outline">
-                                    <a href={exportPdf.url()}>
-                                        <FileDown />
-                                        Export PDF
-                                    </a>
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button asChild variant="outline">
+                                        <a href={exportPdf.url()}>
+                                            <FileDown />
+                                            Export PDF
+                                        </a>
+                                    </Button>
+                                    <Button asChild variant="outline">
+                                        <a href={exportExcel.url()}>
+                                            <FileDown />
+                                            Export Excel
+                                        </a>
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 {users.length ? (
@@ -503,6 +517,84 @@ export default function AttendanceIndex({
                                     <EmptyState
                                         icon={QrCodeIcon}
                                         title="No staff yet"
+                                    />
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Daily summary</CardTitle>
+                                <CardDescription>
+                                    {new Date(
+                                        `${dailySummaryDate}T00:00:00`,
+                                    ).toLocaleDateString(undefined, {
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                    })}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {dailySummary.length ? (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="hover:bg-transparent">
+                                                <TableHead>Staff</TableHead>
+                                                <TableHead>
+                                                    Time In
+                                                </TableHead>
+                                                <TableHead>
+                                                    Time Out
+                                                </TableHead>
+                                                <TableHead>
+                                                    Total Hours
+                                                </TableHead>
+                                                <TableHead>Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {dailySummary.map((row) => (
+                                                <TableRow key={row.user_id}>
+                                                    <TableCell>
+                                                        {row.user_name}
+                                                    </TableCell>
+                                                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                                                        {row.time_in
+                                                            ? new Date(
+                                                                  row.time_in,
+                                                              ).toLocaleTimeString()
+                                                            : '—'}
+                                                    </TableCell>
+                                                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                                                        {row.time_out
+                                                            ? new Date(
+                                                                  row.time_out,
+                                                              ).toLocaleTimeString()
+                                                            : '—'}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {
+                                                            row.worked_minutes_label
+                                                        }
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <StatusBadge
+                                                            value={
+                                                                row.holiday_label ??
+                                                                row.status
+                                                            }
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                ) : (
+                                    <EmptyState
+                                        icon={UsersIcon}
+                                        title="No active staff yet"
                                     />
                                 )}
                             </CardContent>

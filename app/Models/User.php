@@ -31,6 +31,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property AccountStatus $status
  * @property string|null $team
  * @property string|null $qr_token
+ * @property bool $night_shift_eligible
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
@@ -85,6 +86,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'two_factor_confirmed_at' => 'datetime',
             'role' => UserRole::class,
             'status' => AccountStatus::class,
+            'night_shift_eligible' => 'boolean',
         ];
     }
 

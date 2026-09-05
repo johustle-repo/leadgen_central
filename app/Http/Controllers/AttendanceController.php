@@ -3,22 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\AttendanceEntryType;
+use App\Exports\AttendanceBackupExport;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\AttendanceDaySummaryService;
 use App\Services\AttendanceImportService;
 use App\Services\AttendanceScanService;
+use App\Services\HolidayService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AttendanceController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, AttendanceDaySummaryService $summaryService): Response
     {
         Gate::authorize('manage-attendance');
 
@@ -72,10 +78,24 @@ class AttendanceController extends Controller
             'active_staff' => User::query()->where('status', 'active')->count(),
         ];
 
+        $summaryDate = $date ? Carbon::parse($date) : now();
+        $activeUsers = User::query()->where('status', 'active')->orderBy('name')->get();
+        $dailySummary = array_map(fn (array $row): array => [
+            'user_id' => $row['user_id'],
+            'user_name' => $row['user_name'],
+            'time_in' => $row['time_in']?->toIso8601String(),
+            'time_out' => $row['time_out']?->toIso8601String(),
+            'worked_minutes_label' => Attendance::formatMinutes($row['worked_minutes']),
+            'status' => $row['status'],
+            'holiday_label' => $row['holiday_label'],
+        ], $summaryService->buildForDate($summaryDate, $activeUsers));
+
         return Inertia::render('attendance/index', [
             'users' => $users,
             'records' => $records,
             'summary' => $summary,
+            'dailySummary' => $dailySummary,
+            'dailySummaryDate' => $summaryDate->toDateString(),
             'filters' => $request->only(['search', 'entry_type', 'date']),
         ]);
     }
@@ -163,24 +183,44 @@ class AttendanceController extends Controller
             ->with('importErrors', array_slice($errors, 0, 30));
     }
 
-    public function exportPdf(Request $request): HttpResponse
+    public function exportPdf(Request $request, AttendanceDaySummaryService $summaryService, HolidayService $holidayService): HttpResponse
     {
         Gate::authorize('manage-attendance');
 
-        $records = Attendance::query()
+        $attendances = Attendance::query()
             ->with('user:id,name,role')
             ->orderByDesc('recorded_at')
             ->limit(500)
-            ->get()
-            ->map(fn (Attendance $attendance): array => [
+            ->get();
+
+        $holidaysByDate = $holidayService->forDates(
+            $attendances->map(fn (Attendance $attendance): string => $attendance->recorded_at->toDateString())->unique()->values()->all(),
+        );
+
+        $records = $attendances->map(function (Attendance $attendance) use ($summaryService, $holidaysByDate): array {
+            $holiday = $holidaysByDate[$attendance->recorded_at->toDateString()] ?? null;
+
+            $totalHoursLabel = null;
+            if ($attendance->entry_type === AttendanceEntryType::TimeOut && $attendance->user instanceof User) {
+                $day = $summaryService->buildForUserAndDate($attendance->user, $attendance->recorded_at, $holiday);
+                $totalHoursLabel = Attendance::formatMinutes($day['worked_minutes']);
+            }
+
+            $statusLabel = $holiday !== null
+                ? $holiday->name
+                : ($attendance->entry_type === AttendanceEntryType::TimeIn
+                    ? ucfirst(str_replace('_', ' ', Attendance::lateStatusFor($attendance->recorded_at)['status']))
+                    : null);
+
+            return [
                 'user_name' => $attendance->user?->name,
                 'role_label' => $attendance->user?->role?->label(),
                 'entry_label' => $attendance->entry_type->label(),
                 'recorded_at' => $attendance->recorded_at->format('Y-m-d H:i'),
-                'status_label' => $attendance->entry_type === AttendanceEntryType::TimeIn
-                    ? ucfirst(str_replace('_', ' ', Attendance::lateStatusFor($attendance->recorded_at)['status']))
-                    : null,
-            ]);
+                'status_label' => $statusLabel,
+                'total_hours_label' => $totalHoursLabel,
+            ];
+        });
 
         $performedBy = $request->user();
         abort_unless($performedBy instanceof User, 401);
@@ -196,5 +236,30 @@ class AttendanceController extends Controller
 
         return Pdf::loadView('attendance.export', ['records' => $records])
             ->download('Attendance-Report-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    public function exportExcel(Request $request): BinaryFileResponse
+    {
+        Gate::authorize('manage-attendance');
+
+        $month = $request->string('month')->toString();
+        $period = $month !== '' ? Carbon::parse($month)->startOfMonth() : now()->startOfMonth();
+
+        $performedBy = $request->user();
+        abort_unless($performedBy instanceof User, 401);
+
+        AuditLog::query()->create([
+            'user_id' => $performedBy->id,
+            'action' => 'attendance.exported_excel',
+            'auditable_type' => 'attendance',
+            'auditable_id' => null,
+            'description' => 'Downloaded an attendance Excel export.',
+            'metadata' => ['period' => $period->toDateString()],
+        ]);
+
+        return Excel::download(
+            new AttendanceBackupExport($period->copy()->startOfMonth(), $period->copy()->endOfMonth()),
+            'Attendance_'.$period->format('F_Y').'.xlsx',
+        );
     }
 }

@@ -87,6 +87,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
         Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
         Route::post('attendance/scan', [AttendanceController::class, 'scan'])->name('attendance.scan');
         Route::get('attendance/export.pdf', [AttendanceController::class, 'exportPdf'])->middleware('throttle:data-exports')->name('attendance.export-pdf');
+        Route::get('attendance/export.xlsx', [AttendanceController::class, 'exportExcel'])->middleware('throttle:data-exports')->name('attendance.export-excel');
         Route::post('attendance/import', [AttendanceController::class, 'importJson'])->middleware('throttle:data-imports')->name('attendance.import');
     });
 });

@@ -20,3 +20,13 @@ export type AttendanceRecord = {
     status: AttendanceStatus;
     late_minutes: number;
 };
+
+export type AttendanceDailySummary = {
+    user_id: number;
+    user_name: string;
+    time_in: string | null;
+    time_out: string | null;
+    worked_minutes_label: string;
+    status: 'no_time_in' | 'on_time' | 'late' | 'holiday';
+    holiday_label: string | null;
+};

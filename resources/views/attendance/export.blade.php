@@ -21,7 +21,7 @@
     @if ($records->count())
         <table>
             <tr>
-                <th>Name</th><th>Role</th><th>Entry</th><th>Recorded at</th><th>Status</th>
+                <th>Name</th><th>Role</th><th>Entry</th><th>Recorded at</th><th>Status</th><th>Total Hours</th>
             </tr>
             @foreach ($records as $record)
                 <tr>
@@ -30,6 +30,7 @@
                     <td>{{ $record['entry_label'] }}</td>
                     <td>{{ $record['recorded_at'] }}</td>
                     <td>{{ $record['status_label'] }}</td>
+                    <td>{{ $record['total_hours_label'] }}</td>
                 </tr>
             @endforeach
         </table>
