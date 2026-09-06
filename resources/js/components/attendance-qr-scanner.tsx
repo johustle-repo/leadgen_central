@@ -274,7 +274,7 @@ export function AttendanceQrScanner({
                 <CardContent
                     className={cn(
                         'grid gap-6',
-                        layout === 'wide' && 'md:grid-cols-[3fr_2fr]',
+                        layout === 'wide' && 'lg:grid-cols-[3fr_2fr]',
                     )}
                 >
                     <div className="grid gap-4">
@@ -350,7 +350,7 @@ export function AttendanceQrScanner({
                         className={cn(
                             'grid content-start gap-4 border-t pt-6',
                             layout === 'wide' &&
-                                'md:border-t-0 md:border-l md:pt-0 md:pl-6',
+                                'lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6',
                         )}
                     >
                         <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
