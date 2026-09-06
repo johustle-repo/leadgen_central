@@ -65,6 +65,8 @@ type Props = {
     headerStat?: { label: string; value: number | string };
     /** 'stacked' suits a narrow container (e.g. the Settings page); 'wide' uses a two-column layout for full-width station pages. */
     layout?: 'wide' | 'stacked';
+    /** Hide the "Better scanning flow" tips and recent check-ins list, e.g. for a compact single-card page. */
+    showSidebar?: boolean;
 };
 
 export function AttendanceQrScanner({
@@ -74,6 +76,7 @@ export function AttendanceQrScanner({
     recentCheckInsDescription = 'Latest successful attendance records.',
     headerStat,
     layout = 'wide',
+    showSidebar = true,
 }: Props) {
     const form = useForm<{ code: string; entry_type: AttendanceEntryType }>({
         code: '',
@@ -242,7 +245,7 @@ export function AttendanceQrScanner({
     return (
         <div
             className={
-                layout === 'wide'
+                layout === 'wide' && showSidebar
                     ? 'grid gap-6 lg:grid-cols-[1fr_minmax(0,22rem)]'
                     : 'grid gap-6'
             }
@@ -274,7 +277,10 @@ export function AttendanceQrScanner({
                 <CardContent
                     className={cn(
                         'grid gap-6',
-                        layout === 'wide' && 'lg:grid-cols-[3fr_2fr]',
+                        layout === 'wide' &&
+                            (showSidebar
+                                ? 'lg:grid-cols-[3fr_2fr]'
+                                : 'md:grid-cols-[3fr_2fr]'),
                     )}
                 >
                     <div className="grid gap-4">
@@ -350,7 +356,9 @@ export function AttendanceQrScanner({
                         className={cn(
                             'grid content-start gap-4 border-t pt-6',
                             layout === 'wide' &&
-                                'lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6',
+                                (showSidebar
+                                    ? 'lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6'
+                                    : 'md:border-t-0 md:border-l md:pt-0 md:pl-6'),
                         )}
                     >
                         <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -454,87 +462,91 @@ export function AttendanceQrScanner({
                 </CardContent>
             </Card>
 
-            <div className="grid gap-6">
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                                <ListChecks className="size-5" />
-                            </div>
-                            <CardTitle>Better scanning flow</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <ol className="list-decimal space-y-2 pl-4 text-sm text-muted-foreground">
-                            <li>
-                                Choose Time In or Time Out, then use the live
-                                camera scanner.
-                            </li>
-                            <li>
-                                If camera access fails, upload a QR image or
-                                paste the raw QR value.
-                            </li>
-                            <li>
-                                Every successful scan records the timestamp
-                                immediately.
-                            </li>
-                        </ol>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                                <History className="size-5" />
-                            </div>
-                            <div>
-                                <CardTitle>{recentCheckInsTitle}</CardTitle>
-                                <CardDescription>
-                                    {recentCheckInsDescription}
-                                </CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="grid gap-3">
-                        {recentCheckIns.length ? (
-                            recentCheckIns.map((checkIn) => (
-                                <div
-                                    key={checkIn.id}
-                                    className="flex items-start justify-between gap-3 rounded-lg border p-3"
-                                >
-                                    <div className="min-w-0">
-                                        <p className="truncate font-medium">
-                                            {checkIn.user_name ??
-                                                'Deleted user'}
-                                        </p>
-                                        {checkIn.employee_code && (
-                                            <p className="text-xs text-muted-foreground">
-                                                {checkIn.employee_code}
-                                            </p>
-                                        )}
-                                        <div className="mt-1">
-                                            <StatusBadge
-                                                value={checkIn.entry_type}
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="shrink-0 text-right text-xs text-muted-foreground">
-                                        {formatAttendanceDateTime(
-                                            checkIn.recorded_at,
-                                        )}
-                                    </p>
+            {showSidebar && (
+                <div className="grid gap-6">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                    <ListChecks className="size-5" />
                                 </div>
-                            ))
-                        ) : (
-                            <EmptyState
-                                icon={Camera}
-                                title="No check-ins yet"
-                            />
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
+                                <CardTitle>Better scanning flow</CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <ol className="list-decimal space-y-2 pl-4 text-sm text-muted-foreground">
+                                <li>
+                                    Choose Time In or Time Out, then use the
+                                    live camera scanner.
+                                </li>
+                                <li>
+                                    If camera access fails, upload a QR image
+                                    or paste the raw QR value.
+                                </li>
+                                <li>
+                                    Every successful scan records the
+                                    timestamp immediately.
+                                </li>
+                            </ol>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                    <History className="size-5" />
+                                </div>
+                                <div>
+                                    <CardTitle>
+                                        {recentCheckInsTitle}
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {recentCheckInsDescription}
+                                    </CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="grid gap-3">
+                            {recentCheckIns.length ? (
+                                recentCheckIns.map((checkIn) => (
+                                    <div
+                                        key={checkIn.id}
+                                        className="flex items-start justify-between gap-3 rounded-lg border p-3"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="truncate font-medium">
+                                                {checkIn.user_name ??
+                                                    'Deleted user'}
+                                            </p>
+                                            {checkIn.employee_code && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {checkIn.employee_code}
+                                                </p>
+                                            )}
+                                            <div className="mt-1">
+                                                <StatusBadge
+                                                    value={checkIn.entry_type}
+                                                />
+                                            </div>
+                                        </div>
+                                        <p className="shrink-0 text-right text-xs text-muted-foreground">
+                                            {formatAttendanceDateTime(
+                                                checkIn.recorded_at,
+                                            )}
+                                        </p>
+                                    </div>
+                                ))
+                            ) : (
+                                <EmptyState
+                                    icon={Camera}
+                                    title="No check-ins yet"
+                                />
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }

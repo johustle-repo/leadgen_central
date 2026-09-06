@@ -93,7 +93,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     <section
                         className={cn(
                             'space-y-12',
-                            isQrAttendancePage ? 'max-w-5xl' : 'max-w-xl',
+                            isQrAttendancePage ? 'max-w-3xl' : 'max-w-xl',
                         )}
                     >
                         {children}
