@@ -23,6 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { formatAttendanceDateTime } from '@/lib/attendance-time';
+import { cn } from '@/lib/utils';
 import type { AttendanceCheckIn, AttendanceEntryType } from '@/types';
 
 function describeCameraError(error: unknown): string {
@@ -254,7 +255,12 @@ export function AttendanceQrScanner({
                         </div>
                     )}
                 </CardHeader>
-                <CardContent className="grid gap-6 md:grid-cols-2">
+                <CardContent
+                    className={cn(
+                        'grid gap-6',
+                        layout === 'wide' && 'md:grid-cols-2',
+                    )}
+                >
                     <div className="grid gap-4">
                         <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                             Camera
@@ -323,7 +329,13 @@ export function AttendanceQrScanner({
                         )}
                     </div>
 
-                    <div className="grid content-start gap-4 border-t pt-6 md:border-t-0 md:border-l md:pt-0 md:pl-6">
+                    <div
+                        className={cn(
+                            'grid content-start gap-4 border-t pt-6',
+                            layout === 'wide' &&
+                                'md:border-t-0 md:border-l md:pt-0 md:pl-6',
+                        )}
+                    >
                         <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                             Entry type &amp; manual fallback
                         </p>

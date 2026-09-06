@@ -2,6 +2,7 @@ const DEFAULT_COLORS = {
     success: 'bg-success/15 text-success dark:bg-success/20',
     destructive: 'bg-destructive/15 text-destructive dark:bg-destructive/20',
     warning: 'bg-warning/15 text-warning dark:bg-warning/20',
+    info: 'bg-info/15 text-info dark:bg-info/20',
 } as const;
 
 function defaultColor(value: string): string {
@@ -9,7 +10,8 @@ function defaultColor(value: string): string {
         value === 'active' ||
         value === 'accepted' ||
         value === 'completed' ||
-        value === 'valid'
+        value === 'valid' ||
+        value === 'time_in'
     ) {
         return DEFAULT_COLORS.success;
     }
@@ -21,6 +23,10 @@ function defaultColor(value: string): string {
         value === 'rejected'
     ) {
         return DEFAULT_COLORS.destructive;
+    }
+
+    if (value === 'time_out') {
+        return DEFAULT_COLORS.info;
     }
 
     return DEFAULT_COLORS.warning;

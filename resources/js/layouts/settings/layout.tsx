@@ -14,6 +14,10 @@ import type { Auth, NavItem } from '@/types';
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
     const { auth } = usePage<{ auth: Auth }>().props;
+    // The QR Attendance scanner needs a wide two-column layout (camera +
+    // recent check-ins); every other settings page is a narrow form, so
+    // only this page opts out of the shared max-width constraint.
+    const isQrAttendancePage = isCurrentOrParentUrl(editQrAttendance());
 
     const sidebarNavItems: NavItem[] = [
         {
@@ -80,8 +84,18 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
                 <Separator className="my-6 lg:hidden" />
 
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">
+                <div
+                    className={cn(
+                        'flex-1',
+                        !isQrAttendancePage && 'md:max-w-2xl',
+                    )}
+                >
+                    <section
+                        className={cn(
+                            'space-y-12',
+                            isQrAttendancePage ? 'max-w-5xl' : 'max-w-xl',
+                        )}
+                    >
                         {children}
                     </section>
                 </div>
