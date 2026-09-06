@@ -250,7 +250,7 @@ export function AttendanceQrScanner({
         <div
             className={
                 layout === 'wide' && showSidebar
-                    ? 'grid gap-6 lg:grid-cols-[1fr_minmax(0,22rem)]'
+                    ? 'grid gap-6 lg:grid-cols-[1fr_minmax(0,22rem)] lg:items-start'
                     : 'grid gap-6'
             }
         >
