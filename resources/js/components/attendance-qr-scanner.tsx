@@ -65,8 +65,10 @@ type Props = {
     headerStat?: { label: string; value: number | string };
     /** 'stacked' suits a narrow container (e.g. the Settings page); 'wide' uses a two-column layout for full-width station pages. */
     layout?: 'wide' | 'stacked';
-    /** Hide the "Better scanning flow" tips and recent check-ins list, e.g. for a compact single-card page. */
-    showSidebar?: boolean;
+    /** Show the "Better scanning flow" tips card. */
+    showTips?: boolean;
+    /** Show the recent check-ins list card. */
+    showRecentCheckIns?: boolean;
 };
 
 export function AttendanceQrScanner({
@@ -76,8 +78,10 @@ export function AttendanceQrScanner({
     recentCheckInsDescription = 'Latest successful attendance records.',
     headerStat,
     layout = 'wide',
-    showSidebar = true,
+    showTips = true,
+    showRecentCheckIns = true,
 }: Props) {
+    const showSidebar = showTips || showRecentCheckIns;
     const form = useForm<{ code: string; entry_type: AttendanceEntryType }>({
         code: '',
         entry_type: 'time_in',
@@ -464,87 +468,95 @@ export function AttendanceQrScanner({
 
             {showSidebar && (
                 <div className="grid gap-6">
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                                    <ListChecks className="size-5" />
-                                </div>
-                                <CardTitle>Better scanning flow</CardTitle>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <ol className="list-decimal space-y-2 pl-4 text-sm text-muted-foreground">
-                                <li>
-                                    Choose Time In or Time Out, then use the
-                                    live camera scanner.
-                                </li>
-                                <li>
-                                    If camera access fails, upload a QR image
-                                    or paste the raw QR value.
-                                </li>
-                                <li>
-                                    Every successful scan records the
-                                    timestamp immediately.
-                                </li>
-                            </ol>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                                    <History className="size-5" />
-                                </div>
-                                <div>
-                                    <CardTitle>
-                                        {recentCheckInsTitle}
-                                    </CardTitle>
-                                    <CardDescription>
-                                        {recentCheckInsDescription}
-                                    </CardDescription>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="grid gap-3">
-                            {recentCheckIns.length ? (
-                                recentCheckIns.map((checkIn) => (
-                                    <div
-                                        key={checkIn.id}
-                                        className="flex items-start justify-between gap-3 rounded-lg border p-3"
-                                    >
-                                        <div className="min-w-0">
-                                            <p className="truncate font-medium">
-                                                {checkIn.user_name ??
-                                                    'Deleted user'}
-                                            </p>
-                                            {checkIn.employee_code && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {checkIn.employee_code}
-                                                </p>
-                                            )}
-                                            <div className="mt-1">
-                                                <StatusBadge
-                                                    value={checkIn.entry_type}
-                                                />
-                                            </div>
-                                        </div>
-                                        <p className="shrink-0 text-right text-xs text-muted-foreground">
-                                            {formatAttendanceDateTime(
-                                                checkIn.recorded_at,
-                                            )}
-                                        </p>
+                    {showTips && (
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                        <ListChecks className="size-5" />
                                     </div>
-                                ))
-                            ) : (
-                                <EmptyState
-                                    icon={Camera}
-                                    title="No check-ins yet"
-                                />
-                            )}
-                        </CardContent>
-                    </Card>
+                                    <CardTitle>Better scanning flow</CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <ol className="list-decimal space-y-2 pl-4 text-sm text-muted-foreground">
+                                    <li>
+                                        Choose Time In or Time Out, then use
+                                        the live camera scanner.
+                                    </li>
+                                    <li>
+                                        If camera access fails, upload a QR
+                                        image or paste the raw QR value.
+                                    </li>
+                                    <li>
+                                        Every successful scan records the
+                                        timestamp immediately.
+                                    </li>
+                                </ol>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {showRecentCheckIns && (
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                        <History className="size-5" />
+                                    </div>
+                                    <div>
+                                        <CardTitle>
+                                            {recentCheckInsTitle}
+                                        </CardTitle>
+                                        <CardDescription>
+                                            {recentCheckInsDescription}
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="grid gap-3">
+                                {recentCheckIns.length ? (
+                                    recentCheckIns.map((checkIn) => (
+                                        <div
+                                            key={checkIn.id}
+                                            className="flex items-start justify-between gap-3 rounded-lg border p-3"
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="truncate font-medium">
+                                                    {checkIn.user_name ??
+                                                        'Deleted user'}
+                                                </p>
+                                                {checkIn.employee_code && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {
+                                                            checkIn.employee_code
+                                                        }
+                                                    </p>
+                                                )}
+                                                <div className="mt-1">
+                                                    <StatusBadge
+                                                        value={
+                                                            checkIn.entry_type
+                                                        }
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p className="shrink-0 text-right text-xs text-muted-foreground">
+                                                {formatAttendanceDateTime(
+                                                    checkIn.recorded_at,
+                                                )}
+                                            </p>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <EmptyState
+                                        icon={Camera}
+                                        title="No check-ins yet"
+                                    />
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             )}
         </div>

@@ -20,7 +20,7 @@ export default function QrAttendance({ recentCheckIns }: Props) {
                 recentCheckInsTitle="Your recent check-ins"
                 recentCheckInsDescription="Your latest attendance records."
                 layout="wide"
-                showSidebar={false}
+                showTips={false}
             />
         </>
     );
