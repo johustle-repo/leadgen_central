@@ -1,5 +1,16 @@
 import { useForm } from '@inertiajs/react';
-import { Camera, ImageUp, LogIn, LogOut, RotateCcw, Send, Video, VideoOff } from 'lucide-react';
+import {
+    Camera,
+    History,
+    ImageUp,
+    ListChecks,
+    LogIn,
+    LogOut,
+    RotateCcw,
+    Send,
+    Video,
+    VideoOff,
+} from 'lucide-react';
 import QrScanner from 'qr-scanner';
 import { useEffect, useRef, useState } from 'react';
 import { EmptyState } from '@/components/empty-state';
@@ -238,11 +249,16 @@ export function AttendanceQrScanner({
         >
             <Card>
                 <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0">
-                    <div>
-                        <CardTitle>Open the camera and scan</CardTitle>
-                        <CardDescription>
-                            Live camera / image upload / manual entry.
-                        </CardDescription>
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                            <Camera className="size-5" />
+                        </div>
+                        <div>
+                            <CardTitle>Open the camera and scan</CardTitle>
+                            <CardDescription>
+                                Live camera / image upload / manual entry.
+                            </CardDescription>
+                        </div>
                     </div>
                     {headerStat && (
                         <div className="rounded-lg border bg-muted/30 px-3 py-1.5 text-right">
@@ -258,7 +274,7 @@ export function AttendanceQrScanner({
                 <CardContent
                     className={cn(
                         'grid gap-6',
-                        layout === 'wide' && 'md:grid-cols-2',
+                        layout === 'wide' && 'md:grid-cols-[3fr_2fr]',
                     )}
                 >
                     <div className="grid gap-4">
@@ -266,7 +282,7 @@ export function AttendanceQrScanner({
                             Camera
                         </p>
 
-                        <div className="mx-auto w-full max-w-72 overflow-hidden rounded-lg border bg-muted/30">
+                        <div className="mx-auto w-full max-w-md overflow-hidden rounded-lg border bg-muted/30">
                             <video
                                 ref={videoRef}
                                 className="aspect-square w-full object-cover"
@@ -302,6 +318,7 @@ export function AttendanceQrScanner({
                                 onClick={() => void refreshCameras()}
                             >
                                 <RotateCcw />
+                                Refresh
                             </Button>
                             <Button
                                 type="button"
@@ -440,7 +457,12 @@ export function AttendanceQrScanner({
             <div className="grid gap-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Better scanning flow</CardTitle>
+                        <div className="flex items-center gap-3">
+                            <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                <ListChecks className="size-5" />
+                            </div>
+                            <CardTitle>Better scanning flow</CardTitle>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <ol className="list-decimal space-y-2 pl-4 text-sm text-muted-foreground">
@@ -462,10 +484,17 @@ export function AttendanceQrScanner({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>{recentCheckInsTitle}</CardTitle>
-                        <CardDescription>
-                            {recentCheckInsDescription}
-                        </CardDescription>
+                        <div className="flex items-center gap-3">
+                            <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                <History className="size-5" />
+                            </div>
+                            <div>
+                                <CardTitle>{recentCheckInsTitle}</CardTitle>
+                                <CardDescription>
+                                    {recentCheckInsDescription}
+                                </CardDescription>
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="grid gap-3">
                         {recentCheckIns.length ? (
