@@ -5,9 +5,7 @@ import {
     CalendarRange,
     Database,
     FileWarning,
-    MailCheck,
     ShieldAlert,
-    Sparkles,
     Target,
     TrendingUp,
 } from 'lucide-react';
@@ -136,18 +134,8 @@ export default function Dashboard({
             icon: FileWarning,
             tone: 'text-destructive',
         },
-        {
-            label: 'Unread replies',
-            value: stats.unread_replies ?? 0,
-            icon: MailCheck,
-            tone: 'text-chart-4',
-        },
-        {
-            label: 'Possible leads from replies',
-            value: stats.possible_reply_leads ?? 0,
-            icon: Sparkles,
-            tone: 'text-chart-5',
-        },
+        // Unread replies / possible leads from replies are hidden for now
+        // along with the rest of the Email Replies feature.
     ];
 
     return (
@@ -261,9 +249,9 @@ export default function Dashboard({
 
                 <section className="flex flex-col gap-3">
                     <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                        Data health &amp; inbox
+                        Data health
                     </h2>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
                         {healthMetrics.map((metric) => (
                             <StatTile
                                 key={metric.label}

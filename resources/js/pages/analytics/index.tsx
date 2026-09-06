@@ -4,7 +4,6 @@ import {
     Download,
     FileSpreadsheet,
     FileText,
-    MailCheck,
     ShieldAlert,
     SlidersHorizontal,
     Target,
@@ -516,26 +515,14 @@ export default function Analytics({
             tone: 'text-chart-3',
         },
         {
-            label: 'Email replies',
-            value: summary.replies,
-            detail: <Change value={summary.reply_change} />,
-            icon: MailCheck,
-            tone: 'text-chart-2',
-        },
-        {
             label: 'Reply rate',
             value: `${summary.reply_rate}%`,
             detail: `${summary.replied_leads} unique leads replied`,
             icon: BarChart3,
             tone: 'text-chart-1',
         },
-        {
-            label: 'Interested replies',
-            value: summary.interested_replies,
-            detail: 'Interested or possible lead',
-            icon: TrendingUp,
-            tone: 'text-chart-3',
-        },
+        // Email replies / Interested replies are hidden for now along with
+        // the rest of the Email Replies feature.
         {
             label: 'Duplicates flagged',
             value: summary.duplicates,
@@ -701,7 +688,7 @@ export default function Analytics({
                     </div>
                 </FilterBar>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {metrics.map((metric) => (
                         <StatTile
                             key={metric.label}

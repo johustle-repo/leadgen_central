@@ -1,7 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Download,
-    Mail,
     Pencil,
     Plus,
     Search,
@@ -413,7 +412,6 @@ export default function LeadsIndex({
                                 <TableHead>Owner</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Source</TableHead>
-                                <TableHead>Replies</TableHead>
                                 <TableHead align="right">Action</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -472,23 +470,6 @@ export default function LeadsIndex({
                                     </TableCell>
                                     <TableCell className="capitalize">
                                         {lead.source}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Mail className="size-4 text-muted-foreground" />
-                                            <span className="font-medium">
-                                                {lead.email_replies_count}
-                                            </span>
-                                            {lead.unread_email_replies_count >
-                                                0 && (
-                                                <span className="rounded-full bg-info/15 px-2 py-0.5 text-xs font-semibold text-info">
-                                                    {
-                                                        lead.unread_email_replies_count
-                                                    }{' '}
-                                                    new
-                                                </span>
-                                            )}
-                                        </div>
                                     </TableCell>
                                     <TableCell align="right">
                                         <div className="flex justify-end gap-2">
