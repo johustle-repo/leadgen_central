@@ -472,7 +472,6 @@ export default function Analytics({
     leadStatuses,
     sources,
     countries,
-    replyClassifications,
     agentPerformance,
     funnel,
     funnelExcluded,
@@ -802,11 +801,8 @@ export default function Analytics({
                         items={leadStatuses}
                         color="var(--color-chart-3)"
                     />
-                    <Breakdown
-                        title="Reply classification"
-                        items={replyClassifications}
-                        color="var(--color-chart-5)"
-                    />
+                    {/* Reply classification (interested/bounce/etc.) is
+                        hidden for now along with the Email Replies feature. */}
                     <Breakdown
                         title="Lead sources"
                         items={sources}

@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { usePage, usePoll } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import {
     CopyCheck,
     CalendarClock,
@@ -7,7 +7,6 @@ import {
     ClipboardList,
     FileClock,
     LayoutGrid,
-    MailSearch,
     QrCode,
     ShieldCheck,
     Upload,
@@ -36,7 +35,6 @@ import {
 } from '@/routes/attendance';
 import { index as auditLogIndex } from '@/routes/audit-logs';
 import { index as duplicateIndex } from '@/routes/duplicates';
-import { index as emailReplyIndex } from '@/routes/email-replies';
 import { index as leadIndex } from '@/routes/leads';
 import { create as uploadCreate, index as uploadIndex } from '@/routes/uploads';
 import { index as userIndex } from '@/routes/users';
@@ -45,12 +43,7 @@ import type { NavItem } from '@/types';
 import type { Auth } from '@/types';
 
 export function AppSidebar() {
-    usePoll(60000, { only: ['notificationCounts'] });
-
-    const { auth, notificationCounts } = usePage<{
-        auth: Auth;
-        notificationCounts: { unread_email_replies: number };
-    }>().props;
+    const { auth } = usePage<{ auth: Auth }>().props;
     const mainNavItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
         {
@@ -59,12 +52,8 @@ export function AppSidebar() {
             icon: ChartNoAxesCombined,
         },
         { title: 'Leads', href: leadIndex(), icon: Waypoints },
-        {
-            title: 'Email Replies',
-            href: emailReplyIndex(),
-            icon: MailSearch,
-            badge: notificationCounts.unread_email_replies,
-        },
+        // Email Replies is hidden from navigation for now; the route and
+        // page still work, they're just not linked here.
         { title: 'Upload Leads', href: uploadCreate(), icon: Upload },
         { title: 'Upload History', href: uploadIndex(), icon: FileClock },
     ];
