@@ -2,7 +2,9 @@
 
 use App\Models\EmailReply;
 use App\Models\Lead;
+use App\Models\UploadBatch;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('allows administrators to create users', function () {
@@ -63,6 +65,49 @@ it('shows each users total leads and replies', function () {
         ->where('users.data.0.id', $agent->id)
         ->where('users.data.0.leads_count', 3)
         ->where('users.data.0.email_replies_count', 2));
+});
+
+it('lets a super administrator clear an agents leads and completed upload history', function () {
+    Storage::fake('local');
+    Storage::disk('local')->put('lead-imports/agent-file.csv', 'Company Name\nAcme');
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $agent = User::factory()->create();
+    $leads = Lead::factory(3)->for($agent, 'agent')->create();
+    $completedBatch = UploadBatch::factory()->for($agent)->create(['stored_filename' => 'lead-imports/agent-file.csv', 'processing_status' => 'completed']);
+    $pendingBatch = UploadBatch::factory()->for($agent)->create(['processing_status' => 'pending']);
+
+    $response = $this->actingAs($superAdministrator)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->delete(route('users.records.clear', $agent));
+
+    $response->assertRedirect()->assertSessionHas('toast.message', "Cleared 3 lead(s) and 1 upload record(s) for {$agent->name}.");
+    foreach ($leads as $lead) {
+        $this->assertSoftDeleted($lead);
+    }
+    $this->assertModelMissing($completedBatch);
+    Storage::disk('local')->assertMissing('lead-imports/agent-file.csv');
+    $this->assertDatabaseHas('upload_batches', ['id' => $pendingBatch->id]);
+    $this->assertDatabaseHas('audit_logs', ['user_id' => $superAdministrator->id, 'action' => 'agent.records_cleared', 'auditable_id' => $agent->id]);
+    expect($agent->fresh())->not->toBeNull();
+});
+
+it('forbids an administrator from clearing an agents records', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create();
+
+    $this->actingAs($administrator)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->delete(route('users.records.clear', $agent))
+        ->assertForbidden();
+});
+
+it('forbids a super administrator from clearing their own records', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+
+    $this->actingAs($superAdministrator)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->delete(route('users.records.clear', $superAdministrator))
+        ->assertForbidden();
 });
 
 it('forbids agents from user management', function () {

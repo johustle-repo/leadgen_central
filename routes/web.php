@@ -67,6 +67,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::resource('users', UserController::class);
     Route::patch('users/{user}/email-sequence', [EmailSequenceController::class, 'toggleForUser'])->name('users.email-sequence.toggle');
     Route::post('users/{user}/impersonate', [ImpersonationController::class, 'store'])->name('users.impersonate');
+    Route::delete('users/{user}/records', [UserController::class, 'clearRecords'])->middleware('password.confirm')->name('users.records.clear');
     Route::delete('impersonate', [ImpersonationController::class, 'destroy'])->name('impersonate.stop');
     Route::get('system-settings', [SystemSettingController::class, 'edit'])->name('system-settings.edit');
     Route::put('system-settings', [SystemSettingController::class, 'update'])->middleware(['can:manage-settings', 'password.confirm'])->name('system-settings.update');

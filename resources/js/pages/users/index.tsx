@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Crown,
+    Eraser,
     Pencil,
     Plus,
     Search,
@@ -45,6 +46,7 @@ import { create, destroy, edit, impersonate, index } from '@/routes/users';
 
 const ALL_ROLES = '__all__';
 import { toggle } from '@/routes/users/email-sequence';
+import { clear as clearRecords } from '@/routes/users/records';
 type User = {
     id: number;
     name: string;
@@ -55,9 +57,11 @@ type User = {
     created_at: string;
     leads_count: number;
     email_replies_count: number;
+    upload_batches_count: number;
     email_sequence_enabled: boolean;
     can_delete: boolean;
     can_impersonate: boolean;
+    can_clear_records: boolean;
 };
 export default function UsersIndex({
     users,
@@ -307,6 +311,67 @@ export default function UsersIndex({
                                                                 <UserRoundCog />
                                                                 Log in as{' '}
                                                                 {user.name}
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                            {user.can_clear_records && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/15 hover:text-rose-800 dark:text-rose-300 dark:hover:text-rose-200"
+                                                        >
+                                                            <Eraser />
+                                                            Clear records
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogTitle>
+                                                            Clear {user.name}
+                                                            &apos;s records?
+                                                        </DialogTitle>
+                                                        <DialogDescription>
+                                                            This deletes all{' '}
+                                                            {user.leads_count.toLocaleString()}{' '}
+                                                            lead(s) and{' '}
+                                                            {user.upload_batches_count.toLocaleString()}{' '}
+                                                            upload record(s)
+                                                            (including the raw
+                                                            files) owned by{' '}
+                                                            {user.name}. The
+                                                            upload history
+                                                            cannot be recovered
+                                                            afterward. Their
+                                                            user account is not
+                                                            affected.
+                                                        </DialogDescription>
+                                                        <DialogFooter>
+                                                            <DialogClose
+                                                                asChild
+                                                            >
+                                                                <Button variant="secondary">
+                                                                    Cancel
+                                                                </Button>
+                                                            </DialogClose>
+                                                            <Button
+                                                                type="button"
+                                                                variant="destructive"
+                                                                onClick={() =>
+                                                                    router.delete(
+                                                                        clearRecords.url(
+                                                                            user.id,
+                                                                        ),
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                Clear records
                                                             </Button>
                                                         </DialogFooter>
                                                     </DialogContent>

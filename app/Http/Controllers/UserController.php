@@ -6,6 +6,7 @@ use App\AccountStatus;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
+use App\Services\AgentRecordsCleaner;
 use App\UserRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class UserController extends Controller
             ->select(['id', 'name', 'email', 'role', 'team', 'status', 'created_at'])
             ->where('role', '!=', UserRole::SuperAdministrator)
             ->with(['emailSequences:id,user_id,is_active'])
-            ->withCount(['leads', 'emailReplies']);
+            ->withCount(['leads', 'emailReplies', 'uploadBatches']);
         if ($search = $request->string('search')->trim()->toString()) {
             $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
         }
@@ -40,11 +41,13 @@ class UserController extends Controller
             ...$user->only(['id', 'name', 'email', 'role', 'team', 'status', 'created_at']),
             'leads_count' => $user->leads_count,
             'email_replies_count' => $user->email_replies_count,
+            'upload_batches_count' => $user->upload_batches_count,
             'email_sequence_enabled' => $user->emailSequences->isEmpty()
                 ? true
                 : $user->emailSequences->first()->is_active,
             'can_delete' => $request->user()->can('delete', $user),
             'can_impersonate' => $request->user()->can('impersonate', $user),
+            'can_clear_records' => $request->user()->can('clearRecords', $user),
         ]);
 
         return Inertia::render('users/index', ['users' => $users, 'filters' => $request->only(['search', 'role', 'status'])]);
@@ -118,5 +121,19 @@ class UserController extends Controller
         $user->delete();
 
         return redirect()->route('users.index')->with('toast', ['type' => 'success', 'message' => "{$user->name} was deleted successfully."]);
+    }
+
+    /**
+     * Wipe a user's leads and upload history without deleting their account.
+     */
+    public function clearRecords(Request $request, User $user, AgentRecordsCleaner $cleaner): RedirectResponse
+    {
+        Gate::authorize('clearRecords', $user);
+        $result = $cleaner->clear($user, $request->user(), $request->ip(), $request->userAgent());
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'message' => "Cleared {$result['leads']} lead(s) and {$result['uploads']} upload record(s) for {$user->name}.",
+        ]);
     }
 }

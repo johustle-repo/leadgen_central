@@ -67,6 +67,17 @@ class UserPolicy
     }
 
     /**
+     * Determine whether the user can wipe the model's leads and upload
+     * history. Exclusive to Super Administrators, and never against
+     * themselves - the data loss here is largely irreversible (upload
+     * history and its files are hard-deleted).
+     */
+    public function clearRecords(User $user, User $model): bool
+    {
+        return $user->isSuperAdministrator() && ! $user->is($model);
+    }
+
+    /**
      * Determine whether the user can log in as the model.
      *
      * Exclusive to Super Administrators. They cannot impersonate themselves,
