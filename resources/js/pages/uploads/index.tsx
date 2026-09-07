@@ -469,67 +469,65 @@ export default function UploadIndex({
                                                 </Button>
                                             )}
                                             {batch.processing_status ===
-                                                'completed' &&
-                                                batch.duplicate_rows > 0 && (
-                                                    <Dialog>
-                                                        <DialogTrigger asChild>
+                                                'completed' && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                                                        >
+                                                            <RotateCcw />
+                                                            Re-analyze
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogTitle>
+                                                            Re-analyze this
+                                                            upload?
+                                                        </DialogTitle>
+                                                        <DialogDescription>
+                                                            {
+                                                                batch.duplicate_rows
+                                                            }{' '}
+                                                            duplicate row
+                                                            {batch.duplicate_rows ===
+                                                            1
+                                                                ? ''
+                                                                : 's'}{' '}
+                                                            will be re-checked
+                                                            using the latest
+                                                            rules.
+                                                        </DialogDescription>
+                                                        <DialogFooter>
+                                                            <DialogClose
+                                                                asChild
+                                                            >
+                                                                <Button variant="secondary">
+                                                                    Cancel
+                                                                </Button>
+                                                            </DialogClose>
                                                             <Button
                                                                 type="button"
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                                                                onClick={() =>
+                                                                    router.post(
+                                                                        reanalyze(
+                                                                            batch.id,
+                                                                        ),
+                                                                        {},
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    )
+                                                                }
                                                             >
-                                                                <RotateCcw />
                                                                 Re-analyze
                                                             </Button>
-                                                        </DialogTrigger>
-                                                        <DialogContent>
-                                                            <DialogTitle>
-                                                                Re-analyze this
-                                                                upload?
-                                                            </DialogTitle>
-                                                            <DialogDescription>
-                                                                {
-                                                                    batch.duplicate_rows
-                                                                }{' '}
-                                                                duplicate row
-                                                                {batch.duplicate_rows ===
-                                                                1
-                                                                    ? ''
-                                                                    : 's'}{' '}
-                                                                will be
-                                                                re-checked using
-                                                                the latest
-                                                                rules.
-                                                            </DialogDescription>
-                                                            <DialogFooter>
-                                                                <DialogClose
-                                                                    asChild
-                                                                >
-                                                                    <Button variant="secondary">
-                                                                        Cancel
-                                                                    </Button>
-                                                                </DialogClose>
-                                                                <Button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        router.post(
-                                                                            reanalyze(
-                                                                                batch.id,
-                                                                            ),
-                                                                            {},
-                                                                            {
-                                                                                preserveScroll: true,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Re-analyze
-                                                                </Button>
-                                                            </DialogFooter>
-                                                        </DialogContent>
-                                                    </Dialog>
-                                                )}
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
                                             {isAdministrator &&
                                                 [
                                                     'completed',
