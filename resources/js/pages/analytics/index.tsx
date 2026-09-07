@@ -198,16 +198,18 @@ function Breakdown({
     title,
     items,
     color,
+    className,
 }: {
     title: string;
     items: Distribution[];
     color: string;
+    className?: string;
 }) {
     const maximum = Math.max(...items.map((item) => item.value), 1);
     const total = items.reduce((sum, item) => sum + item.value, 0);
 
     return (
-        <Card>
+        <Card className={className}>
             <CardHeader className="flex-row items-center justify-between">
                 <CardTitle>{title}</CardTitle>
                 <span className="text-xs text-muted-foreground">
@@ -711,9 +713,7 @@ export default function Analytics({
                     </div>
                 </FilterBar>
 
-                <div
-                    className={`grid gap-4 sm:grid-cols-2 ${canViewReplies ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}
-                >
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {metrics.map((metric) => (
                         <StatTile
                             key={metric.label}
@@ -830,14 +830,15 @@ export default function Analytics({
                         />
                     )}
                     <Breakdown
-                        title="Lead sources"
-                        items={sources}
-                        color="var(--color-chart-1)"
-                    />
-                    <Breakdown
                         title="Top countries"
                         items={countries}
                         color="var(--color-chart-2)"
+                    />
+                    <Breakdown
+                        title="Lead sources"
+                        items={sources}
+                        color="var(--color-chart-1)"
+                        className="xl:col-span-2"
                     />
                 </div>
 
