@@ -84,7 +84,7 @@ export default function VerificationIndex({
 
     return (
         <>
-            <Head title="Verification" />
+            <Head title="Lead Verification" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <HeaderActionsPortal>
                     <Button asChild size="sm">
@@ -283,5 +283,5 @@ export default function VerificationIndex({
     );
 }
 VerificationIndex.layout = {
-    breadcrumbs: [{ title: 'Verification', href: index() }],
+    breadcrumbs: [{ title: 'Lead Verification', href: index() }],
 };

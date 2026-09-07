@@ -2,6 +2,7 @@ import { Form, Head, Link } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
+    ClipboardCopy,
     Download,
     FileText,
     History,
@@ -11,6 +12,7 @@ import {
     Trash2,
     Upload,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { HeaderActionsPortal } from '@/components/header-actions';
 import InputError from '@/components/input-error';
 import { StatusBadge } from '@/components/status-badge';
@@ -119,11 +121,42 @@ export default function VerificationShow({
     nextId: number | null;
     reviewers: User[];
 }) {
+    const copyDetails = async () => {
+        const field = (name: string) => {
+            const value = lead[name];
+
+            return value === null || value === undefined ? '' : String(value);
+        };
+        const details = [
+            `Name of Contact: ${field('contact_person')}`,
+            `email: ${field('email')}`,
+            `Company Name: ${field('company_name')}`,
+            `Website: ${field('website')}`,
+            `Country: ${field('country')}`,
+            `City/Capital: ${field('raw_city') || field('city')}`,
+            `Import Trades: ${field('import_trades')}`,
+            `LinkedIn: ${field('linkedin_url')}`,
+            `Source of Leads: ${field('data_source')}`,
+            `Source Link: ${field('source_url')}`,
+        ].join('\n');
+
+        try {
+            await navigator.clipboard.writeText(details);
+            toast.success('Contact details copied to clipboard.');
+        } catch {
+            toast.error('Could not copy details. Please try again.');
+        }
+    };
+
     return (
         <>
             <Head title={`Verify ${lead.company_name}`} />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <HeaderActionsPortal>
+                    <Button size="sm" onClick={copyDetails}>
+                        <ClipboardCopy />
+                        Copy details
+                    </Button>
                     <Button asChild variant="outline" size="sm">
                         <Link href={index()}>Queue</Link>
                     </Button>
@@ -616,5 +649,5 @@ export default function VerificationShow({
     );
 }
 VerificationShow.layout = {
-    breadcrumbs: [{ title: 'Verification', href: index() }],
+    breadcrumbs: [{ title: 'Lead Verification', href: index() }],
 };

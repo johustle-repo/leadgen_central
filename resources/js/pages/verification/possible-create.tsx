@@ -319,7 +319,7 @@ export default function PossibleLeadCreate({
 
 PossibleLeadCreate.layout = {
     breadcrumbs: [
-        { title: 'Verification', href: index() },
+        { title: 'Lead Verification', href: index() },
         { title: 'Add Possible Lead', href: possibleLeads.create() },
     ],
 };

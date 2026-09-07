@@ -79,7 +79,7 @@ export function AppSidebar() {
     if (auth.user.role !== 'agent') {
         mainNavItems.push(
             {
-                title: 'Verification',
+                title: 'Lead Verification',
                 href: verificationIndex(),
                 icon: ShieldCheck,
             },
