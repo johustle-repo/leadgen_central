@@ -1,6 +1,6 @@
 import { Form, Head } from '@inertiajs/react';
 import { FileText, UserRound } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -20,9 +20,87 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { index, store, update } from '@/routes/leads';
+import { companyContactCount, index, store, update } from '@/routes/leads';
 
 const NO_DATA_SOURCE = '__none__';
+
+function CompanyField({
+    defaultValue,
+    agentId,
+}: {
+    defaultValue: string;
+    agentId: string;
+}) {
+    const [company, setCompany] = useState(defaultValue);
+    const [result, setResult] = useState<{
+        company: string;
+        agentId: string;
+        count: number | null;
+    } | null>(null);
+    useEffect(() => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => {
+            fetch(
+                companyContactCount.url({
+                    query: { company_name: company, agent_id: agentId },
+                }),
+                {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                },
+            )
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error('Count unavailable');
+                    }
+
+                    return response.json();
+                })
+                .then(({ count }: { count: number }) =>
+                    setResult({ company, agentId, count }),
+                )
+                .catch(() => {
+                    if (!controller.signal.aborted) {
+                        setResult({ company, agentId, count: null });
+                    }
+                });
+        }, 250);
+
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [company, agentId]);
+    const count =
+        result?.company === company && result.agentId === agentId
+            ? result.count
+            : undefined;
+
+    return (
+        <>
+            <div className="flex items-center gap-2">
+                <Label htmlFor="company_name">Company *</Label>
+                <span className="text-xs text-muted-foreground" role="status">
+                    (
+                    {count === undefined
+                        ? 'Loading contacts…'
+                        : count === null
+                          ? 'Count unavailable'
+                          : `${count} ${count === 1 ? 'contact' : 'contacts'}`}
+                    )
+                </span>
+            </div>
+            <Input
+                id="company_name"
+                name="company_name"
+                required
+                defaultValue={defaultValue}
+                onChange={(event) => setCompany(event.target.value)}
+                className="mt-2"
+            />
+        </>
+    );
+}
 
 function DataSourceSelect({
     id,
@@ -96,6 +174,9 @@ export default function LeadForm({
     agents: Array<{ id: number; name: string }>;
 }) {
     const form = lead ? update.form(lead.id) : store.form();
+    const [selectedAgent, setSelectedAgent] = useState(
+        String(lead?.agent_id ?? defaults.agent_id ?? agents[0]?.id ?? ''),
+    );
 
     return (
         <>
@@ -150,6 +231,7 @@ export default function LeadForm({
                                         <Label htmlFor="agent_id">Agent</Label>
                                         <Select
                                             name="agent_id"
+                                            onValueChange={setSelectedAgent}
                                             defaultValue={String(
                                                 lead?.agent_id ??
                                                     defaults.agent_id ??
@@ -212,14 +294,27 @@ export default function LeadForm({
                                                             : ''
                                                     }
                                                 >
-                                                    <Label htmlFor={field.name}>
-                                                        {field.label}
-                                                        {field.required
-                                                            ? ' *'
-                                                            : ''}
-                                                    </Label>
+                                                    {field.name !==
+                                                        'company_name' && (
+                                                        <Label
+                                                            htmlFor={field.name}
+                                                        >
+                                                            {field.label}
+                                                            {field.required
+                                                                ? ' *'
+                                                                : ''}
+                                                        </Label>
+                                                    )}
                                                     {field.name ===
-                                                    'data_source' ? (
+                                                    'company_name' ? (
+                                                        <CompanyField
+                                                            defaultValue={value}
+                                                            agentId={
+                                                                selectedAgent
+                                                            }
+                                                        />
+                                                    ) : field.name ===
+                                                      'data_source' ? (
                                                         <DataSourceSelect
                                                             id={field.name}
                                                             name={field.name}

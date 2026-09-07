@@ -13,11 +13,14 @@ use App\Models\User;
 use App\Services\CsvCellSanitizer;
 use App\Services\LeadBulkDeletion;
 use App\Services\LeadCreator;
+use App\Services\LeadNormalizationService;
 use App\Services\TimezoneReferenceResolver;
 use App\UserRole;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,6 +28,20 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LeadController extends Controller
 {
+    public function companyContactCount(Request $request, LeadNormalizationService $normalizer): JsonResponse
+    {
+        Gate::authorize('viewAny', Lead::class);
+        $company = $normalizer->normalize(['company_name' => $request->string('company_name')->toString()]);
+        $agentId = $request->user()->canViewAllLeads()
+            ? $request->integer('agent_id', $request->user()->id)
+            : $request->user()->id;
+
+        return response()->json(['count' => $company['normalized_company_name'] === '' ? 0 : Lead::query()
+            ->where('agent_id', $agentId)
+            ->where('normalized_company_name', $company['normalized_company_name'])
+            ->count()]);
+    }
+
     /**
      * Download authorized leads from the selected date range in the raw file format.
      */
@@ -142,6 +159,11 @@ class LeadController extends Controller
             $query->orderBy("leads.{$sort}", $direction);
         }
 
+        $query->addSelect(['company_contact_count' => DB::table('leads as company_contacts')
+            ->selectRaw('count(*)')
+            ->whereColumn('company_contacts.agent_id', 'leads.agent_id')
+            ->whereColumn('company_contacts.normalized_company_name', 'leads.normalized_company_name')
+            ->whereNull('company_contacts.deleted_at')]);
         $leads = $query->paginate($perPage)->withQueryString();
         $leads->through(fn (Lead $lead): array => [
             ...$lead->toArray(),

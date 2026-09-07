@@ -36,6 +36,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::get('leads/raw.csv', [LeadController::class, 'downloadRaw'])->middleware('throttle:data-exports')->name('leads.download-raw');
     Route::get('leads/cleaned.csv', [LeadController::class, 'downloadCleaned'])->middleware('throttle:data-exports')->name('leads.download-cleaned');
     Route::delete('leads/bulk', [LeadController::class, 'bulkDestroy'])->name('leads.bulk-destroy');
+    Route::get('leads/company-contact-count', [LeadController::class, 'companyContactCount'])->name('leads.company-contact-count');
     Route::resource('leads', LeadController::class);
     Route::get('uploads', [UploadBatchController::class, 'index'])->name('uploads.index');
     Route::get('uploads/create', [UploadBatchController::class, 'create'])->name('uploads.create');

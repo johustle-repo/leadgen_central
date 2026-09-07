@@ -5,6 +5,47 @@ use App\Models\Lead;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
+it('counts company contacts for the current agent using normalized names and excluding archived leads', function () {
+    $agent = User::factory()->create();
+    $otherAgent = User::factory()->create();
+    Lead::factory()->count(2)->for($agent, 'agent')->create(['normalized_company_name' => 'acme ventures']);
+    Lead::factory()->for($otherAgent, 'agent')->create(['normalized_company_name' => 'acme ventures']);
+    Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'acme ventures', 'deleted_at' => now()]);
+    Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'other company']);
+
+    $this->actingAs($agent)->getJson(route('leads.company-contact-count', ['company_name' => ' ACME   Ventures! ', 'agent_id' => $otherAgent->id]))
+        ->assertJson(['count' => 2]);
+});
+
+it('returns zero contacts for a new or empty company', function (string $company) {
+    $this->actingAs(User::factory()->create())
+        ->getJson(route('leads.company-contact-count', ['company_name' => $company]))
+        ->assertJson(['count' => 0]);
+})->with(['New Company', '']);
+
+it('requires authentication to count company contacts', function () {
+    $this->getJson(route('leads.company-contact-count'))->assertUnauthorized();
+});
+
+it('lets administrators count contacts for the selected lead owner', function () {
+    $agent = User::factory()->create();
+    Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'acme']);
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->getJson(route('leads.company-contact-count', ['company_name' => 'Acme', 'agent_id' => $agent->id]))
+        ->assertJson(['count' => 1]);
+});
+
+it('includes contacts outside the current list filter in the company count', function () {
+    $agent = User::factory()->create();
+    Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'acme', 'lead_date' => '2026-09-07']);
+    Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'acme', 'lead_date' => '2026-09-06']);
+    Lead::factory()->create(['normalized_company_name' => 'acme']);
+
+    $this->actingAs($agent)->get(route('leads.index', ['date' => '2026-09-07']))
+        ->assertInertia(fn (Assert $page) => $page->has('leads.data', 1)->where('leads.data.0.company_contact_count', 2));
+});
+
 it('creates a manual lead owned by the authenticated agent', function () {
     $agent = User::factory()->create();
     $response = $this->actingAs($agent)->post(route('leads.store'), ['lead_date' => '2026-08-25', 'company_name' => 'Acme Ventures', 'website' => 'acme.test', 'contact_person' => 'Ada', 'email' => 'hello@acme.test', 'country_code' => 'us', 'city' => 'Austin', 'import_trades' => 'Machinery', 'linkedin_url' => 'https://linkedin.com/company/acme', 'data_source' => 'Tendata/Lusha', 'source_url' => 'https://example.com/acme']);
@@ -14,6 +55,7 @@ it('creates a manual lead owned by the authenticated agent', function () {
     ]);
     $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'lead_date' => '2026-08-25 00:00:00', 'company_name' => 'Acme Ventures', 'contact_person' => 'Ada', 'country_code' => 'US', 'city' => 'Austin', 'import_trades' => 'Machinery', 'data_source' => 'Tendata/Lusha', 'source_url' => 'https://example.com/acme', 'source' => 'manual', 'created_by' => $agent->id]);
     expect(Lead::firstOrFail()->lead_code)->toStartWith('LD-');
+    $this->getJson(route('leads.company-contact-count', ['company_name' => 'Acme Ventures']))->assertJson(['count' => 1]);
 });
 
 it('normalizes manually entered contact names to title case', function (string $contactName) {

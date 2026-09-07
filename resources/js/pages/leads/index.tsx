@@ -55,6 +55,7 @@ type Lead = {
     id: number;
     lead_code: string;
     company_name: string;
+    company_contact_count: number;
     city: string | null;
     country: string | null;
     contact_person: string | null;
@@ -448,6 +449,13 @@ export default function LeadsIndex({
                                         >
                                             {lead.company_name}
                                         </Link>
+                                        <span className="ml-2 text-xs text-muted-foreground">
+                                            ({lead.company_contact_count}{' '}
+                                            {lead.company_contact_count === 1
+                                                ? 'contact'
+                                                : 'contacts'}
+                                            )
+                                        </span>
                                         <div className="text-xs text-muted-foreground">
                                             {lead.website_domain ||
                                                 lead.lead_code}
