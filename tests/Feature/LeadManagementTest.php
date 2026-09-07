@@ -5,6 +5,36 @@ use App\Models\Lead;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
+it('loads the displayed company count with the create and edit forms', function () {
+    $agent = User::factory()->create();
+    $leads = Lead::factory()->count(2)->for($agent, 'agent')->create([
+        'company_name' => 'Acme Ventures', 'normalized_company_name' => 'acme ventures',
+    ]);
+    Lead::factory()->create(['normalized_company_name' => 'acme ventures']);
+
+    $this->actingAs($agent)->get(route('leads.create'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('companyContactCount.company', 'Acme Ventures')
+            ->where('companyContactCount.count', 2));
+    $this->get(route('leads.edit', $leads->first()))
+        ->assertInertia(fn (Assert $page) => $page->where('companyContactCount.count', 2));
+});
+
+it('refreshes the count from the company currently typed in the form without returning form defaults', function () {
+    $agent = User::factory()->create();
+    $otherAgent = User::factory()->create();
+    Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'new company']);
+    Lead::factory()->for($otherAgent, 'agent')->create(['normalized_company_name' => 'new company']);
+
+    $this->actingAs($agent)->get(route('leads.create', ['company_name' => 'NEW Company', 'agent_id' => $otherAgent->id]), [
+        'X-Inertia-Partial-Component' => 'leads/form',
+        'X-Inertia-Partial-Data' => 'companyContactCount',
+    ])->assertInertia(fn (Assert $page) => $page
+        ->where('companyContactCount.company', 'NEW Company')
+        ->where('companyContactCount.count', 1)
+        ->missing('defaults'));
+});
+
 it('counts company contacts for the current agent using normalized names and excluding archived leads', function () {
     $agent = User::factory()->create();
     $otherAgent = User::factory()->create();

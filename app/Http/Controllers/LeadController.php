@@ -42,6 +42,21 @@ class LeadController extends Controller
             ->count()]);
     }
 
+    /** @return array{company: string, agentId: string, count: int} */
+    private function formCompanyContactCount(Request $request, string $company, ?int $agentId): array
+    {
+        $company = $request->string('company_name', $company)->toString();
+        $agentId = $request->user()->canViewAllLeads()
+            ? $request->integer('agent_id', $agentId ?? $request->user()->id)
+            : $request->user()->id;
+        $normalized = app(LeadNormalizationService::class)->normalize(['company_name' => $company]);
+
+        return ['company' => $company, 'agentId' => (string) $agentId, 'count' => $normalized['normalized_company_name'] === '' ? 0 : Lead::query()
+            ->where('agent_id', $agentId)
+            ->where('normalized_company_name', $normalized['normalized_company_name'])
+            ->count()];
+    }
+
     /**
      * Download authorized leads from the selected date range in the raw file format.
      */
@@ -193,7 +208,7 @@ class LeadController extends Controller
             'linkedin_url' => '',
         ];
 
-        return Inertia::render('leads/form', ['lead' => null, 'defaults' => $defaults, 'formVersion' => $latestLead === null ? 0 : $latestLead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : []]);
+        return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $defaults['company_name'] ?? '', $defaults['agent_id'] ?? null), 'lead' => null, 'defaults' => $defaults, 'formVersion' => $latestLead === null ? 0 : $latestLead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : []]);
     }
 
     /**
@@ -227,7 +242,7 @@ class LeadController extends Controller
     {
         Gate::authorize('update', $lead);
 
-        return Inertia::render('leads/form', ['lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : []]);
+        return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $lead->company_name, $lead->agent_id), 'lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : []]);
     }
 
     /**

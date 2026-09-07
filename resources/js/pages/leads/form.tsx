@@ -1,4 +1,4 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, router } from '@inertiajs/react';
 import { FileText, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -20,61 +20,46 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { companyContactCount, index, store, update } from '@/routes/leads';
+import { index, store, update } from '@/routes/leads';
 
 const NO_DATA_SOURCE = '__none__';
+
+type CompanyContactCount = { company: string; agentId: string; count: number };
 
 function CompanyField({
     defaultValue,
     agentId,
+    result,
 }: {
     defaultValue: string;
     agentId: string;
+    result: CompanyContactCount;
 }) {
     const [company, setCompany] = useState(defaultValue);
-    const [result, setResult] = useState<{
-        company: string;
-        agentId: string;
-        count: number | null;
-    } | null>(null);
+    const ownerId = agentId || result.agentId;
+    const matches = result.company === company && result.agentId === ownerId;
     useEffect(() => {
-        const controller = new AbortController();
-        const timer = setTimeout(() => {
-            fetch(
-                companyContactCount.url({
-                    query: { company_name: company, agent_id: agentId },
-                }),
-                {
-                    headers: { Accept: 'application/json' },
-                    signal: controller.signal,
-                },
-            )
-                .then((response) => {
-                    if (!response.ok) {
-                        throw new Error('Count unavailable');
-                    }
+        if (matches) {
+            return;
+        }
 
-                    return response.json();
-                })
-                .then(({ count }: { count: number }) =>
-                    setResult({ company, agentId, count }),
-                )
-                .catch(() => {
-                    if (!controller.signal.aborted) {
-                        setResult({ company, agentId, count: null });
-                    }
-                });
+        let cancel: (() => void) | undefined;
+        const timer = setTimeout(() => {
+            router.reload({
+                only: ['companyContactCount'],
+                data: { company_name: company, agent_id: ownerId },
+                onCancelToken: (token) => {
+                    cancel = () => token.cancel();
+                },
+            });
         }, 250);
 
         return () => {
             clearTimeout(timer);
-            controller.abort();
+            cancel?.();
         };
-    }, [company, agentId]);
-    const count =
-        result?.company === company && result.agentId === agentId
-            ? result.count
-            : undefined;
+    }, [company, ownerId, matches]);
+    const count = matches ? result.count : undefined;
 
     return (
         <>
@@ -84,9 +69,7 @@ function CompanyField({
                     (
                     {count === undefined
                         ? 'Loading contacts…'
-                        : count === null
-                          ? 'Count unavailable'
-                          : `${count} ${count === 1 ? 'contact' : 'contacts'}`}
+                        : `${count} ${count === 1 ? 'contact' : 'contacts'}`}
                     )
                 </span>
             </div>
@@ -167,10 +150,12 @@ export default function LeadForm({
     defaults,
     formVersion,
     agents,
+    companyContactCount,
 }: {
     lead: Lead | null;
     defaults: Record<string, string | number | null>;
     formVersion: number;
+    companyContactCount: CompanyContactCount;
     agents: Array<{ id: number; name: string }>;
 }) {
     const form = lead ? update.form(lead.id) : store.form();
@@ -308,6 +293,9 @@ export default function LeadForm({
                                                     {field.name ===
                                                     'company_name' ? (
                                                         <CompanyField
+                                                            result={
+                                                                companyContactCount
+                                                            }
                                                             defaultValue={value}
                                                             agentId={
                                                                 selectedAgent
