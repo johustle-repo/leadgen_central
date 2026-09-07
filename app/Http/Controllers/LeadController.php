@@ -104,7 +104,10 @@ class LeadController extends Controller
         Gate::authorize('viewAny', Lead::class);
         $user = $request->user();
         $columns = ['id', 'lead_code', 'agent_id', 'upload_batch_id', 'company_name', 'website', 'website_domain', 'city', 'country', 'country_code', 'contact_person', 'position', 'email', 'phone', 'industry', 'status', 'validation_status', 'source', 'created_at'];
-        $query = Lead::query()->select(array_map(fn (string $column): string => "leads.{$column}", $columns))->with(['agent:id,name', 'uploadBatch:id,batch_code'])->withCount(['emailReplies', 'emailReplies as unread_email_replies_count' => fn ($query) => $query->where('is_read', false)]);
+        $query = Lead::query()->select(array_map(fn (string $column): string => "leads.{$column}", $columns))->with(['agent:id,name', 'uploadBatch:id,batch_code']);
+        if ($user->isSuperAdministrator()) {
+            $query->withCount(['emailReplies', 'emailReplies as unread_email_replies_count' => fn ($query) => $query->where('is_read', false)]);
+        }
         if (! $user->canViewAllLeads()) {
             $query->whereBelongsTo($user, 'agent');
         }

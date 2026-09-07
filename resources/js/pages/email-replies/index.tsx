@@ -10,7 +10,6 @@ import {
     RefreshCw,
     SlidersHorizontal,
     Sparkles,
-    Unplug,
 } from 'lucide-react';
 import { useState } from 'react';
 import { FilterBar } from '@/components/filter-bar';
@@ -19,7 +18,7 @@ import { Pagination } from '@/components/pagination';
 import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
@@ -37,7 +36,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { index, markAllRead, update } from '@/routes/email-replies';
-import { connect, disconnect, sync } from '@/routes/gmail';
+import { syncFor } from '@/routes/gmail';
 
 type Classification =
     | 'bounce'
@@ -74,12 +73,10 @@ type Reply = {
     } | null;
 };
 
-type Props = {
-    replies: {
-        data: Reply[];
-        links: Array<{ url: string | null; label: string; active: boolean }>;
-    };
-    filters: Record<string, string>;
+type AgentGmailConnection = {
+    id: number;
+    name: string;
+    role: string;
     connection: {
         id: number;
         gmail_address: string;
@@ -87,7 +84,16 @@ type Props = {
         last_synced_at: string | null;
         last_error: string | null;
     } | null;
+};
+
+type Props = {
+    replies: {
+        data: Reply[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+    };
+    filters: Record<string, string>;
     summary: { unread: number; possible: number; needs_review: number };
+    agentGmailConnections: AgentGmailConnection[];
 };
 
 const classificationStyles: Record<Classification, string> = {
@@ -140,8 +146,8 @@ const manualClassifications: Classification[] = [
 export default function EmailRepliesIndex({
     replies,
     filters,
-    connection,
     summary,
+    agentGmailConnections,
 }: Props) {
     const ALL_CLASSIFICATIONS = '__all__';
     const [classificationFilter, setClassificationFilter] = useState(
@@ -150,9 +156,10 @@ export default function EmailRepliesIndex({
     const [selectedReplyId, setSelectedReplyId] = useState<number | null>(null);
     const selectedReply =
         replies.data.find((reply) => reply.id === selectedReplyId) ?? null;
+    const [syncingId, setSyncingId] = useState<number | null>(null);
 
     usePoll(30000, {
-        only: ['replies', 'connection', 'summary'],
+        only: ['replies', 'summary'],
     });
 
     const filter = (event: React.FormEvent<HTMLFormElement>) => {
@@ -164,16 +171,18 @@ export default function EmailRepliesIndex({
         );
     };
 
+    const syncAgent = (agentId: number) => {
+        setSyncingId(agentId);
+        router.post(syncFor.url(agentId), undefined, {
+            preserveScroll: true,
+            onFinish: () => setSyncingId(null),
+        });
+    };
+
     return (
         <>
             <Head title="Email Replies" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                {connection?.last_error && (
-                    <p className="text-sm text-destructive">
-                        {connection.last_error}
-                    </p>
-                )}
-
                 <HeaderActionsPortal>
                     <Form {...markAllRead.form()}>
                         {({ processing }) => (
@@ -188,52 +197,6 @@ export default function EmailRepliesIndex({
                             </Button>
                         )}
                     </Form>
-                    {connection ? (
-                        <>
-                            <Form {...sync.form()}>
-                                {({ processing }) => (
-                                    <Button
-                                        type="submit"
-                                        size="sm"
-                                        disabled={processing}
-                                    >
-                                        <RefreshCw
-                                            className={
-                                                processing ? 'animate-spin' : ''
-                                            }
-                                        />
-                                        Sync now
-                                    </Button>
-                                )}
-                            </Form>
-                            <Form {...disconnect.form()}>
-                                {({ processing }) => (
-                                    <Button
-                                        type="submit"
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={processing}
-                                    >
-                                        <Unplug />
-                                        Disconnect
-                                    </Button>
-                                )}
-                            </Form>
-                        </>
-                    ) : (
-                        <Form {...connect.form()}>
-                            {({ processing }) => (
-                                <Button
-                                    type="submit"
-                                    size="sm"
-                                    disabled={processing}
-                                >
-                                    <Mail />
-                                    Connect Gmail
-                                </Button>
-                            )}
-                        </Form>
-                    )}
                 </HeaderActionsPortal>
 
                 <div className="grid gap-4 sm:grid-cols-3">
@@ -256,6 +219,86 @@ export default function EmailRepliesIndex({
                         tone="text-warning"
                     />
                 </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Agent Gmail accounts</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            Each agent connects their own Gmail from their
+                            profile settings. Trigger a re-sync here if a
+                            mailbox looks stale.
+                        </p>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {agentGmailConnections.length ? (
+                            <div className="divide-y">
+                                {agentGmailConnections.map((agent) => (
+                                    <div
+                                        key={agent.id}
+                                        className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-medium">
+                                                {agent.name}
+                                            </p>
+                                            {agent.connection ? (
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    {
+                                                        agent.connection
+                                                            .gmail_address
+                                                    }
+                                                    {agent.connection
+                                                        .last_synced_at
+                                                        ? ` · Last synced ${agent.connection.last_synced_at}`
+                                                        : ' · Not synced yet'}
+                                                </p>
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Gmail not connected
+                                                </p>
+                                            )}
+                                            {agent.connection?.last_error && (
+                                                <p className="mt-0.5 text-xs text-destructive">
+                                                    {
+                                                        agent.connection
+                                                            .last_error
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+                                        {agent.connection && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={
+                                                    syncingId === agent.id
+                                                }
+                                                onClick={() =>
+                                                    syncAgent(agent.id)
+                                                }
+                                            >
+                                                <RefreshCw
+                                                    className={
+                                                        syncingId === agent.id
+                                                            ? 'animate-spin'
+                                                            : ''
+                                                    }
+                                                />
+                                                Sync
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="flex items-center gap-2 px-5 py-8 text-sm text-muted-foreground">
+                                <Mail className="size-4" />
+                                No agents have connected Gmail yet.
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <FilterBar
                     as="form"

@@ -25,13 +25,15 @@
         <tr><td>Leads created</td><td>{{ $data['summary']['total_leads'] }}</td></tr>
         <tr><td>Qualified leads</td><td>{{ $data['summary']['qualified_leads'] }}</td></tr>
         <tr><td>Qualification rate</td><td>{{ $data['summary']['qualification_rate'] }}%</td></tr>
-        <tr><td>Email replies</td><td>{{ $data['summary']['replies'] }}</td></tr>
-        <tr><td>Reply rate</td><td>{{ $data['summary']['reply_rate'] }}%</td></tr>
-        <tr><td>Interested replies</td><td>{{ $data['summary']['interested_replies'] }}</td></tr>
+        @if ($canViewReplies)
+            <tr><td>Email replies</td><td>{{ $data['summary']['replies'] }}</td></tr>
+            <tr><td>Reply rate</td><td>{{ $data['summary']['reply_rate'] }}%</td></tr>
+            <tr><td>Interested replies</td><td>{{ $data['summary']['interested_replies'] }}</td></tr>
+        @endif
         <tr><td>Duplicates flagged</td><td>{{ $data['summary']['duplicates'] }}</td></tr>
     </table>
 
-    @foreach ([['Lead status', $data['leadStatuses']], ['Reply classification', $data['replyClassifications']], ['Lead sources', $data['sources']], ['Top countries', $data['countries']]] as [$title, $items])
+    @foreach ([['Lead status', $data['leadStatuses']], ...($canViewReplies ? [['Reply classification', $data['replyClassifications']]] : []), ['Lead sources', $data['sources']], ['Top countries', $data['countries']]] as [$title, $items])
         <h2>{{ $title }}</h2>
         @if (count($items))
             <table>
@@ -49,8 +51,11 @@
         <h2>Agent performance</h2>
         <table>
             <tr>
-                <th>Agent</th><th>Leads</th><th>Qualified</th><th>Qual. rate</th><th>Replies</th>
-                <th>Interested</th><th>Uploads</th><th>Avg batch</th><th>Dup. rate</th><th>Error rate</th>
+                <th>Agent</th><th>Leads</th><th>Qualified</th><th>Qual. rate</th>
+                @if ($canViewReplies)
+                    <th>Replies</th><th>Interested</th>
+                @endif
+                <th>Uploads</th><th>Avg batch</th><th>Dup. rate</th><th>Error rate</th>
             </tr>
             @foreach ($data['agentPerformance'] as $agent)
                 <tr>
@@ -58,8 +63,10 @@
                     <td>{{ $agent['leads'] }}</td>
                     <td>{{ $agent['qualified'] }}</td>
                     <td>{{ $agent['qualification_rate'] }}%</td>
-                    <td>{{ $agent['replies'] }}</td>
-                    <td>{{ $agent['interested'] }}</td>
+                    @if ($canViewReplies)
+                        <td>{{ $agent['replies'] }}</td>
+                        <td>{{ $agent['interested'] }}</td>
+                    @endif
                     <td>{{ $agent['uploads'] }}</td>
                     <td>{{ $agent['avg_batch_size'] }}</td>
                     <td>{{ $agent['duplicate_rate'] }}%</td>

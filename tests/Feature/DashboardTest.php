@@ -17,6 +17,26 @@ test('authenticated users can visit the dashboard', function () {
     $response = $this->get(route('dashboard'));
     $response->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('dashboard')
+        ->has('stats', 6)
+        ->hasAll([
+            'stats.total_leads',
+            'stats.unique_leads',
+            'stats.qualified_leads',
+            'stats.qualification_rate',
+            'stats.duplicates_flagged',
+            'stats.data_issues',
+        ])
+        ->missing('stats.unread_replies')
+        ->missing('stats.possible_reply_leads'));
+});
+
+test('only a super administrator sees reply stats on the dashboard', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $this->actingAs($superAdministrator);
+
+    $response = $this->get(route('dashboard'));
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('dashboard')
         ->has('stats', 8)
         ->hasAll([
             'stats.total_leads',

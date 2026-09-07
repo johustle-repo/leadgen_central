@@ -1,6 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Download,
+    Mail,
     Pencil,
     Plus,
     Search,
@@ -49,6 +50,7 @@ import {
     edit,
     index,
 } from '@/routes/leads';
+import type { Auth } from '@/types';
 type Lead = {
     id: number;
     lead_code: string;
@@ -64,8 +66,8 @@ type Lead = {
     upload_batch: { batch_code: string } | null;
     agent: { name: string } | null;
     can_update: boolean;
-    email_replies_count: number;
-    unread_email_replies_count: number;
+    email_replies_count?: number;
+    unread_email_replies_count?: number;
 };
 type Agent = { id: number; name: string };
 type Props = {
@@ -83,6 +85,8 @@ export default function LeadsIndex({
     canBulkDelete,
     agents,
 }: Props) {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const isSuperAdministrator = auth.user.role === 'super_administrator';
     const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -412,6 +416,9 @@ export default function LeadsIndex({
                                 <TableHead>Owner</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Source</TableHead>
+                                {isSuperAdministrator && (
+                                    <TableHead>Replies</TableHead>
+                                )}
                                 <TableHead align="right">Action</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -471,6 +478,26 @@ export default function LeadsIndex({
                                     <TableCell className="capitalize">
                                         {lead.source}
                                     </TableCell>
+                                    {isSuperAdministrator && (
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <Mail className="size-4 text-muted-foreground" />
+                                                <span className="font-medium">
+                                                    {lead.email_replies_count ??
+                                                        0}
+                                                </span>
+                                                {(lead.unread_email_replies_count ??
+                                                    0) > 0 && (
+                                                    <span className="rounded-full bg-info/15 px-2 py-0.5 text-xs font-semibold text-info">
+                                                        {
+                                                            lead.unread_email_replies_count
+                                                        }{' '}
+                                                        new
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    )}
                                     <TableCell align="right">
                                         <div className="flex justify-end gap-2">
                                             {lead.can_update && (

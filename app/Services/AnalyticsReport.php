@@ -30,16 +30,21 @@ class AnalyticsReport
         $previous = $this->summary($this->leadQuery($user, $previousFrom, $previousTo), $this->replyQuery($user, $previousFrom, $previousTo), $user, $previousFrom, $previousTo);
         $funnel = $user->isAdministrator() ? $this->funnel($leads) : ['stages' => [], 'excluded' => []];
 
+        $canViewReplies = $user->isSuperAdministrator();
+        $summary = [...$current, 'lead_change' => $this->change($current['total_leads'], $previous['total_leads']), 'reply_change' => $this->change($current['replies'], $previous['replies'])];
+
         return [
             'period' => $period,
             'filters' => ['date_from' => $from->toDateString(), 'date_to' => $to->toDateString()],
-            'summary' => [...$current, 'lead_change' => $this->change($current['total_leads'], $previous['total_leads']), 'reply_change' => $this->change($current['replies'], $previous['replies'])],
-            'dailyActivity' => $this->dailyActivity($leads, $replies, $from, $to),
+            'summary' => $canViewReplies ? $summary : [...$summary, 'replies' => 0, 'replied_leads' => 0, 'reply_rate' => 0.0, 'interested_replies' => 0, 'reply_change' => 0.0],
+            'dailyActivity' => $canViewReplies
+                ? $this->dailyActivity($leads, $replies, $from, $to)
+                : array_map(fn (array $day): array => [...$day, 'replies' => 0], $this->dailyActivity($leads, $replies, $from, $to)),
             'leadStatuses' => $this->distribution($leads, 'status'),
             'sources' => $this->distribution($leads, 'data_source'),
             'countries' => $this->distribution($leads, 'country_code', 8),
-            'replyClassifications' => $this->distribution($replies, 'classification'),
-            'agentPerformance' => $user->isAdministrator() ? $this->agentPerformance($from, $to) : [],
+            'replyClassifications' => $canViewReplies ? $this->distribution($replies, 'classification') : [],
+            'agentPerformance' => $user->isAdministrator() ? $this->agentPerformance($from, $to, $canViewReplies) : [],
             'funnel' => $funnel['stages'],
             'funnelExcluded' => $funnel['excluded'],
             'dataQualityTrend' => $user->isAdministrator() ? $this->dataQualityTrend($this->batchQuery($user, $from, $to), $from, $to) : [],
@@ -162,15 +167,17 @@ class AnalyticsReport
     }
 
     /** @return array<int, array<string, int|string|float>> */
-    private function agentPerformance(CarbonImmutable $from, CarbonImmutable $to): array
+    private function agentPerformance(CarbonImmutable $from, CarbonImmutable $to, bool $canViewReplies): array
     {
         return User::query()
             ->where('role', UserRole::Agent)
             ->withCount([
                 'leads as leads_count' => fn (Builder $query) => $query->whereBetween('created_at', [$from, $to]),
                 'leads as qualified_count' => fn (Builder $query) => $query->whereBetween('created_at', [$from, $to])->where('status', 'qualified_lead'),
-                'emailReplies as replies_count' => fn (Builder $query) => $query->whereBetween('received_at', [$from, $to]),
-                'emailReplies as interested_count' => fn (Builder $query) => $query->whereBetween('received_at', [$from, $to])->whereIn('classification', ['interested', 'possible_lead']),
+                ...($canViewReplies ? [
+                    'emailReplies as replies_count' => fn (Builder $query) => $query->whereBetween('received_at', [$from, $to]),
+                    'emailReplies as interested_count' => fn (Builder $query) => $query->whereBetween('received_at', [$from, $to])->whereIn('classification', ['interested', 'possible_lead']),
+                ] : []),
                 'uploadBatches as uploads_count' => fn (Builder $query) => $query->whereBetween('created_at', [$from, $to]),
             ])
             ->withSum(['uploadBatches as total_rows_sum' => fn (Builder $query) => $query->whereBetween('created_at', [$from, $to])], 'total_rows')
@@ -179,7 +186,7 @@ class AnalyticsReport
             ->orderByDesc('leads_count')
             ->limit(20)
             ->get(['id', 'name'])
-            ->map(function (User $agent): array {
+            ->map(function (User $agent) use ($canViewReplies): array {
                 $leads = (int) $agent->getAttribute('leads_count');
                 $qualified = (int) $agent->getAttribute('qualified_count');
                 $uploads = (int) $agent->getAttribute('uploads_count');
@@ -190,8 +197,8 @@ class AnalyticsReport
                     'name' => $agent->name,
                     'leads' => $leads,
                     'qualified' => $qualified,
-                    'replies' => (int) $agent->getAttribute('replies_count'),
-                    'interested' => (int) $agent->getAttribute('interested_count'),
+                    'replies' => $canViewReplies ? (int) $agent->getAttribute('replies_count') : 0,
+                    'interested' => $canViewReplies ? (int) $agent->getAttribute('interested_count') : 0,
                     'qualification_rate' => $leads > 0 ? round(($qualified / $leads) * 100, 1) : 0.0,
                     'uploads' => $uploads,
                     'avg_batch_size' => $uploads > 0 ? round($totalRows / $uploads, 1) : 0.0,

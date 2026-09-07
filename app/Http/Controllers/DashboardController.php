@@ -30,7 +30,6 @@ class DashboardController extends Controller
         $batches = UploadBatch::query()->when(! $all, fn ($q) => $q->whereBelongsTo($user))->when($from, fn ($q) => $q->whereDate('created_at', '>=', $from))->when($to, fn ($q) => $q->whereDate('created_at', '<=', $to));
         $totalLeads = (clone $leads)->count();
         $qualified = (clone $leads)->where('status', 'qualified_lead')->count();
-        $replies = EmailReply::query()->when(! $all, fn ($query) => $query->whereBelongsTo($user, 'agent'));
         $stats = [
             'total_leads' => $totalLeads,
             // Distinct companies among this period's leads, not a sum of per-batch "accepted
@@ -43,9 +42,15 @@ class DashboardController extends Controller
             'qualification_rate' => $totalLeads > 0 ? round(($qualified / $totalLeads) * 100, 1) : 0,
             'duplicates_flagged' => (int) (clone $batches)->sum('duplicate_rows'),
             'data_issues' => (int) (clone $batches)->sum('invalid_rows') + (int) (clone $batches)->sum('location_error_rows') + (int) (clone $batches)->sum('error_rows'),
-            'unread_replies' => (clone $replies)->where('is_read', false)->count(),
-            'possible_reply_leads' => (clone $replies)->whereIn('classification', ['interested', 'possible_lead'])->count(),
         ];
+
+        // Reply data is a Super Administrator-only feature; other roles get
+        // nothing here rather than a zeroed-out figure.
+        if ($user->isSuperAdministrator()) {
+            $replies = EmailReply::query()->when(! $all, fn ($query) => $query->whereBelongsTo($user, 'agent'));
+            $stats['unread_replies'] = (clone $replies)->where('is_read', false)->count();
+            $stats['possible_reply_leads'] = (clone $replies)->whereIn('classification', ['interested', 'possible_lead'])->count();
+        }
 
         $productivity = $user->isAdministrator() ? User::query()->where('role', UserRole::Agent)->withSum(['uploadBatches as uploaded' => fn ($query) => $query->when($from, fn ($query) => $query->whereDate('created_at', '>=', $from))->when($to, fn ($query) => $query->whereDate('created_at', '<=', $to))], 'total_rows')->withSum(['uploadBatches as accepted' => fn ($query) => $query->when($from, fn ($query) => $query->whereDate('created_at', '>=', $from))->when($to, fn ($query) => $query->whereDate('created_at', '<=', $to))], 'new_leads')->withSum(['uploadBatches as duplicates' => fn ($query) => $query->when($from, fn ($query) => $query->whereDate('created_at', '>=', $from))->when($to, fn ($query) => $query->whereDate('created_at', '<=', $to))], 'duplicate_rows')->withSum(['uploadBatches as errors' => fn ($query) => $query->when($from, fn ($query) => $query->whereDate('created_at', '>=', $from))->when($to, fn ($query) => $query->whereDate('created_at', '<=', $to))], 'rejected_rows')->withCount(['leads as possible' => fn ($query) => $query->where('status', 'possible_lead'), 'leads as qualified' => fn ($query) => $query->where('status', 'qualified_lead'), 'leads as forwarded' => fn ($query) => $query->where('status', 'forwarded')])->orderByDesc('uploaded')->get(['id', 'name']) : [];
 

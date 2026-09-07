@@ -50,14 +50,11 @@ class HandleInertiaRequests extends Middleware
             'notificationCounts' => [
                 'unread_email_replies' => function () use ($request): int {
                     $user = $request->user();
-                    if ($user === null) {
+                    if ($user === null || ! $user->isSuperAdministrator()) {
                         return 0;
                     }
 
-                    return EmailReply::query()
-                        ->when(! $user->canViewAllLeads(), fn ($query) => $query->whereBelongsTo($user, 'agent'))
-                        ->where('is_read', false)
-                        ->count();
+                    return EmailReply::query()->where('is_read', false)->count();
                 },
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

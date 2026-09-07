@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Jobs\SyncGmailReplies;
 use App\Models\AuditLog;
 use App\Models\GmailConnection;
+use App\Models\User;
 use App\Services\GmailOAuthService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,7 +31,7 @@ class GmailConnectionController extends Controller
         abort_unless($expectedState !== '' && hash_equals($expectedState, $request->string('state')->toString()), 403);
 
         if ($request->filled('error')) {
-            return redirect()->route('email-replies.index')->with('toast', ['type' => 'error', 'message' => 'Gmail access was not approved.']);
+            return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'error', 'message' => 'Gmail access was not approved.']);
         }
 
         $request->validate(['code' => ['required', 'string']]);
@@ -40,13 +42,13 @@ class GmailConnectionController extends Controller
         } catch (Throwable $exception) {
             report($exception);
 
-            return redirect()->route('email-replies.index')->with('toast', ['type' => 'error', 'message' => 'Gmail connection failed. Please try again or contact an administrator.']);
+            return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'error', 'message' => 'Gmail connection failed. Please try again or contact an administrator.']);
         }
 
         $existing = GmailConnection::query()->whereBelongsTo($request->user())->first();
         $refreshToken = (string) ($tokens['refresh_token'] ?? $existing->refresh_token ?? '');
         if ($refreshToken === '') {
-            return redirect()->route('email-replies.index')->with('toast', ['type' => 'error', 'message' => 'Google did not provide offline access. Disconnect the app in Google and connect again.']);
+            return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'error', 'message' => 'Google did not provide offline access. Disconnect the app in Google and connect again.']);
         }
 
         $connection = GmailConnection::query()->updateOrCreate(
@@ -64,7 +66,7 @@ class GmailConnectionController extends Controller
         $this->audit($request, 'gmail.connected', $connection, "Connected Gmail mailbox {$connection->gmail_address}.");
         SyncGmailReplies::dispatch($connection->id);
 
-        return redirect()->route('email-replies.index')->with('toast', ['type' => 'success', 'message' => 'Gmail connected. Initial reply synchronization was queued.']);
+        return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'success', 'message' => 'Gmail connected. Initial reply synchronization was queued.']);
     }
 
     public function sync(Request $request): RedirectResponse
@@ -77,6 +79,25 @@ class GmailConnectionController extends Controller
         SyncGmailReplies::dispatch($connection->id);
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Gmail reply synchronization was queued.']);
+    }
+
+    /**
+     * Super Administrator triggers a sync for another user's connected mailbox
+     * (e.g. an agent's), without needing access to that person's Google account.
+     */
+    public function syncFor(Request $request, User $user): RedirectResponse
+    {
+        Gate::authorize('sync-agent-gmail');
+
+        $connection = GmailConnection::query()->whereBelongsTo($user)->first();
+        if ($connection === null) {
+            return back()->with('toast', ['type' => 'error', 'message' => "{$user->name} has not connected a Gmail account."]);
+        }
+
+        SyncGmailReplies::dispatch($connection->id);
+        $this->audit($request, 'gmail.synced_by_admin', $connection, "Queued a synchronization for {$connection->gmail_address} (owned by {$user->name}).");
+
+        return back()->with('toast', ['type' => 'success', 'message' => "Synchronization for {$user->name}'s Gmail was queued."]);
     }
 
     public function disconnect(Request $request, GmailOAuthService $gmail): RedirectResponse
@@ -94,7 +115,19 @@ class GmailConnectionController extends Controller
         $this->audit($request, 'gmail.disconnected', $connection, "Disconnected Gmail mailbox {$connection->gmail_address}.");
         $connection->delete();
 
-        return redirect()->route('email-replies.index')->with('toast', ['type' => 'success', 'message' => 'Gmail disconnected. Existing matched replies were preserved.']);
+        return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'success', 'message' => 'Gmail disconnected. Existing matched replies were preserved.']);
+    }
+
+    /**
+     * Where to send a user after connecting/disconnecting their own mailbox:
+     * Super Administrators manage it from the Email Replies inbox, everyone
+     * else (Email Replies is off-limits to them) uses their profile settings.
+     */
+    private function connectionHomeUrl(Request $request): string
+    {
+        return $request->user()->isSuperAdministrator()
+            ? route('email-replies.index')
+            : route('profile.edit');
     }
 
     private function audit(Request $request, string $action, GmailConnection $connection, string $description): void

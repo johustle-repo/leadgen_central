@@ -1,9 +1,10 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     BarChart3,
     Download,
     FileSpreadsheet,
     FileText,
+    MailCheck,
     ShieldAlert,
     SlidersHorizontal,
     Target,
@@ -59,6 +60,7 @@ import {
     exportPdf as analyticsExportPdf,
     index as analyticsIndex,
 } from '@/routes/analytics';
+import type { Auth } from '@/types';
 
 type Distribution = { label: string; value: number };
 type DailyActivity = {
@@ -471,6 +473,7 @@ export default function Analytics({
     leadStatuses,
     sources,
     countries,
+    replyClassifications,
     agentPerformance,
     funnel,
     funnelExcluded,
@@ -478,6 +481,8 @@ export default function Analytics({
     uploadTimingHeatmap,
     industries,
 }: Props) {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const canViewReplies = auth.user.role === 'super_administrator';
     const applyFilters = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         router.get(
@@ -514,15 +519,33 @@ export default function Analytics({
             icon: Target,
             tone: 'text-chart-3',
         },
-        {
-            label: 'Reply rate',
-            value: `${summary.reply_rate}%`,
-            detail: `${summary.replied_leads} unique leads replied`,
-            icon: BarChart3,
-            tone: 'text-chart-1',
-        },
-        // Email replies / Interested replies are hidden for now along with
-        // the rest of the Email Replies feature.
+        // Email replies / Reply rate / Interested replies are a Super
+        // Administrator-only feature, hidden entirely for every other role.
+        ...(canViewReplies
+            ? [
+                  {
+                      label: 'Email replies',
+                      value: summary.replies,
+                      detail: <Change value={summary.reply_change} />,
+                      icon: MailCheck,
+                      tone: 'text-chart-2',
+                  },
+                  {
+                      label: 'Reply rate',
+                      value: `${summary.reply_rate}%`,
+                      detail: `${summary.replied_leads} unique leads replied`,
+                      icon: BarChart3,
+                      tone: 'text-chart-1',
+                  },
+                  {
+                      label: 'Interested replies',
+                      value: summary.interested_replies,
+                      detail: 'Interested or possible lead',
+                      icon: TrendingUp,
+                      tone: 'text-chart-3',
+                  },
+              ]
+            : []),
         {
             label: 'Duplicates flagged',
             value: summary.duplicates,
@@ -688,7 +711,9 @@ export default function Analytics({
                     </div>
                 </FilterBar>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div
+                    className={`grid gap-4 sm:grid-cols-2 ${canViewReplies ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}
+                >
                     {metrics.map((metric) => (
                         <StatTile
                             key={metric.label}
@@ -704,7 +729,11 @@ export default function Analytics({
                 <Card>
                     <CardHeader className="flex-row items-center justify-between">
                         <div className="flex flex-col gap-1">
-                            <CardTitle>Lead and reply activity</CardTitle>
+                            <CardTitle>
+                                {canViewReplies
+                                    ? 'Lead and reply activity'
+                                    : 'Lead activity'}
+                            </CardTitle>
                             <p className="text-sm text-muted-foreground">
                                 Daily volume for the selected period
                             </p>
@@ -719,15 +748,18 @@ export default function Analytics({
                                 />
                                 Leads
                             </span>
-                            <span className="flex items-center gap-1.5">
-                                <i
-                                    className="size-2 rounded-full"
-                                    style={{
-                                        backgroundColor: 'var(--color-chart-2)',
-                                    }}
-                                />
-                                Replies
-                            </span>
+                            {canViewReplies && (
+                                <span className="flex items-center gap-1.5">
+                                    <i
+                                        className="size-2 rounded-full"
+                                        style={{
+                                            backgroundColor:
+                                                'var(--color-chart-2)',
+                                        }}
+                                    />
+                                    Replies
+                                </span>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -767,15 +799,17 @@ export default function Analytics({
                                         dot={false}
                                         activeDot={{ r: 4 }}
                                     />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="replies"
-                                        name="Replies"
-                                        stroke="var(--color-chart-2)"
-                                        strokeWidth={2}
-                                        dot={false}
-                                        activeDot={{ r: 4 }}
-                                    />
+                                    {canViewReplies && (
+                                        <Line
+                                            type="monotone"
+                                            dataKey="replies"
+                                            name="Replies"
+                                            stroke="var(--color-chart-2)"
+                                            strokeWidth={2}
+                                            dot={false}
+                                            activeDot={{ r: 4 }}
+                                        />
+                                    )}
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
@@ -788,8 +822,13 @@ export default function Analytics({
                         items={leadStatuses}
                         color="var(--color-chart-3)"
                     />
-                    {/* Reply classification (interested/bounce/etc.) is
-                        hidden for now along with the Email Replies feature. */}
+                    {canViewReplies && (
+                        <Breakdown
+                            title="Reply classification"
+                            items={replyClassifications}
+                            color="var(--color-chart-5)"
+                        />
+                    )}
                     <Breakdown
                         title="Lead sources"
                         items={sources}
@@ -946,8 +985,9 @@ export default function Analytics({
                                             'Leads',
                                             'Qualified',
                                             'Qualification rate',
-                                            'Replies',
-                                            'Interested',
+                                            ...(canViewReplies
+                                                ? ['Replies', 'Interested']
+                                                : []),
                                             'Uploads',
                                             'Avg batch size',
                                             'Duplicate rate',
@@ -980,12 +1020,16 @@ export default function Analytics({
                                             <td className="px-5 py-3 tabular-nums">
                                                 {agent.qualification_rate}%
                                             </td>
-                                            <td className="px-5 py-3 tabular-nums">
-                                                {agent.replies}
-                                            </td>
-                                            <td className="px-5 py-3 tabular-nums">
-                                                {agent.interested}
-                                            </td>
+                                            {canViewReplies && (
+                                                <>
+                                                    <td className="px-5 py-3 tabular-nums">
+                                                        {agent.replies}
+                                                    </td>
+                                                    <td className="px-5 py-3 tabular-nums">
+                                                        {agent.interested}
+                                                    </td>
+                                                </>
+                                            )}
                                             <td className="px-5 py-3 tabular-nums">
                                                 {agent.uploads}
                                             </td>

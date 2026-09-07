@@ -1,6 +1,6 @@
 import { Form, Head, usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
-import { UserRound } from 'lucide-react';
+import { Mail, RefreshCw, Unplug, UserRound } from 'lucide-react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import InputError from '@/components/input-error';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { connect, disconnect, sync } from '@/routes/gmail';
 import { edit } from '@/routes/profile';
 import { send } from '@/routes/verification';
 import type { Auth } from '@/types';
@@ -22,12 +23,22 @@ type PageProps = {
     auth: Auth;
 };
 
+type GmailConnection = {
+    id: number;
+    gmail_address: string;
+    status: string;
+    last_synced_at: string | null;
+    last_error: string | null;
+};
+
 export default function Profile({
     mustVerifyEmail,
     status,
+    gmailConnection,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
+    gmailConnection: GmailConnection | null;
 }) {
     const { auth } = usePage<PageProps>().props;
 
@@ -135,6 +146,90 @@ export default function Profile({
                     </Card>
                 )}
             </Form>
+
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                            <Mail className="size-5" />
+                        </div>
+                        <div>
+                            <CardTitle>Gmail connection</CardTitle>
+                            <CardDescription>
+                                Connect your Gmail mailbox so replies to your
+                                outreach can be captured automatically.
+                            </CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {gmailConnection ? (
+                        <>
+                            <div className="text-sm">
+                                <p className="font-medium">
+                                    {gmailConnection.gmail_address}
+                                </p>
+                                <p className="text-muted-foreground">
+                                    {gmailConnection.last_synced_at
+                                        ? `Last synced ${gmailConnection.last_synced_at}`
+                                        : 'Not synced yet'}
+                                </p>
+                                {gmailConnection.last_error && (
+                                    <p className="mt-1 text-destructive">
+                                        {gmailConnection.last_error}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Form {...sync.form()}>
+                                    {({ processing }) => (
+                                        <Button
+                                            type="submit"
+                                            size="sm"
+                                            disabled={processing}
+                                        >
+                                            <RefreshCw
+                                                className={
+                                                    processing
+                                                        ? 'animate-spin'
+                                                        : ''
+                                                }
+                                            />
+                                            Sync now
+                                        </Button>
+                                    )}
+                                </Form>
+                                <Form {...disconnect.form()}>
+                                    {({ processing }) => (
+                                        <Button
+                                            type="submit"
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={processing}
+                                        >
+                                            <Unplug />
+                                            Disconnect
+                                        </Button>
+                                    )}
+                                </Form>
+                            </div>
+                        </>
+                    ) : (
+                        <Form {...connect.form()}>
+                            {({ processing }) => (
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    disabled={processing}
+                                >
+                                    <Mail />
+                                    Connect Gmail
+                                </Button>
+                            )}
+                        </Form>
+                    )}
+                </CardContent>
+            </Card>
 
             <DeleteUser />
         </>

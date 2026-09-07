@@ -1,11 +1,13 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowRight,
     Building2,
     CalendarRange,
     Database,
     FileWarning,
+    MailCheck,
     ShieldAlert,
+    Sparkles,
     Target,
     TrendingUp,
 } from 'lucide-react';
@@ -25,6 +27,7 @@ import {
 import { dashboard } from '@/routes';
 import { edit as leadEdit, index as leadsIndex } from '@/routes/leads';
 import { index as uploadsIndex, show as uploadShow } from '@/routes/uploads';
+import type { Auth } from '@/types';
 
 type Props = {
     stats: Record<string, number>;
@@ -72,6 +75,8 @@ export default function Dashboard({
     filters,
     productivity,
 }: Props) {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const isSuperAdministrator = auth.user.role === 'super_administrator';
     const [selectedPeriod, setSelectedPeriod] = useState(period);
     const isCustomPeriod = selectedPeriod === 'custom';
 
@@ -134,8 +139,24 @@ export default function Dashboard({
             icon: FileWarning,
             tone: 'text-destructive',
         },
-        // Unread replies / possible leads from replies are hidden for now
-        // along with the rest of the Email Replies feature.
+        // Unread replies / possible leads from replies are a Super
+        // Administrator-only feature, hidden entirely for every other role.
+        ...(isSuperAdministrator
+            ? [
+                  {
+                      label: 'Unread replies',
+                      value: stats.unread_replies ?? 0,
+                      icon: MailCheck,
+                      tone: 'text-chart-4',
+                  },
+                  {
+                      label: 'Possible leads from replies',
+                      value: stats.possible_reply_leads ?? 0,
+                      icon: Sparkles,
+                      tone: 'text-chart-5',
+                  },
+              ]
+            : []),
     ];
 
     return (
@@ -249,9 +270,13 @@ export default function Dashboard({
 
                 <section className="flex flex-col gap-3">
                     <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                        Data health
+                        {isSuperAdministrator
+                            ? 'Data health & inbox'
+                            : 'Data health'}
                     </h2>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div
+                        className={`grid gap-4 sm:grid-cols-2 ${isSuperAdministrator ? 'lg:grid-cols-4' : ''}`}
+                    >
                         {healthMetrics.map((metric) => (
                             <StatTile
                                 key={metric.label}

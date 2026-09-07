@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { usePage } from '@inertiajs/react';
+import { usePage, usePoll } from '@inertiajs/react';
 import {
     CopyCheck,
     CalendarClock,
@@ -7,6 +7,7 @@ import {
     ClipboardList,
     FileClock,
     LayoutGrid,
+    MailSearch,
     QrCode,
     ShieldCheck,
     Upload,
@@ -35,6 +36,7 @@ import {
 } from '@/routes/attendance';
 import { index as auditLogIndex } from '@/routes/audit-logs';
 import { index as duplicateIndex } from '@/routes/duplicates';
+import { index as emailReplyIndex } from '@/routes/email-replies';
 import { index as leadIndex } from '@/routes/leads';
 import { create as uploadCreate, index as uploadIndex } from '@/routes/uploads';
 import { index as userIndex } from '@/routes/users';
@@ -43,7 +45,13 @@ import type { NavItem } from '@/types';
 import type { Auth } from '@/types';
 
 export function AppSidebar() {
-    const { auth } = usePage<{ auth: Auth }>().props;
+    usePoll(60000, { only: ['notificationCounts'] });
+
+    const { auth, notificationCounts } = usePage<{
+        auth: Auth;
+        notificationCounts: { unread_email_replies: number };
+    }>().props;
+    const isSuperAdministrator = auth.user.role === 'super_administrator';
     const mainNavItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
         {
@@ -52,8 +60,18 @@ export function AppSidebar() {
             icon: ChartNoAxesCombined,
         },
         { title: 'Leads', href: leadIndex(), icon: Waypoints },
-        // Email Replies is hidden from navigation for now; the route and
-        // page still work, they're just not linked here.
+        // Email Replies is a Super Administrator-only feature; every other
+        // role has it hidden entirely, not just unlinked from the sidebar.
+        ...(isSuperAdministrator
+            ? [
+                  {
+                      title: 'Email Replies',
+                      href: emailReplyIndex(),
+                      icon: MailSearch,
+                      badge: notificationCounts.unread_email_replies,
+                  },
+              ]
+            : []),
         { title: 'Upload Leads', href: uploadCreate(), icon: Upload },
         { title: 'Upload History', href: uploadIndex(), icon: FileClock },
     ];

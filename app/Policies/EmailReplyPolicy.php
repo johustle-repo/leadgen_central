@@ -9,10 +9,13 @@ class EmailReplyPolicy
 {
     /**
      * Determine whether the user can view any models.
+     *
+     * The Email Replies feature (inbox, dashboard/analytics reply data, the
+     * leads "Replies" column) is restricted to Super Administrators only.
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->isSuperAdministrator();
     }
 
     /**
@@ -20,7 +23,7 @@ class EmailReplyPolicy
      */
     public function view(User $user, EmailReply $emailReply): bool
     {
-        return $user->canViewAllLeads() || $emailReply->agent_id === $user->id;
+        return $user->isSuperAdministrator();
     }
 
     /**

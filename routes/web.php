@@ -81,6 +81,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::post('integrations/gmail/connect', [GmailConnectionController::class, 'connect'])->middleware('throttle:integrations')->name('gmail.connect');
     Route::get('integrations/gmail/callback', [GmailConnectionController::class, 'callback'])->name('gmail.callback');
     Route::post('integrations/gmail/sync', [GmailConnectionController::class, 'sync'])->middleware('throttle:integrations')->name('gmail.sync');
+    Route::post('integrations/gmail/{user}/sync', [GmailConnectionController::class, 'syncFor'])->middleware('throttle:integrations')->name('gmail.sync-for');
     Route::delete('integrations/gmail/disconnect', [GmailConnectionController::class, 'disconnect'])->middleware(['password.confirm', 'throttle:integrations'])->name('gmail.disconnect');
 
     Route::middleware('can:manage-attendance')->group(function () {

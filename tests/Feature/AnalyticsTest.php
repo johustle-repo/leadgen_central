@@ -144,16 +144,45 @@ it('shows an agent analytics only for their owned leads and replies', function (
         ->where('summary.total_leads', 2)
         ->where('summary.qualified_leads', 1)
         ->where('summary.qualification_rate', 50)
-        ->where('summary.replies', 1)
-        ->where('summary.interested_replies', 1)
+        // Reply data is a Super Administrator-only feature: an agent gets
+        // zeroed-out figures here, not their real (owned-only) counts.
+        ->where('summary.replies', 0)
+        ->where('summary.interested_replies', 0)
         ->where('summary.duplicates', 3)
         ->has('dailyActivity', 7)
+        ->where('replyClassifications', [])
         ->where('agentPerformance', [])
         ->where('funnel', [])
         ->where('funnelExcluded', [])
         ->where('dataQualityTrend', [])
         ->where('uploadTimingHeatmap', [])
         ->where('industries', []));
+});
+
+it('only shows real reply figures in analytics to a super administrator', function () {
+    $this->travelTo('2026-09-01 12:00:00');
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $agent = User::factory()->create();
+    $qualified = Lead::factory()->for($agent, 'agent')->create([
+        'status' => 'qualified_lead',
+        'created_by' => $agent->id,
+        'created_at' => '2026-08-30 10:00:00',
+    ]);
+    EmailReply::factory()->create([
+        'agent_id' => $agent->id,
+        'lead_id' => $qualified->id,
+        'classification' => 'interested',
+        'received_at' => '2026-08-31 11:00:00',
+    ]);
+
+    $response = $this->actingAs($superAdministrator)->get(route('analytics.index', ['period' => '7_days']));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('analytics/index')
+        ->where('summary.replies', 1)
+        ->where('summary.interested_replies', 1)
+        ->has('replyClassifications', 1)
+        ->etc());
 });
 
 it('shows administrator agent performance without leaking records outside the selected period', function () {

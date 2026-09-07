@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpdateEmailReplyRequest;
 use App\Models\AuditLog;
 use App\Models\EmailReply;
-use App\Models\GmailConnection;
+use App\Models\User;
 use App\Services\EmailReplyTextExtractor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,12 +55,22 @@ class EmailReplyController extends Controller
         return Inertia::render('email-replies/index', [
             'replies' => $replies,
             'filters' => $request->only(['search', 'classification', 'unread', 'date']),
-            'connection' => GmailConnection::query()->whereBelongsTo($user)->first(['id', 'gmail_address', 'status', 'last_synced_at', 'last_error']),
             'summary' => [
                 'unread' => (clone $authorizedReplies)->where('is_read', false)->count(),
                 'possible' => (clone $authorizedReplies)->whereIn('classification', ['interested', 'possible_lead'])->count(),
                 'needs_review' => (clone $authorizedReplies)->where('classification', 'needs_review')->count(),
             ],
+            'agentGmailConnections' => User::query()
+                ->with(['gmailConnections' => fn ($query) => $query->latest('id')->limit(1)])
+                ->whereHas('gmailConnections')
+                ->orderBy('name')
+                ->get(['id', 'name', 'role'])
+                ->map(fn (User $agent): array => [
+                    'id' => $agent->id,
+                    'name' => $agent->name,
+                    'role' => $agent->role->value,
+                    'connection' => $agent->gmailConnections->first()?->only(['id', 'gmail_address', 'status', 'last_synced_at', 'last_error']),
+                ]),
         ]);
     }
 
