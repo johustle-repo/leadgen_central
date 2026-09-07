@@ -833,6 +833,7 @@ export default function Analytics({
                         title="Top countries"
                         items={countries}
                         color="var(--color-chart-2)"
+                        className={canViewReplies ? 'xl:col-span-2' : undefined}
                     />
                     <Breakdown
                         title="Lead sources"
