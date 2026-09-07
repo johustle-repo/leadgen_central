@@ -77,7 +77,6 @@ it('lets a super administrator clear an agents leads and completed upload histor
     $pendingBatch = UploadBatch::factory()->for($agent)->create(['processing_status' => 'pending']);
 
     $response = $this->actingAs($superAdministrator)
-        ->withSession(['auth.password_confirmed_at' => time()])
         ->delete(route('users.records.clear', $agent));
 
     $response->assertRedirect()->assertSessionHas('toast.message', "Cleared 3 lead(s) and 1 upload record(s) for {$agent->name}.");
@@ -96,7 +95,6 @@ it('forbids an administrator from clearing an agents records', function () {
     $agent = User::factory()->create();
 
     $this->actingAs($administrator)
-        ->withSession(['auth.password_confirmed_at' => time()])
         ->delete(route('users.records.clear', $agent))
         ->assertForbidden();
 });
@@ -105,7 +103,6 @@ it('forbids a super administrator from clearing their own records', function () 
     $superAdministrator = User::factory()->superAdministrator()->create();
 
     $this->actingAs($superAdministrator)
-        ->withSession(['auth.password_confirmed_at' => time()])
         ->delete(route('users.records.clear', $superAdministrator))
         ->assertForbidden();
 });
