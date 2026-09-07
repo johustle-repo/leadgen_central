@@ -226,7 +226,10 @@ export default function UploadIndex({
                                 updateQuery({ per_page: value })
                             }
                         >
-                            <SelectTrigger id="uploads-per-page">
+                            <SelectTrigger
+                                id="uploads-per-page"
+                                className="w-full"
+                            >
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -256,7 +259,10 @@ export default function UploadIndex({
                                     })
                                 }
                             >
-                                <SelectTrigger id="uploads-agent">
+                                <SelectTrigger
+                                    id="uploads-agent"
+                                    className="w-full"
+                                >
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -288,7 +294,7 @@ export default function UploadIndex({
                                 updateQuery({ sort: value })
                             }
                         >
-                            <SelectTrigger id="uploads-sort">
+                            <SelectTrigger id="uploads-sort" className="w-full">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
