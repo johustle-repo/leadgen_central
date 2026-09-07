@@ -488,17 +488,14 @@ export default function UploadIndex({
                                                             upload?
                                                         </DialogTitle>
                                                         <DialogDescription>
-                                                            {
-                                                                batch.duplicate_rows
-                                                            }{' '}
-                                                            duplicate row
-                                                            {batch.duplicate_rows ===
-                                                            1
-                                                                ? ''
-                                                                : 's'}{' '}
-                                                            will be re-checked
-                                                            using the latest
-                                                            rules.
+                                                            Duplicate rows, and
+                                                            any rows only
+                                                            rejected for
+                                                            exceeding the
+                                                            per-company contact
+                                                            limit, will be
+                                                            re-checked using the
+                                                            latest rules.
                                                         </DialogDescription>
                                                         <DialogFooter>
                                                             <DialogClose

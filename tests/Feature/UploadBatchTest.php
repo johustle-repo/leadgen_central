@@ -345,6 +345,38 @@ it('re-analyzes duplicate rows from the stored upload without uploading again', 
     $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 3, 'processing_status' => 'needs_review', 'error_category' => 'location']);
 });
 
+it('re-analyzes rows previously rejected for the disabled company contact limit', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    Storage::disk('local')->put('lead-imports/reanalyze-capped.csv', "Company,Name,Email\nAcme,Eleventh Contact,eleventh@acme.test\n");
+    $batch = UploadBatch::factory()->for($agent)->create([
+        'stored_filename' => 'lead-imports/reanalyze-capped.csv',
+        'headers' => ['Company', 'Name', 'Email'],
+        'column_mapping' => ['Company' => 'company_name', 'Name' => 'contact_person', 'Email' => 'email'],
+        'processing_status' => 'completed',
+        'total_rows' => 1,
+        'rejected_rows' => 1,
+        'invalid_rows' => 1,
+    ]);
+    UploadRow::factory()->for($batch)->create([
+        'row_number' => 2,
+        'processing_status' => 'rejected',
+        'error_category' => 'company_contact_limit',
+        'error_message' => 'An agent can have a maximum of 10 contacts for the same company.',
+    ]);
+
+    $response = $this->actingAs($agent)->post(route('uploads.reanalyze', $batch));
+
+    $response->assertRedirect()->assertSessionHas('toast');
+    expect($batch->refresh()->processing_status->value)->toBe('completed')
+        ->and($batch->accepted_rows)->toBe(1)
+        ->and($batch->rejected_rows)->toBe(0);
+    $this->assertDatabaseHas('leads', ['upload_batch_id' => $batch->id, 'contact_person' => 'Eleventh Contact', 'email' => 'eleventh@acme.test']);
+    // No country/city column was mapped, so the row lands on "needs review" for its
+    // location rather than a clean "accepted" - either way, it's no longer rejected.
+    $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 2, 'processing_status' => 'needs_review', 'error_category' => 'location']);
+});
+
 it('prevents an agent from re-analyzing another agents upload', function () {
     $owner = User::factory()->create();
     $otherAgent = User::factory()->create();

@@ -16,10 +16,13 @@ class UploadBatchReanalyzer
     {
         return DB::transaction(function () use ($uploadBatch): int {
             $batch = UploadBatch::query()->lockForUpdate()->findOrFail($uploadBatch->id);
+            // Duplicate rows are re-checked against the latest matching rules, and rows
+            // rejected only because the per-company contact cap was hit are retried too -
+            // that cap is disabled for now, so those contacts should go through if re-run.
             $rows = $batch->rows()
                 ->where(function ($query): void {
                     $query->where('processing_status', UploadRowStatus::Duplicate)
-                        ->orWhereIn('error_category', ['exact_duplicate', 'possible_duplicate']);
+                        ->orWhereIn('error_category', ['exact_duplicate', 'possible_duplicate', 'company_contact_limit']);
                 })
                 ->get();
 
