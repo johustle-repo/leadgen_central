@@ -97,7 +97,7 @@ it('rejects a manual lead with an unsupported data source', function () {
     $this->assertDatabaseCount('leads', 0);
 });
 
-it('limits an agent to ten contacts from the same company', function () {
+it('no longer limits an agent to ten contacts from the same company while the cap is disabled', function () {
     $agent = User::factory()->create();
     Lead::factory()->count(10)->for($agent, 'agent')->create([
         'company_name' => 'Acme Ventures',
@@ -111,8 +111,8 @@ it('limits an agent to ten contacts from the same company', function () {
         'email' => 'eleventh@acme.test',
     ]);
 
-    $response->assertSessionHasErrors(['company_name' => 'An agent can have a maximum of 10 contacts for the same company.']);
-    expect(Lead::query()->whereBelongsTo($agent, 'agent')->count())->toBe(10);
+    $response->assertSessionDoesntHaveErrors('company_name');
+    expect(Lead::query()->whereBelongsTo($agent, 'agent')->count())->toBe(11);
 });
 
 it('rejects a manually added lead whose email already exists for another agent', function () {

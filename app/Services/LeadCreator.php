@@ -41,16 +41,18 @@ class LeadCreator
                 }
             }
 
-            $companyContactCount = Lead::query()
-                ->whereBelongsTo($owner, 'agent')
-                ->where('normalized_company_name', $normalized['normalized_company_name'])
-                ->count();
-
-            if ($companyContactCount >= self::MAX_CONTACTS_PER_COMPANY) {
-                throw ValidationException::withMessages([
-                    'company_name' => 'An agent can have a maximum of 10 contacts for the same company.',
-                ]);
-            }
+            // The per-company contact cap is disabled for now (uploads and manual
+            // entry both go through here) - re-enable by restoring this block.
+            // $companyContactCount = Lead::query()
+            //     ->whereBelongsTo($owner, 'agent')
+            //     ->where('normalized_company_name', $normalized['normalized_company_name'])
+            //     ->count();
+            //
+            // if ($companyContactCount >= self::MAX_CONTACTS_PER_COMPANY) {
+            //     throw ValidationException::withMessages([
+            //         'company_name' => 'An agent can have a maximum of 10 contacts for the same company.',
+            //     ]);
+            // }
 
             return Lead::create([...$normalized, ...$location->leadAttributes($data['city'] ?? null, $data['country'] ?? ($data['country_code'] ?? null)), 'agent_id' => $owner->id, 'upload_batch_id' => $batch?->id, 'source' => $batch ? LeadSource::Csv : LeadSource::Manual, 'status' => $batch ? LeadStatus::Validated : LeadStatus::Raw, 'created_by' => $actor->id]);
         });

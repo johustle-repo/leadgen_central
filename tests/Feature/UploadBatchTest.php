@@ -300,7 +300,7 @@ it('prevents agents from viewing another agents upload', function () {
     $this->actingAs($agent)->get(route('uploads.show', $batch))->assertForbidden();
 });
 
-it('rejects uploaded contacts beyond an agents company limit', function () {
+it('no longer rejects uploaded contacts beyond an agents company limit while the cap is disabled', function () {
     Storage::fake('local');
     $agent = User::factory()->create();
     $rows = collect(range(1, 11))
@@ -312,8 +312,8 @@ it('rejects uploaded contacts beyond an agents company limit', function () {
 
     $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [0 => 'company_name', 1 => 'contact_person', 2 => 'email']]);
 
-    expect(Lead::query()->whereBelongsTo($agent, 'agent')->count())->toBe(10);
-    $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 12, 'processing_status' => 'rejected', 'error_category' => 'company_contact_limit', 'error_message' => 'An agent can have a maximum of 10 contacts for the same company.']);
+    expect(Lead::query()->whereBelongsTo($agent, 'agent')->count())->toBe(11);
+    $this->assertDatabaseMissing('upload_rows', ['upload_batch_id' => $batch->id, 'error_category' => 'company_contact_limit']);
 });
 
 it('re-analyzes duplicate rows from the stored upload without uploading again', function () {
