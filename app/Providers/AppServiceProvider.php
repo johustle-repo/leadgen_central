@@ -44,7 +44,7 @@ class AppServiceProvider extends ServiceProvider
         Model::preventLazyLoading(! app()->isProduction());
         Gate::define('manage-settings', fn (User $user): bool => $user->isAdministrator());
         Gate::define('manage-attendance', fn (User $user): bool => $user->isSuperAdministrator());
-        Gate::define('sync-agent-gmail', fn (User $user): bool => $user->isSuperAdministrator());
+        Gate::define('manage-agent-gmail', fn (User $user): bool => $user->isSuperAdministrator());
     }
 
     /**

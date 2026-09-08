@@ -140,3 +140,59 @@ it('forbids a non-super-administrator from syncing another users mailbox', funct
 
     $this->actingAs($administrator)->post(route('gmail.sync-for', $agent))->assertForbidden();
 });
+
+it('lets a super administrator start the OAuth flow on behalf of an agent', function () {
+    config()->set('services.google', [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'redirect_uri' => 'http://localhost/integrations/gmail/callback',
+    ]);
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $agent = User::factory()->create();
+
+    $response = $this->actingAs($superAdministrator)->post(route('gmail.connect-for', $agent));
+
+    $response->assertRedirectContains('accounts.google.com/o/oauth2/v2/auth');
+    $response->assertSessionHas('gmail_oauth_state');
+    $response->assertSessionHas('gmail_oauth_user_id', $agent->id);
+});
+
+it('forbids a non-super-administrator from connecting Gmail on behalf of another user', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create();
+
+    $this->actingAs($administrator)->post(route('gmail.connect-for', $agent))->assertForbidden();
+});
+
+it('saves the connection under the target agent when a super administrator completes the OAuth flow for them', function () {
+    config()->set('services.google', [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'redirect_uri' => 'http://localhost/integrations/gmail/callback',
+    ]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://oauth2.googleapis.com/token' => Http::response([
+            'access_token' => 'new-access-token',
+            'refresh_token' => 'new-refresh-token',
+            'expires_in' => 3600,
+        ]),
+        'https://gmail.googleapis.com/gmail/v1/users/me/profile' => Http::response([
+            'emailAddress' => 'dexter@gmail.com',
+            'historyId' => '1234',
+        ]),
+    ]);
+    Queue::fake([SyncGmailReplies::class]);
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $agent = User::factory()->create(['name' => 'Dexter']);
+
+    $response = $this->actingAs($superAdministrator)
+        ->withSession(['gmail_oauth_state' => 'valid-state', 'gmail_oauth_user_id' => $agent->id])
+        ->get(route('gmail.callback', ['state' => 'valid-state', 'code' => 'authorization-code']));
+
+    $response->assertRedirectToRoute('email-replies.index');
+    $connection = GmailConnection::query()->whereBelongsTo($agent)->firstOrFail();
+    expect($connection->gmail_address)->toBe('dexter@gmail.com');
+    $this->assertDatabaseCount('gmail_connections', 1);
+    $this->assertDatabaseHas('audit_logs', ['user_id' => $superAdministrator->id, 'action' => 'gmail.connected_by_admin']);
+});

@@ -7,6 +7,7 @@ import {
     Inbox,
     Mail,
     MailOpen,
+    Plug,
     RefreshCw,
     SlidersHorizontal,
     Sparkles,
@@ -36,7 +37,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { index, markAllRead, update } from '@/routes/email-replies';
-import { syncFor } from '@/routes/gmail';
+import { connectFor, syncFor } from '@/routes/gmail';
 
 type Classification =
     | 'bounce'
@@ -224,9 +225,10 @@ export default function EmailRepliesIndex({
                     <CardHeader>
                         <CardTitle>Agent Gmail accounts</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            Each agent connects their own Gmail from their
-                            profile settings. Trigger a re-sync here if a
-                            mailbox looks stale.
+                            Every agent is listed here. They can connect
+                            their own Gmail from their profile settings, or
+                            you can connect it for them below. Trigger a
+                            re-sync if a mailbox looks stale.
                         </p>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -266,7 +268,7 @@ export default function EmailRepliesIndex({
                                                 </p>
                                             )}
                                         </div>
-                                        {agent.connection && (
+                                        {agent.connection ? (
                                             <Button
                                                 type="button"
                                                 size="sm"
@@ -287,6 +289,21 @@ export default function EmailRepliesIndex({
                                                 />
                                                 Sync
                                             </Button>
+                                        ) : (
+                                            <Form
+                                                {...connectFor.form(agent.id)}
+                                            >
+                                                {({ processing }) => (
+                                                    <Button
+                                                        type="submit"
+                                                        size="sm"
+                                                        disabled={processing}
+                                                    >
+                                                        <Plug />
+                                                        Connect
+                                                    </Button>
+                                                )}
+                                            </Form>
                                         )}
                                     </div>
                                 ))}
@@ -294,7 +311,7 @@ export default function EmailRepliesIndex({
                         ) : (
                             <p className="flex items-center gap-2 px-5 py-8 text-sm text-muted-foreground">
                                 <Mail className="size-4" />
-                                No agents have connected Gmail yet.
+                                No agents to connect yet.
                             </p>
                         )}
                     </CardContent>

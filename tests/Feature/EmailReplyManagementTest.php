@@ -36,6 +36,25 @@ it('shows a super administrator every agents replies', function () {
         ->has('agentGmailConnections', 2));
 });
 
+it('lists every active agent in the Gmail accounts panel, including those who have never connected', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $connectedAgent = User::factory()->create(['name' => 'Connected Agent']);
+    GmailConnection::factory()->for($connectedAgent)->create();
+    $unconnectedAgent = User::factory()->create(['name' => 'Dexter']);
+    $inactiveAgent = User::factory()->inactive()->create(['name' => 'Former Agent']);
+    $administrator = User::factory()->administrator()->create(['name' => 'Some Admin']);
+
+    $response = $this->actingAs($superAdministrator)->get(route('email-replies.index'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('email-replies/index')
+        ->has('agentGmailConnections', 2)
+        ->where('agentGmailConnections.0.name', $connectedAgent->name)
+        ->where('agentGmailConnections.0.connection.id', fn ($id) => $id !== null)
+        ->where('agentGmailConnections.1.name', $unconnectedAgent->name)
+        ->where('agentGmailConnections.1.connection', null));
+});
+
 it('filters replies by classification date and search text', function () {
     $this->travelTo('2026-09-01 12:00:00');
     $superAdministrator = User::factory()->superAdministrator()->create();

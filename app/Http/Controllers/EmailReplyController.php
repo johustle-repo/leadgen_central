@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\AccountStatus;
 use App\Http\Requests\UpdateEmailReplyRequest;
 use App\Models\AuditLog;
 use App\Models\EmailReply;
 use App\Models\User;
 use App\Services\EmailReplyTextExtractor;
+use App\UserRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
@@ -61,8 +63,9 @@ class EmailReplyController extends Controller
                 'needs_review' => (clone $authorizedReplies)->where('classification', 'needs_review')->count(),
             ],
             'agentGmailConnections' => User::query()
+                ->where('role', UserRole::Agent)
+                ->where('status', AccountStatus::Active)
                 ->with(['gmailConnections' => fn ($query) => $query->latest('id')->limit(1)])
-                ->whereHas('gmailConnections')
                 ->orderBy('name')
                 ->get(['id', 'name', 'role'])
                 ->map(fn (User $agent): array => [

@@ -81,6 +81,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::post('email-sequences/enroll', [EmailSequenceController::class, 'enroll'])->middleware('throttle:30,1')->name('email-sequences.enroll');
     Route::delete('email-sequences/enrollments/{enrollment}', [EmailSequenceController::class, 'cancel'])->name('email-sequences.cancel');
     Route::post('integrations/gmail/connect', [GmailConnectionController::class, 'connect'])->middleware('throttle:integrations')->name('gmail.connect');
+    Route::post('integrations/gmail/{user}/connect', [GmailConnectionController::class, 'connectFor'])->middleware('throttle:integrations')->name('gmail.connect-for');
     Route::get('integrations/gmail/callback', [GmailConnectionController::class, 'callback'])->name('gmail.callback');
     Route::post('integrations/gmail/sync', [GmailConnectionController::class, 'sync'])->middleware('throttle:integrations')->name('gmail.sync');
     Route::post('integrations/gmail/{user}/sync', [GmailConnectionController::class, 'syncFor'])->middleware('throttle:integrations')->name('gmail.sync-for');

@@ -19,8 +19,28 @@ class GmailConnectionController extends Controller
 {
     public function connect(Request $request, GmailOAuthService $gmail): Response
     {
+        return $this->redirectToGoogle($request, $gmail, $request->user());
+    }
+
+    /**
+     * Super Administrator initiates the OAuth flow on behalf of another
+     * user (e.g. an agent who needs help connecting their mailbox). The
+     * agent's own Google account must be the one that signs in and
+     * approves consent - the resulting connection is saved under their
+     * user, not the administrator's.
+     */
+    public function connectFor(Request $request, User $user, GmailOAuthService $gmail): Response
+    {
+        Gate::authorize('manage-agent-gmail');
+
+        return $this->redirectToGoogle($request, $gmail, $user);
+    }
+
+    private function redirectToGoogle(Request $request, GmailOAuthService $gmail, User $forUser): Response
+    {
         $state = Str::random(64);
         $request->session()->put('gmail_oauth_state', $state);
+        $request->session()->put('gmail_oauth_user_id', $forUser->id);
 
         return Inertia::location($gmail->authorizationUrl($state));
     }
@@ -29,6 +49,10 @@ class GmailConnectionController extends Controller
     {
         $expectedState = (string) $request->session()->pull('gmail_oauth_state', '');
         abort_unless($expectedState !== '' && hash_equals($expectedState, $request->string('state')->toString()), 403);
+
+        $targetUserId = $request->session()->pull('gmail_oauth_user_id');
+        $targetUser = $targetUserId !== null ? User::query()->whereKey($targetUserId)->first() : null;
+        $targetUser ??= $request->user();
 
         if ($request->filled('error')) {
             return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'error', 'message' => 'Gmail access was not approved.']);
@@ -45,14 +69,14 @@ class GmailConnectionController extends Controller
             return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'error', 'message' => 'Gmail connection failed. Please try again or contact an administrator.']);
         }
 
-        $existing = GmailConnection::query()->whereBelongsTo($request->user())->first();
+        $existing = GmailConnection::query()->whereBelongsTo($targetUser)->first();
         $refreshToken = (string) ($tokens['refresh_token'] ?? $existing->refresh_token ?? '');
         if ($refreshToken === '') {
             return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'error', 'message' => 'Google did not provide offline access. Disconnect the app in Google and connect again.']);
         }
 
         $connection = GmailConnection::query()->updateOrCreate(
-            ['user_id' => $request->user()->id],
+            ['user_id' => $targetUser->id],
             [
                 'gmail_address' => (string) $profile['emailAddress'],
                 'access_token' => (string) $tokens['access_token'],
@@ -63,10 +87,21 @@ class GmailConnectionController extends Controller
                 'last_error' => null,
             ],
         );
-        $this->audit($request, 'gmail.connected', $connection, "Connected Gmail mailbox {$connection->gmail_address}.");
+
+        $onBehalfOfSomeoneElse = $targetUser->isNot($request->user());
+        $this->audit(
+            $request,
+            $onBehalfOfSomeoneElse ? 'gmail.connected_by_admin' : 'gmail.connected',
+            $connection,
+            $onBehalfOfSomeoneElse
+                ? "Connected Gmail mailbox {$connection->gmail_address} for {$targetUser->name}."
+                : "Connected Gmail mailbox {$connection->gmail_address}.",
+        );
         SyncGmailReplies::dispatch($connection->id);
 
-        return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'success', 'message' => 'Gmail connected. Initial reply synchronization was queued.']);
+        return redirect($this->connectionHomeUrl($request))->with('toast', ['type' => 'success', 'message' => $onBehalfOfSomeoneElse
+            ? "Gmail connected for {$targetUser->name}. Initial reply synchronization was queued."
+            : 'Gmail connected. Initial reply synchronization was queued.']);
     }
 
     public function sync(Request $request): RedirectResponse
@@ -87,7 +122,7 @@ class GmailConnectionController extends Controller
      */
     public function syncFor(Request $request, User $user): RedirectResponse
     {
-        Gate::authorize('sync-agent-gmail');
+        Gate::authorize('manage-agent-gmail');
 
         $connection = GmailConnection::query()->whereBelongsTo($user)->first();
         if ($connection === null) {
