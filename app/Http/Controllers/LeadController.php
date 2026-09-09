@@ -141,10 +141,16 @@ class LeadController extends Controller
         if ($user->isSuperAdministrator()) {
             $query->withCount(['emailReplies', 'emailReplies as unread_email_replies_count' => fn ($query) => $query->where('is_read', false)]);
         }
-        if (! $user->canViewAllLeads()) {
+        $search = $request->string('search')->trim()->toString();
+        // A search reaches every lead in the database regardless of who owns
+        // it, so an agent can find a company even if it belongs to a
+        // colleague. Browsing without a search term stays scoped to the
+        // agent's own leads, and editing another agent's lead is still
+        // blocked by the update policy.
+        if (! $user->canViewAllLeads() && $search === '') {
             $query->whereBelongsTo($user, 'agent');
         }
-        if ($search = $request->string('search')->trim()->toString()) {
+        if ($search !== '') {
             // Company names imported from CSVs often carry stray spacing,
             // punctuation, or casing that defeats a literal LIKE match, so
             // also compare against the same normalized form used to store

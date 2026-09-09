@@ -411,13 +411,22 @@ it('requires at least one valid lead for bulk deletion', function () {
     $this->assertDatabaseCount('audit_logs', 0);
 });
 
-it('combines enhanced search filters while preserving agent ownership restrictions', function () {
+it('combines enhanced search filters and reaches every agents leads while searching', function () {
     $agent = User::factory()->create();
     $otherAgent = User::factory()->create();
     $matching = Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Target Manufacturing', 'website_domain' => 'target.test', 'country' => 'United States', 'status' => 'qualified_lead', 'validation_status' => 'verified', 'created_by' => $agent->id]);
-    Lead::factory()->for($otherAgent, 'agent')->create(['company_name' => 'Target Manufacturing Secret', 'website_domain' => 'target.test', 'country' => 'United States', 'status' => 'qualified_lead', 'validation_status' => 'verified', 'created_by' => $otherAgent->id]);
+    $colleagueMatch = Lead::factory()->for($otherAgent, 'agent')->create(['company_name' => 'Target Manufacturing Secret', 'website_domain' => 'target.test', 'country' => 'United States', 'status' => 'qualified_lead', 'validation_status' => 'verified', 'created_by' => $otherAgent->id]);
 
     $response = $this->actingAs($agent)->get(route('leads.index', ['search' => 'target.test', 'status' => 'qualified_lead', 'validation_status' => 'verified', 'country' => 'United States']));
 
-    $response->assertOk()->assertSee($matching->company_name)->assertDontSee('Target Manufacturing Secret');
+    // Searching reaches every agent's leads, but only the agent's own lead
+    // is editable.
+    $response->assertOk()->assertSee($matching->company_name)->assertSee('Target Manufacturing Secret');
+    $leadsById = collect($response->viewData('page')['props']['leads']['data'])->keyBy('id');
+    expect($leadsById[$matching->id]['can_update'])->toBeTrue();
+    expect($leadsById[$colleagueMatch->id]['can_update'])->toBeFalse();
+
+    // Browsing without a search term stays scoped to the agent's own leads.
+    $this->actingAs($agent)->get(route('leads.index'))
+        ->assertOk()->assertSee($matching->company_name)->assertDontSee('Target Manufacturing Secret');
 });
