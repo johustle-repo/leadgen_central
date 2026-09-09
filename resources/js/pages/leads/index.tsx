@@ -156,19 +156,15 @@ export default function LeadsIndex({
         );
     };
 
-    // Searches every lead in the database that matches the keyword, ignoring
-    // the lead-date filter (which otherwise scopes the list to a single day).
+    // Searches every lead in the database that matches the keyword as a
+    // standalone action: it ignores every other filter (date, agent, sort,
+    // status, etc.) instead of combining with whatever is currently set.
     const searchAllLeads = () => {
         setSelectedDate('');
+        setAgentFilter(ALL_AGENTS);
         router.get(
             index.url(),
-            {
-                search: searchTerm,
-                per_page: filters.per_page || '10',
-                agent_id: agentFilter === ALL_AGENTS ? undefined : agentFilter,
-                sort: filters.sort,
-                direction: filters.direction,
-            },
+            { search: searchTerm, per_page: '100' },
             { preserveState: true, replace: true },
         );
     };
@@ -249,7 +245,7 @@ export default function LeadsIndex({
                     icon={SlidersHorizontal}
                     label="Filters"
                     gridClassName="sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]"
-                    hint="Search matches company, contact, email, phone, location, and more across every lead. Press the search button (or Enter) to search all leads regardless of the lead date filter."
+                    hint="Search matches company, contact, email, phone, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of every other filter below."
                 >
                     <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
                         <label

@@ -22,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -144,7 +145,12 @@ class LeadController extends Controller
             $query->whereBelongsTo($user, 'agent');
         }
         if ($search = $request->string('search')->trim()->toString()) {
-            $query->where(fn ($q) => $q->where('lead_code', 'like', "%{$search}%")->orWhere('company_name', 'like', "%{$search}%")->orWhere('website', 'like', "%{$search}%")->orWhere('website_domain', 'like', "%{$search}%")->orWhere('contact_person', 'like', "%{$search}%")->orWhere('position', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")->orWhere('city', 'like', "%{$search}%")->orWhere('state_province', 'like', "%{$search}%")->orWhere('country', 'like', "%{$search}%")->orWhere('country_code', 'like', "%{$search}%")->orWhere('industry', 'like', "%{$search}%")->orWhere('business_type', 'like', "%{$search}%")->orWhere('linkedin_url', 'like', "%{$search}%")->orWhere('import_trades', 'like', "%{$search}%")->orWhere('data_source', 'like', "%{$search}%")->orWhere('source_url', 'like', "%{$search}%")->orWhere('notes', 'like', "%{$search}%")->orWhereHas('agent', fn ($agent) => $agent->where('name', 'like', "%{$search}%"))->orWhereHas('uploadBatch', fn ($batch) => $batch->where('batch_code', 'like', "%{$search}%")));
+            // Company names imported from CSVs often carry stray spacing,
+            // punctuation, or casing that defeats a literal LIKE match, so
+            // also compare against the same normalized form used to store
+            // normalized_company_name.
+            $normalizedSearch = Str::of($search)->lower()->ascii()->replaceMatches('/[^a-z0-9]+/', ' ')->squish()->toString();
+            $query->where(fn ($q) => $q->where('lead_code', 'like', "%{$search}%")->orWhere('company_name', 'like', "%{$search}%")->orWhere('normalized_company_name', 'like', "%{$normalizedSearch}%")->orWhere('website', 'like', "%{$search}%")->orWhere('website_domain', 'like', "%{$search}%")->orWhere('contact_person', 'like', "%{$search}%")->orWhere('position', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")->orWhere('city', 'like', "%{$search}%")->orWhere('state_province', 'like', "%{$search}%")->orWhere('country', 'like', "%{$search}%")->orWhere('country_code', 'like', "%{$search}%")->orWhere('industry', 'like', "%{$search}%")->orWhere('business_type', 'like', "%{$search}%")->orWhere('linkedin_url', 'like', "%{$search}%")->orWhere('import_trades', 'like', "%{$search}%")->orWhere('data_source', 'like', "%{$search}%")->orWhere('source_url', 'like', "%{$search}%")->orWhere('notes', 'like', "%{$search}%")->orWhereHas('agent', fn ($agent) => $agent->where('name', 'like', "%{$search}%"))->orWhereHas('uploadBatch', fn ($batch) => $batch->where('batch_code', 'like', "%{$search}%")));
         }
         foreach (['status', 'source', 'country'] as $filter) {
             if ($value = $request->string($filter)->toString()) {
