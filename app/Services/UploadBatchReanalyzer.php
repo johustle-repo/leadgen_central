@@ -16,13 +16,16 @@ class UploadBatchReanalyzer
     {
         return DB::transaction(function () use ($uploadBatch): int {
             $batch = UploadBatch::query()->lockForUpdate()->findOrFail($uploadBatch->id);
-            // Duplicate rows are re-checked against the latest matching rules, and rows
-            // rejected only because the per-company contact cap was hit are retried too -
-            // that cap is disabled for now, so those contacts should go through if re-run.
+            // Duplicate rows are re-checked against the latest matching rules. Rows
+            // rejected only because the per-company contact cap was hit are retried
+            // too - that cap is disabled for now, so those contacts should go
+            // through if re-run. Rows rejected by field validation are retried as
+            // well, since that's where an old required/format-checked LinkedIn URL
+            // would have cost a row its place before LinkedIn became optional.
             $rows = $batch->rows()
                 ->where(function ($query): void {
                     $query->where('processing_status', UploadRowStatus::Duplicate)
-                        ->orWhereIn('error_category', ['exact_duplicate', 'possible_duplicate', 'company_contact_limit']);
+                        ->orWhereIn('error_category', ['exact_duplicate', 'possible_duplicate', 'company_contact_limit', 'validation']);
                 })
                 ->get();
 

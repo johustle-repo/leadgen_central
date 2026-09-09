@@ -476,60 +476,23 @@ export default function UploadIndex({
                                             )}
                                             {batch.processing_status ===
                                                 'completed' && (
-                                                <Dialog>
-                                                    <DialogTrigger asChild>
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
-                                                        >
-                                                            <RotateCcw />
-                                                            Re-analyze
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                    <DialogContent>
-                                                        <DialogTitle>
-                                                            Re-analyze this
-                                                            upload?
-                                                        </DialogTitle>
-                                                        <DialogDescription>
-                                                            Duplicate rows, and
-                                                            any rows only
-                                                            rejected for
-                                                            exceeding the
-                                                            per-company contact
-                                                            limit, will be
-                                                            re-checked using the
-                                                            latest rules.
-                                                        </DialogDescription>
-                                                        <DialogFooter>
-                                                            <DialogClose
-                                                                asChild
-                                                            >
-                                                                <Button variant="secondary">
-                                                                    Cancel
-                                                                </Button>
-                                                            </DialogClose>
-                                                            <Button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    router.post(
-                                                                        reanalyze(
-                                                                            batch.id,
-                                                                        ),
-                                                                        {},
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                Re-analyze
-                                                            </Button>
-                                                        </DialogFooter>
-                                                    </DialogContent>
-                                                </Dialog>
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                                                >
+                                                    <Link
+                                                        href={reanalyze(
+                                                            batch.id,
+                                                        )}
+                                                        method="post"
+                                                        preserveScroll
+                                                    >
+                                                        <RotateCcw />
+                                                        Re-analyze
+                                                    </Link>
+                                                </Button>
                                             )}
                                             {isAdministrator &&
                                                 [

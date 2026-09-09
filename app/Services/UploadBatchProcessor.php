@@ -59,7 +59,9 @@ class UploadBatchProcessor
                 continue;
             }
             $processed = $this->mappedData($batch, $raw);
-            $validator = Validator::make($processed, ['lead_date' => ['nullable', 'date'], 'company_name' => ['required', 'string', 'max:255'], 'website' => ['nullable', 'string', 'max:255'], 'country_code' => ['nullable', 'string', 'size:2'], 'email' => ['nullable', 'email', 'max:255'], 'linkedin_url' => ['nullable', 'url:http,https', 'max:255'], 'source_url' => ['nullable', 'url:http,https', 'max:255']]);
+            // LinkedIn is optional and never blocks a row: a missing or
+            // malformed LinkedIn value should never cost a lead its place.
+            $validator = Validator::make($processed, ['lead_date' => ['nullable', 'date'], 'company_name' => ['required', 'string', 'max:255'], 'website' => ['nullable', 'string', 'max:255'], 'country_code' => ['nullable', 'string', 'size:2'], 'email' => ['nullable', 'email', 'max:255'], 'linkedin_url' => ['nullable', 'string', 'max:255'], 'source_url' => ['nullable', 'url:http,https', 'max:255']]);
             if ($validator->fails()) {
                 $row->update(['processed_data' => $processed, 'processing_status' => UploadRowStatus::Rejected, 'error_category' => 'validation', 'error_message' => $validator->errors()->first()]);
 
@@ -122,12 +124,17 @@ class UploadBatchProcessor
             $processed['country_code'] = strtoupper((string) $processed['country']);
             unset($processed['country']);
         }
-        $processed['lead_date'] = $this->resolveLeadDate($processed['lead_date'] ?? null, $batch->original_filename);
+        $processed['lead_date'] = $this->resolveLeadDate($processed['lead_date'] ?? null, $batch);
 
         return $processed;
     }
 
-    private function resolveLeadDate(mixed $value, string $filename): ?string
+    /**
+     * Every imported lead gets a date: an explicit column value wins, then a
+     * date embedded in the filename, and finally the date the file itself
+     * was uploaded - so lead_date is never left blank.
+     */
+    private function resolveLeadDate(mixed $value, UploadBatch $batch): ?string
     {
         $dateValue = trim((string) $value);
         if ($dateValue !== '') {
@@ -145,11 +152,14 @@ class UploadBatchProcessor
             return $dateValue;
         }
 
+        return $this->dateFromFilename($batch->original_filename) ?? $batch->created_at?->toDateString();
+    }
+
+    private function dateFromFilename(string $filename): ?string
+    {
         if (preg_match('/(?<!\d)(\d{2})[-_](\d{2})[-_](\d{4})(?!\d)/', $filename, $matches) === 1) {
             try {
-                $date = Date::createFromFormat('m-d-Y', "{$matches[1]}-{$matches[2]}-{$matches[3]}");
-
-                return $date?->toDateString();
+                return Date::createFromFormat('m-d-Y', "{$matches[1]}-{$matches[2]}-{$matches[3]}")?->toDateString();
             } catch (Throwable) {
                 return null;
             }
@@ -157,9 +167,7 @@ class UploadBatchProcessor
 
         if (preg_match('/(?<!\d)(\d{4})[-_](\d{2})[-_](\d{2})(?!\d)/', $filename, $matches) === 1) {
             try {
-                $date = Date::createFromFormat('Y-m-d', "{$matches[1]}-{$matches[2]}-{$matches[3]}");
-
-                return $date?->toDateString();
+                return Date::createFromFormat('Y-m-d', "{$matches[1]}-{$matches[2]}-{$matches[3]}")?->toDateString();
             } catch (Throwable) {
                 return null;
             }

@@ -316,6 +316,38 @@ it('no longer rejects uploaded contacts beyond an agents company limit while the
     $this->assertDatabaseMissing('upload_rows', ['upload_batch_id' => $batch->id, 'error_category' => 'company_contact_limit']);
 });
 
+it('retains a lead whose LinkedIn value is empty or badly formatted', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'linkedin.csv',
+        "Company,Email,LinkedIn\nAcme,ada@acme.test,not-a-valid-url\nOther Co,other@acme.test,\n",
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'linkedin_url',
+    ]]);
+
+    $this->assertDatabaseHas('leads', ['company_name' => 'Acme', 'email' => 'ada@acme.test', 'linkedin_url' => 'not-a-valid-url']);
+    $this->assertDatabaseHas('leads', ['company_name' => 'Other Co', 'email' => 'other@acme.test', 'linkedin_url' => null]);
+    $this->assertDatabaseMissing('upload_rows', ['upload_batch_id' => $batch->id, 'error_category' => 'validation']);
+});
+
+it('auto-detects a lead date from the upload date when none is provided', function () {
+    Storage::fake('local');
+    $this->travelTo('2026-08-25 09:00:00');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent('no-date.csv', "Company,Email\nAcme,ada@acme.test\n");
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [0 => 'company_name', 1 => 'email']]);
+
+    $this->assertDatabaseHas('leads', ['company_name' => 'Acme', 'email' => 'ada@acme.test', 'lead_date' => '2026-08-25 00:00:00']);
+});
+
 it('re-analyzes duplicate rows from the stored upload without uploading again', function () {
     Storage::fake('local');
     $agent = User::factory()->create();
@@ -375,6 +407,34 @@ it('re-analyzes rows previously rejected for the disabled company contact limit'
     // No country/city column was mapped, so the row lands on "needs review" for its
     // location rather than a clean "accepted" - either way, it's no longer rejected.
     $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 2, 'processing_status' => 'needs_review', 'error_category' => 'location']);
+});
+
+it('re-analyzes rows previously rejected by validation, such as an old LinkedIn format check', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    Storage::disk('local')->put('lead-imports/reanalyze-validation.csv', "Company,Name,Email,LinkedIn\nAcme,Ada Lovelace,ada@acme.test,not-a-valid-url\n");
+    $batch = UploadBatch::factory()->for($agent)->create([
+        'stored_filename' => 'lead-imports/reanalyze-validation.csv',
+        'headers' => ['Company', 'Name', 'Email', 'LinkedIn'],
+        'column_mapping' => ['Company' => 'company_name', 'Name' => 'contact_person', 'Email' => 'email', 'LinkedIn' => 'linkedin_url'],
+        'processing_status' => 'completed',
+        'total_rows' => 1,
+        'rejected_rows' => 1,
+        'invalid_rows' => 1,
+    ]);
+    UploadRow::factory()->for($batch)->create([
+        'row_number' => 2,
+        'processing_status' => 'rejected',
+        'error_category' => 'validation',
+        'error_message' => 'The linkedin url field must be a valid URL.',
+    ]);
+
+    $response = $this->actingAs($agent)->post(route('uploads.reanalyze', $batch));
+
+    $response->assertRedirect()->assertSessionHas('toast');
+    expect($batch->refresh()->accepted_rows)->toBe(1)
+        ->and($batch->rejected_rows)->toBe(0);
+    $this->assertDatabaseHas('leads', ['upload_batch_id' => $batch->id, 'contact_person' => 'Ada Lovelace', 'email' => 'ada@acme.test', 'linkedin_url' => 'not-a-valid-url']);
 });
 
 it('prevents an agent from re-analyzing another agents upload', function () {

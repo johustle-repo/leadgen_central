@@ -138,7 +138,7 @@ class UploadBatchController extends Controller
         $rowCount = $reanalyzer->prepare($uploadBatch);
 
         if ($rowCount === 0) {
-            return back()->with('toast', ['type' => 'info', 'message' => 'This upload has no duplicate or capped rows to re-analyze.']);
+            return back()->with('toast', ['type' => 'info', 'message' => 'This upload has no duplicate, capped, or rejected rows to re-analyze.']);
         }
 
         ProcessUploadBatch::dispatch($uploadBatch->id);
