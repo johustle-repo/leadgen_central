@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Exceptions\GmailReauthorizationRequiredException;
 use App\Models\GmailConnection;
 use App\Services\GmailReplySynchronizer;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -29,9 +30,20 @@ class SyncGmailReplies implements ShouldBeUnique, ShouldQueue
      */
     public function handle(GmailReplySynchronizer $synchronizer): void
     {
-        $connection = GmailConnection::query()->where('status', 'active')->find($this->gmailConnectionId);
-        if ($connection !== null) {
+        // Looked up by id alone (not scoped to status = active) so a manual
+        // "Sync" click on a previously failed connection genuinely retries
+        // instead of silently doing nothing.
+        $connection = GmailConnection::query()->find($this->gmailConnectionId);
+        if ($connection === null) {
+            return;
+        }
+
+        try {
             $synchronizer->sync($connection);
+        } catch (GmailReauthorizationRequiredException $exception) {
+            // Retrying won't help until the mailbox is reconnected, so stop
+            // burning retry attempts and report it right away.
+            $this->fail($exception);
         }
     }
 
@@ -42,9 +54,12 @@ class SyncGmailReplies implements ShouldBeUnique, ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        $isReauthRequired = $exception instanceof GmailReauthorizationRequiredException;
         GmailConnection::query()->whereKey($this->gmailConnectionId)->update([
-            'status' => 'error',
-            'last_error' => $exception?->getMessage() ?? 'Gmail synchronization failed.',
+            'status' => $isReauthRequired ? 'expired' : 'error',
+            'last_error' => $isReauthRequired
+                ? $exception->getMessage()
+                : 'Gmail synchronization failed. Try again, or reconnect this account if the problem continues.',
         ]);
     }
 }

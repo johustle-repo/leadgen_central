@@ -1,6 +1,6 @@
 import { Form, Head, usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
-import { Mail, RefreshCw, Unplug, UserRound } from 'lucide-react';
+import { Mail, Plug, RefreshCw, Unplug, UserRound } from 'lucide-react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import InputError from '@/components/input-error';
@@ -181,24 +181,39 @@ export default function Profile({
                                 )}
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <Form {...sync.form()}>
-                                    {({ processing }) => (
-                                        <Button
-                                            type="submit"
-                                            size="sm"
-                                            disabled={processing}
-                                        >
-                                            <RefreshCw
-                                                className={
-                                                    processing
-                                                        ? 'animate-spin'
-                                                        : ''
-                                                }
-                                            />
-                                            Sync now
-                                        </Button>
-                                    )}
-                                </Form>
+                                {gmailConnection.status === 'expired' ? (
+                                    <Form {...connect.form()}>
+                                        {({ processing }) => (
+                                            <Button
+                                                type="submit"
+                                                size="sm"
+                                                disabled={processing}
+                                            >
+                                                <Plug />
+                                                Reconnect
+                                            </Button>
+                                        )}
+                                    </Form>
+                                ) : (
+                                    <Form {...sync.form()}>
+                                        {({ processing }) => (
+                                            <Button
+                                                type="submit"
+                                                size="sm"
+                                                disabled={processing}
+                                            >
+                                                <RefreshCw
+                                                    className={
+                                                        processing
+                                                            ? 'animate-spin'
+                                                            : ''
+                                                    }
+                                                />
+                                                Sync now
+                                            </Button>
+                                        )}
+                                    </Form>
+                                )}
                                 <Form {...disconnect.form()}>
                                     {({ processing }) => (
                                         <Button

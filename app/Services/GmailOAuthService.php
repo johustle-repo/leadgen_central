@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\GmailReauthorizationRequiredException;
 use App\Models\GmailConnection;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -50,13 +51,21 @@ class GmailOAuthService
             return $connection->access_token;
         }
 
-        $tokens = Http::asForm()->acceptJson()->timeout(20)->retry(3, 250)
+        // throw: false so a 400 invalid_grant response can be inspected below
+        // instead of retry() immediately raising the raw HTTP exception.
+        $response = Http::asForm()->acceptJson()->timeout(20)->retry(3, 250, throw: false)
             ->post('https://oauth2.googleapis.com/token', [
                 'client_id' => $this->config('client_id'),
                 'client_secret' => $this->config('client_secret'),
                 'grant_type' => 'refresh_token',
                 'refresh_token' => $connection->refresh_token,
-            ])->throw()->json();
+            ]);
+
+        if ($response->status() === 400 && $response->json('error') === 'invalid_grant') {
+            throw new GmailReauthorizationRequiredException;
+        }
+
+        $tokens = $response->throw()->json();
 
         $connection->update([
             'access_token' => (string) $tokens['access_token'],

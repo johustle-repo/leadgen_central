@@ -268,7 +268,23 @@ export default function EmailRepliesIndex({
                                                 </p>
                                             )}
                                         </div>
-                                        {agent.connection ? (
+                                        {agent.connection?.status ===
+                                        'expired' ? (
+                                            <Form
+                                                {...connectFor.form(agent.id)}
+                                            >
+                                                {({ processing }) => (
+                                                    <Button
+                                                        type="submit"
+                                                        size="sm"
+                                                        disabled={processing}
+                                                    >
+                                                        <Plug />
+                                                        Reconnect
+                                                    </Button>
+                                                )}
+                                            </Form>
+                                        ) : agent.connection ? (
                                             <Button
                                                 type="button"
                                                 size="sm"
