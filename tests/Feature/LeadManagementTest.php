@@ -94,6 +94,7 @@ it('normalizes manually entered contact names to title case', function (string $
     $response = $this->actingAs($agent)->post(route('leads.store'), [
         'company_name' => 'Acme Ventures',
         'contact_person' => $contactName,
+        'email' => 'jonathan@acme.test',
     ]);
 
     $response->assertRedirect(route('leads.create'));
@@ -197,6 +198,7 @@ it('rejects a manually added lead whose email already exists for another agent',
 
     $response = $this->actingAs($agent)->post(route('leads.store'), [
         'company_name' => 'Duplicate Contact Co',
+        'contact_person' => 'Duplicate Contact',
         'email' => 'Shared@Acme.test',
     ]);
 

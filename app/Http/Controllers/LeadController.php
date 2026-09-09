@@ -135,7 +135,7 @@ class LeadController extends Controller
     {
         Gate::authorize('viewAny', Lead::class);
         $user = $request->user();
-        $columns = ['id', 'lead_code', 'agent_id', 'upload_batch_id', 'company_name', 'website', 'website_domain', 'city', 'country', 'country_code', 'contact_person', 'position', 'email', 'phone', 'industry', 'status', 'validation_status', 'source', 'created_at'];
+        $columns = ['id', 'lead_code', 'agent_id', 'upload_batch_id', 'company_name', 'website', 'website_domain', 'city', 'country', 'country_code', 'contact_person', 'position', 'email', 'phone', 'industry', 'status', 'validation_status', 'source', 'lead_date', 'created_at'];
         $query = Lead::query()->select(array_map(fn (string $column): string => "leads.{$column}", $columns))->with(['agent:id,name', 'uploadBatch:id,batch_code']);
         if ($user->isSuperAdministrator()) {
             $query->withCount(['emailReplies', 'emailReplies as unread_email_replies_count' => fn ($query) => $query->where('is_read', false)]);
@@ -144,7 +144,7 @@ class LeadController extends Controller
             $query->whereBelongsTo($user, 'agent');
         }
         if ($search = $request->string('search')->trim()->toString()) {
-            $query->where(fn ($q) => $q->where('company_name', 'like', "%{$search}%")->orWhere('website', 'like', "%{$search}%")->orWhere('website_domain', 'like', "%{$search}%")->orWhere('contact_person', 'like', "%{$search}%")->orWhere('position', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")->orWhere('city', 'like', "%{$search}%")->orWhere('country', 'like', "%{$search}%")->orWhere('industry', 'like', "%{$search}%")->orWhereHas('agent', fn ($agent) => $agent->where('name', 'like', "%{$search}%"))->orWhereHas('uploadBatch', fn ($batch) => $batch->where('batch_code', 'like', "%{$search}%")));
+            $query->where(fn ($q) => $q->where('lead_code', 'like', "%{$search}%")->orWhere('company_name', 'like', "%{$search}%")->orWhere('website', 'like', "%{$search}%")->orWhere('website_domain', 'like', "%{$search}%")->orWhere('contact_person', 'like', "%{$search}%")->orWhere('position', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")->orWhere('city', 'like', "%{$search}%")->orWhere('state_province', 'like', "%{$search}%")->orWhere('country', 'like', "%{$search}%")->orWhere('country_code', 'like', "%{$search}%")->orWhere('industry', 'like', "%{$search}%")->orWhere('business_type', 'like', "%{$search}%")->orWhere('linkedin_url', 'like', "%{$search}%")->orWhere('import_trades', 'like', "%{$search}%")->orWhere('data_source', 'like', "%{$search}%")->orWhere('source_url', 'like', "%{$search}%")->orWhere('notes', 'like', "%{$search}%")->orWhereHas('agent', fn ($agent) => $agent->where('name', 'like', "%{$search}%"))->orWhereHas('uploadBatch', fn ($batch) => $batch->where('batch_code', 'like', "%{$search}%")));
         }
         foreach (['status', 'source', 'country'] as $filter) {
             if ($value = $request->string($filter)->toString()) {

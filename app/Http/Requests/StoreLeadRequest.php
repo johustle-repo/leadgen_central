@@ -38,7 +38,13 @@ class StoreLeadRequest extends FormRequest
      */
     public function rules(): array
     {
-        return self::leadRules();
+        return [
+            ...self::leadRules(),
+            // New leads must have a way to identify and reach the contact;
+            // LinkedIn stays optional since it isn't always available.
+            'contact_person' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+        ];
     }
 
     /** @return array<string, list<string>> */

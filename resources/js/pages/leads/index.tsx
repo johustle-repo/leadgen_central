@@ -56,6 +56,7 @@ type Lead = {
     lead_code: string;
     company_name: string;
     company_contact_count: number;
+    lead_date: string | null;
     city: string | null;
     country: string | null;
     contact_person: string | null;
@@ -71,6 +72,19 @@ type Lead = {
     unread_email_replies_count?: number;
 };
 type Agent = { id: number; name: string };
+const formatLeadDate = (value: string | null) => {
+    if (!value) {
+        return '—';
+    }
+
+    const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+
+    if (!year || !month || !day) {
+        return '—';
+    }
+
+    return new Date(year, month - 1, day).toLocaleDateString();
+};
 type Props = {
     leads: {
         data: Lead[];
@@ -92,6 +106,7 @@ export default function LeadsIndex({
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [selectedDate, setSelectedDate] = useState(filters.date || '');
+    const [searchTerm, setSearchTerm] = useState(filters.search || '');
     const ALL_AGENTS = '__all__';
     const [agentFilter, setAgentFilter] = useState(
         filters.agent_id || ALL_AGENTS,
@@ -137,6 +152,23 @@ export default function LeadsIndex({
         router.get(
             index.url(),
             Object.fromEntries(new FormData(event.currentTarget)),
+            { preserveState: true, replace: true },
+        );
+    };
+
+    // Searches every lead in the database that matches the keyword, ignoring
+    // the lead-date filter (which otherwise scopes the list to a single day).
+    const searchAllLeads = () => {
+        setSelectedDate('');
+        router.get(
+            index.url(),
+            {
+                search: searchTerm,
+                per_page: filters.per_page || '10',
+                agent_id: agentFilter === ALL_AGENTS ? undefined : agentFilter,
+                sort: filters.sort,
+                direction: filters.direction,
+            },
             { preserveState: true, replace: true },
         );
     };
@@ -217,7 +249,7 @@ export default function LeadsIndex({
                     icon={SlidersHorizontal}
                     label="Filters"
                     gridClassName="sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]"
-                    hint="Search matches company, contact, and email. Lead date filters by the date recorded on each lead, not when it was uploaded."
+                    hint="Search matches company, contact, email, phone, location, and more across every lead. Press the search button (or Enter) to search all leads regardless of the lead date filter."
                 >
                     <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
                         <label
@@ -227,14 +259,32 @@ export default function LeadsIndex({
                             Search
                         </label>
                         <div className="relative">
-                            <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 id="leads-search"
                                 name="search"
-                                defaultValue={filters.search}
+                                value={searchTerm}
+                                onChange={(event) =>
+                                    setSearchTerm(event.target.value)
+                                }
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        searchAllLeads();
+                                    }
+                                }}
                                 placeholder="Search leads…"
-                                className="pl-9"
+                                className="pr-24 pl-9"
                             />
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={searchAllLeads}
+                                className="absolute top-1/2 right-1 h-7 -translate-y-1/2"
+                            >
+                                <Search className="size-3.5" />
+                                Search
+                            </Button>
                         </div>
                     </div>
                     <div className="flex flex-col gap-1.5">
@@ -411,6 +461,7 @@ export default function LeadsIndex({
                                         />
                                     </TableHead>
                                 )}
+                                <TableHead>Date</TableHead>
                                 <TableHead>Company</TableHead>
                                 <TableHead>Location</TableHead>
                                 <TableHead>Contact</TableHead>
@@ -442,6 +493,9 @@ export default function LeadsIndex({
                                             />
                                         </TableCell>
                                     )}
+                                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                                        {formatLeadDate(lead.lead_date)}
+                                    </TableCell>
                                     <TableCell>
                                         <Link
                                             href={edit(lead.id)}

@@ -1,6 +1,6 @@
 import { Form, Head, router } from '@inertiajs/react';
 import { FileText, UserRound } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,33 @@ import {
 import { index, store, update } from '@/routes/leads';
 
 const NO_DATA_SOURCE = '__none__';
+const DRAFT_STORAGE_KEY = 'leadgen:add-lead-draft';
+
+function readDraft(): Record<string, string> {
+    try {
+        const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+
+        return raw ? JSON.parse(raw) : {};
+    } catch {
+        return {};
+    }
+}
+
+function writeDraft(values: Record<string, string>) {
+    try {
+        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(values));
+    } catch {
+        // Ignore storage failures (private browsing, quota, etc).
+    }
+}
+
+function clearDraft() {
+    try {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch {
+        // Ignore storage failures.
+    }
+}
 
 type CompanyContactCount = { company: string; agentId: string; count: number };
 
@@ -89,12 +116,19 @@ function DataSourceSelect({
     id,
     name,
     defaultValue,
+    onValueChange,
 }: {
     id: string;
     name: string;
     defaultValue: string;
+    onValueChange?: (value: string) => void;
 }) {
     const [value, setValue] = useState(defaultValue || NO_DATA_SOURCE);
+
+    const handleValueChange = (next: string) => {
+        setValue(next);
+        onValueChange?.(next === NO_DATA_SOURCE ? '' : next);
+    };
 
     return (
         <>
@@ -103,7 +137,7 @@ function DataSourceSelect({
                 name={name}
                 value={value === NO_DATA_SOURCE ? '' : value}
             />
-            <Select value={value} onValueChange={setValue}>
+            <Select value={value} onValueChange={handleValueChange}>
                 <SelectTrigger id={id} className="mt-2 w-full">
                     <SelectValue />
                 </SelectTrigger>
@@ -129,8 +163,13 @@ const fields = [
     { name: 'lead_date', label: 'Date', type: 'date' },
     { name: 'company_name', label: 'Company', required: true },
     { name: 'website', label: 'Website' },
-    { name: 'contact_person', label: 'First Name' },
-    { name: 'email', label: 'Email', type: 'email' },
+    { name: 'contact_person', label: 'First Name', requiredOnCreate: true },
+    {
+        name: 'email',
+        label: 'Email',
+        type: 'email',
+        requiredOnCreate: true,
+    },
     { name: 'country_code', label: 'Country', maxLength: 2 },
     { name: 'city', label: 'City' },
     { name: 'import_trades', label: 'Import Trades' },
@@ -159,9 +198,58 @@ export default function LeadForm({
     agents: Array<{ id: number; name: string }>;
 }) {
     const form = lead ? update.form(lead.id) : store.form();
-    const [selectedAgent, setSelectedAgent] = useState(
-        String(lead?.agent_id ?? defaults.agent_id ?? agents[0]?.id ?? ''),
+    const isCreating = !lead;
+    const [draft] = useState<Record<string, string>>(() =>
+        isCreating ? readDraft() : {},
     );
+    const defaultFor = (name: string) =>
+        String(lead?.[name] ?? draft[name] ?? defaults[name] ?? '');
+    const [selectedAgent, setSelectedAgent] = useState(
+        String(
+            lead?.agent_id ??
+                draft.agent_id ??
+                defaults.agent_id ??
+                agents[0]?.id ??
+                '',
+        ),
+    );
+    const autosaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+        undefined,
+    );
+
+    const scheduleAutosave = (formEl: HTMLFormElement | null) => {
+        if (!isCreating || !formEl) {
+            return;
+        }
+
+        if (autosaveTimer.current) {
+            clearTimeout(autosaveTimer.current);
+        }
+
+        autosaveTimer.current = setTimeout(() => {
+            writeDraft(
+                Object.fromEntries(
+                    new FormData(formEl),
+                ) as Record<string, string>,
+            );
+        }, 400);
+    };
+
+    const updateDraftField = (name: string, value: string) => {
+        if (!isCreating) {
+            return;
+        }
+
+        writeDraft({ ...readDraft(), [name]: value });
+    };
+
+    useEffect(() => {
+        return () => {
+            if (autosaveTimer.current) {
+                clearTimeout(autosaveTimer.current);
+            }
+        };
+    }, []);
 
     return (
         <>
@@ -171,6 +259,16 @@ export default function LeadForm({
                     key={formVersion}
                     {...form}
                     resetOnSuccess={!lead}
+                    onInput={(event) =>
+                        scheduleAutosave(
+                            (event.target as HTMLElement).closest('form'),
+                        )
+                    }
+                    onSuccess={() => {
+                        if (isCreating) {
+                            clearDraft();
+                        }
+                    }}
                     onError={(errors) => {
                         const companyError = errors.company_name;
 
@@ -216,12 +314,14 @@ export default function LeadForm({
                                         <Label htmlFor="agent_id">Agent</Label>
                                         <Select
                                             name="agent_id"
-                                            onValueChange={setSelectedAgent}
-                                            defaultValue={String(
-                                                lead?.agent_id ??
-                                                    defaults.agent_id ??
-                                                    agents[0]?.id,
-                                            )}
+                                            onValueChange={(value) => {
+                                                setSelectedAgent(value);
+                                                updateDraftField(
+                                                    'agent_id',
+                                                    value,
+                                                );
+                                            }}
+                                            defaultValue={selectedAgent}
                                         >
                                             <SelectTrigger
                                                 id="agent_id"
@@ -263,11 +363,13 @@ export default function LeadForm({
                                 <CardContent>
                                     <div className="grid gap-4 md:grid-cols-2">
                                         {fields.map((field) => {
-                                            const value = String(
-                                                lead?.[field.name] ??
-                                                    defaults[field.name] ??
-                                                    '',
+                                            const value = defaultFor(
+                                                field.name,
                                             );
+                                            const isRequired =
+                                                field.required ||
+                                                (field.requiredOnCreate &&
+                                                    isCreating);
 
                                             return (
                                                 <div
@@ -285,7 +387,7 @@ export default function LeadForm({
                                                             htmlFor={field.name}
                                                         >
                                                             {field.label}
-                                                            {field.required
+                                                            {isRequired
                                                                 ? ' *'
                                                                 : ''}
                                                         </Label>
@@ -307,6 +409,14 @@ export default function LeadForm({
                                                             id={field.name}
                                                             name={field.name}
                                                             defaultValue={value}
+                                                            onValueChange={(
+                                                                next,
+                                                            ) =>
+                                                                updateDraftField(
+                                                                    field.name,
+                                                                    next,
+                                                                )
+                                                            }
                                                         />
                                                     ) : (
                                                         <Input
@@ -326,7 +436,7 @@ export default function LeadForm({
                                                                     : value
                                                             }
                                                             required={
-                                                                field.required
+                                                                isRequired
                                                             }
                                                             maxLength={
                                                                 field.maxLength
