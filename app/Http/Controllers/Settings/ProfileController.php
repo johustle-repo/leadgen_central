@@ -20,10 +20,14 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+
         return Inertia::render('settings/profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
-            'gmailConnection' => GmailConnection::query()->whereBelongsTo($request->user())->first(['id', 'gmail_address', 'status', 'last_synced_at', 'last_error']),
+            'gmailConnection' => $user->isSuperAdministrator()
+                ? GmailConnection::query()->whereBelongsTo($user)->first(['id', 'gmail_address', 'status', 'last_synced_at', 'last_error'])
+                : null,
         ]);
     }
 

@@ -147,104 +147,107 @@ export default function Profile({
                 )}
             </Form>
 
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                            <Mail className="size-5" />
+            {auth.user.role === 'super_administrator' && (
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                <Mail className="size-5" />
+                            </div>
+                            <div>
+                                <CardTitle>Gmail connection</CardTitle>
+                                <CardDescription>
+                                    Connect your Gmail mailbox so replies to
+                                    your outreach can be captured
+                                    automatically.
+                                </CardDescription>
+                            </div>
                         </div>
-                        <div>
-                            <CardTitle>Gmail connection</CardTitle>
-                            <CardDescription>
-                                Connect your Gmail mailbox so replies to your
-                                outreach can be captured automatically.
-                            </CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {gmailConnection ? (
-                        <>
-                            <div className="text-sm">
-                                <p className="font-medium">
-                                    {gmailConnection.gmail_address}
-                                </p>
-                                <p className="text-muted-foreground">
-                                    {gmailConnection.last_synced_at
-                                        ? `Last synced ${gmailConnection.last_synced_at}`
-                                        : 'Not synced yet'}
-                                </p>
-                                {gmailConnection.last_error && (
-                                    <p className="mt-1 text-destructive">
-                                        {gmailConnection.last_error}
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {gmailConnection ? (
+                            <>
+                                <div className="text-sm">
+                                    <p className="font-medium">
+                                        {gmailConnection.gmail_address}
                                     </p>
-                                )}
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {gmailConnection.status === 'expired' ? (
-                                    <Form {...connect.form()}>
-                                        {({ processing }) => (
-                                            <Button
-                                                type="submit"
-                                                size="sm"
-                                                disabled={processing}
-                                            >
-                                                <Plug />
-                                                Reconnect
-                                            </Button>
-                                        )}
-                                    </Form>
-                                ) : (
-                                    <Form {...sync.form()}>
-                                        {({ processing }) => (
-                                            <Button
-                                                type="submit"
-                                                size="sm"
-                                                disabled={processing}
-                                            >
-                                                <RefreshCw
-                                                    className={
-                                                        processing
-                                                            ? 'animate-spin'
-                                                            : ''
-                                                    }
-                                                />
-                                                Sync now
-                                            </Button>
-                                        )}
-                                    </Form>
-                                )}
-                                <Form {...disconnect.form()}>
-                                    {({ processing }) => (
-                                        <Button
-                                            type="submit"
-                                            size="sm"
-                                            variant="outline"
-                                            disabled={processing}
-                                        >
-                                            <Unplug />
-                                            Disconnect
-                                        </Button>
+                                    <p className="text-muted-foreground">
+                                        {gmailConnection.last_synced_at
+                                            ? `Last synced ${gmailConnection.last_synced_at}`
+                                            : 'Not synced yet'}
+                                    </p>
+                                    {gmailConnection.last_error && (
+                                        <p className="mt-1 text-destructive">
+                                            {gmailConnection.last_error}
+                                        </p>
                                     )}
-                                </Form>
-                            </div>
-                        </>
-                    ) : (
-                        <Form {...connect.form()}>
-                            {({ processing }) => (
-                                <Button
-                                    type="submit"
-                                    size="sm"
-                                    disabled={processing}
-                                >
-                                    <Mail />
-                                    Connect Gmail
-                                </Button>
-                            )}
-                        </Form>
-                    )}
-                </CardContent>
-            </Card>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {gmailConnection.status === 'expired' ? (
+                                        <Form {...connect.form()}>
+                                            {({ processing }) => (
+                                                <Button
+                                                    type="submit"
+                                                    size="sm"
+                                                    disabled={processing}
+                                                >
+                                                    <Plug />
+                                                    Reconnect
+                                                </Button>
+                                            )}
+                                        </Form>
+                                    ) : (
+                                        <Form {...sync.form()}>
+                                            {({ processing }) => (
+                                                <Button
+                                                    type="submit"
+                                                    size="sm"
+                                                    disabled={processing}
+                                                >
+                                                    <RefreshCw
+                                                        className={
+                                                            processing
+                                                                ? 'animate-spin'
+                                                                : ''
+                                                        }
+                                                    />
+                                                    Sync now
+                                                </Button>
+                                            )}
+                                        </Form>
+                                    )}
+                                    <Form {...disconnect.form()}>
+                                        {({ processing }) => (
+                                            <Button
+                                                type="submit"
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={processing}
+                                            >
+                                                <Unplug />
+                                                Disconnect
+                                            </Button>
+                                        )}
+                                    </Form>
+                                </div>
+                            </>
+                        ) : (
+                            <Form {...connect.form()}>
+                                {({ processing }) => (
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        disabled={processing}
+                                    >
+                                        <Mail />
+                                        Connect Gmail
+                                    </Button>
+                                )}
+                            </Form>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             <DeleteUser />
         </>
