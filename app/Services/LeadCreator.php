@@ -32,11 +32,18 @@ class LeadCreator
             User::query()->whereKey($owner->id)->lockForUpdate()->firstOrFail();
 
             if ($batch === null && $normalized['email'] !== null) {
-                $existing = Lead::query()->where('email', $normalized['email'])->first(['id', 'lead_code', 'agent_id']);
+                $existing = Lead::query()->where('email', $normalized['email'])->with('agent:id,name')->first(['id', 'lead_code', 'agent_id', 'lead_date', 'created_at']);
 
                 if ($existing !== null) {
+                    $capturedOn = ($existing->lead_date ?? $existing->created_at)?->format('M j, Y') ?? 'an unknown date';
+                    $message = "This email is already saved as lead {$existing->lead_code}, captured on {$capturedOn}";
+
+                    if ($existing->agent_id !== $owner->id && $existing->agent?->name !== null) {
+                        $message .= ", owned by {$existing->agent->name}";
+                    }
+
                     throw ValidationException::withMessages([
-                        'email' => "This email is already saved as lead {$existing->lead_code}.",
+                        'email' => "{$message}.",
                     ]);
                 }
             }

@@ -188,10 +188,11 @@ it('no longer limits an agent to ten contacts from the same company while the ca
     expect(Lead::query()->whereBelongsTo($agent, 'agent')->count())->toBe(11);
 });
 
-it('rejects a manually added lead whose email already exists for another agent', function () {
-    $existingOwner = User::factory()->create();
-    Lead::factory()->for($existingOwner, 'agent')->create([
+it('rejects a manually added lead whose email already exists for another agent and names the owner', function () {
+    $existingOwner = User::factory()->create(['name' => 'Fiona Ley Maramba']);
+    $existingLead = Lead::factory()->for($existingOwner, 'agent')->create([
         'email' => 'shared@acme.test',
+        'lead_date' => '2026-08-01',
         'created_by' => $existingOwner->id,
     ]);
     $agent = User::factory()->create();
@@ -202,8 +203,29 @@ it('rejects a manually added lead whose email already exists for another agent',
         'email' => 'Shared@Acme.test',
     ]);
 
-    $response->assertSessionHasErrors('email');
+    $response->assertSessionHasErrors([
+        'email' => "This email is already saved as lead {$existingLead->lead_code}, captured on Aug 1, 2026, owned by Fiona Ley Maramba.",
+    ]);
     expect(Lead::query()->whereBelongsTo($agent, 'agent')->count())->toBe(0);
+});
+
+it('omits the owner name from the duplicate email message when the agent already owns the lead', function () {
+    $agent = User::factory()->create();
+    $existingLead = Lead::factory()->for($agent, 'agent')->create([
+        'email' => 'mine@acme.test',
+        'lead_date' => '2026-08-01',
+        'created_by' => $agent->id,
+    ]);
+
+    $response = $this->actingAs($agent)->post(route('leads.store'), [
+        'company_name' => 'Duplicate Contact Co',
+        'contact_person' => 'Duplicate Contact',
+        'email' => 'mine@acme.test',
+    ]);
+
+    $response->assertSessionHasErrors([
+        'email' => "This email is already saved as lead {$existingLead->lead_code}, captured on Aug 1, 2026.",
+    ]);
 });
 
 it('supports a safe lead quantity filter', function () {
