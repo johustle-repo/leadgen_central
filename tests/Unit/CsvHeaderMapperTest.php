@@ -27,8 +27,7 @@ it('maps the established cleaned lead file headings', function () {
 });
 
 it('maps every column of the default lead upload template', function () {
-    // This is the exact header row shipped in public/templates/lead-upload-template.csv,
-    // linked from the Upload Leads page as the recommended starting format.
+    // This is the recommended standard header row for lead upload CSVs.
     $mapping = (new CsvHeaderMapper)->map([
         'Date', 'Company', 'Website', 'First Name', 'Email', 'Country',
         'City', 'Import Trades', 'LinkedIn', 'Sources of Data', 'Source Link',

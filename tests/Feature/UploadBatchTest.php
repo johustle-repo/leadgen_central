@@ -178,10 +178,10 @@ it('uploads maps and processes valid and invalid CSV rows', function () {
 });
 
 it('accepts a lead when the CSV is missing some of the default template columns', function () {
-    // The default template (public/templates/lead-upload-template.csv) has Date, Company,
-    // Website, First Name, Email, Country, City, Import Trades, LinkedIn, Sources of Data,
-    // and Source Link - but a CSV missing some of those columns entirely must still process:
-    // the missing fields are simply left blank rather than rejecting the row.
+    // The recognized standard columns are Date, Company, Website, First Name, Email,
+    // Country, City, Import Trades, LinkedIn, Sources of Data, and Source Link - but a
+    // CSV missing some of those entirely must still process: the missing fields are
+    // simply left blank rather than rejecting the row.
     Storage::fake('local');
     $agent = User::factory()->create();
     $file = UploadedFile::fake()->createWithContent('minimal.csv', "Company,Email\nAcme,ada@acme.test\n");
