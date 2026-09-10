@@ -28,7 +28,6 @@ import {
 } from '@/components/ui/sidebar';
 import { isAdministratorRole } from '@/lib/utils';
 import { dashboard } from '@/routes';
-import { index as analyticsIndex } from '@/routes/analytics';
 import {
     index as attendanceIndex,
     scanner as attendanceScanner,
@@ -38,10 +37,11 @@ import { index as auditLogIndex } from '@/routes/audit-logs';
 import { index as duplicateIndex } from '@/routes/duplicates';
 import { index as emailReplyIndex } from '@/routes/email-replies';
 import { index as leadIndex } from '@/routes/leads';
+import { index as reportIndex } from '@/routes/report';
 import { create as uploadCreate, index as uploadIndex } from '@/routes/uploads';
 import { index as userIndex } from '@/routes/users';
 import { index as verificationIndex } from '@/routes/verification';
-import type { NavItem } from '@/types';
+import type { NavGroup } from '@/types';
 import type { Auth } from '@/types';
 
 export function AppSidebar() {
@@ -52,81 +52,106 @@ export function AppSidebar() {
         notificationCounts: { unread_email_replies: number };
     }>().props;
     const isSuperAdministrator = auth.user.role === 'super_administrator';
-    const mainNavItems: NavItem[] = [
-        { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+    const navGroups: NavGroup[] = [
         {
-            title: 'Reports',
-            href: analyticsIndex(),
-            icon: ChartNoAxesCombined,
+            label: 'Overview',
+            items: [
+                { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+                {
+                    title: 'Lead Reports',
+                    href: reportIndex(),
+                    icon: ChartNoAxesCombined,
+                },
+            ],
         },
-        { title: 'Leads', href: leadIndex(), icon: Waypoints },
-        // Email Replies is a Super Administrator-only feature; every other
-        // role has it hidden entirely, not just unlinked from the sidebar.
-        ...(isSuperAdministrator
-            ? [
-                  {
-                      title: 'Email Replies',
-                      href: emailReplyIndex(),
-                      icon: MailSearch,
-                      badge: notificationCounts.unread_email_replies,
-                  },
-              ]
-            : []),
-        { title: 'Upload Leads', href: uploadCreate(), icon: Upload },
-        { title: 'Upload History', href: uploadIndex(), icon: FileClock },
+        {
+            label: 'Leads',
+            items: [
+                { title: 'Leads', href: leadIndex(), icon: Waypoints },
+                // Email Replies is a Super Administrator-only feature; every
+                // other role has it hidden entirely, not just unlinked.
+                ...(isSuperAdministrator
+                    ? [
+                          {
+                              title: 'Email Replies',
+                              href: emailReplyIndex(),
+                              icon: MailSearch,
+                              badge: notificationCounts.unread_email_replies,
+                          },
+                      ]
+                    : []),
+                {
+                    title: 'Upload Leads',
+                    href: uploadCreate(),
+                    icon: Upload,
+                },
+                {
+                    title: 'Upload History',
+                    href: uploadIndex(),
+                    icon: FileClock,
+                },
+                // Verification and duplicate review are review steps agents
+                // don't perform themselves, so they're hidden for that role.
+                ...(auth.user.role !== 'agent'
+                    ? [
+                          {
+                              title: 'Lead Verification',
+                              href: verificationIndex(),
+                              icon: ShieldCheck,
+                          },
+                          {
+                              title: 'Duplicate Review',
+                              href: duplicateIndex(),
+                              icon: CopyCheck,
+                          },
+                      ]
+                    : []),
+            ],
+        },
     ];
 
-    if (auth.user.role !== 'agent') {
-        mainNavItems.push(
-            {
-                title: 'Lead Verification',
-                href: verificationIndex(),
-                icon: ShieldCheck,
-            },
-            {
-                title: 'Duplicate Review',
-                href: duplicateIndex(),
-                icon: CopyCheck,
-            },
-        );
-    }
-
     if (isAdministratorRole(auth.user.role)) {
-        mainNavItems.push(
-            { title: 'Users', href: userIndex(), icon: Users },
-            {
-                title: 'Audit Logs',
-                href: auditLogIndex(),
-                icon: ClipboardList,
-            },
-        );
+        navGroups.push({
+            label: 'Administration',
+            items: [
+                { title: 'Users', href: userIndex(), icon: Users },
+                {
+                    title: 'Audit Logs',
+                    href: auditLogIndex(),
+                    icon: ClipboardList,
+                },
+            ],
+        });
     }
 
-    if (auth.user.role === 'super_administrator') {
-        mainNavItems.push(
-            {
-                title: 'QR Scanner',
-                href: attendanceScanner(),
-                icon: QrCode,
-            },
-            {
-                title: 'Attendance',
-                href: attendanceIndex(),
-                icon: FileClock,
-            },
-            {
-                title: 'Attendance Summary',
-                href: attendanceSummary(),
-                icon: CalendarClock,
-            },
-        );
+    if (isSuperAdministrator) {
+        navGroups.push({
+            label: 'Attendance',
+            items: [
+                {
+                    title: 'QR Scanner',
+                    href: attendanceScanner(),
+                    icon: QrCode,
+                },
+                {
+                    title: 'Attendance',
+                    href: attendanceIndex(),
+                    icon: FileClock,
+                },
+                {
+                    title: 'Attendance Summary',
+                    href: attendanceSummary(),
+                    icon: CalendarClock,
+                },
+            ],
+        });
     }
 
     return (
         <Sidebar
             collapsible="icon"
             variant="inset"
-            className="[&_[data-sidebar=sidebar]]:border [&_[data-sidebar=sidebar]]:border-white/8 [&_[data-sidebar=sidebar]]:shadow-2xl [&_[data-sidebar=sidebar]]:shadow-slate-950/20"
+            className="[&_[data-sidebar=sidebar]]:border [&_[data-sidebar=sidebar]]:border-white/8"
         >
             <SidebarHeader className="border-b border-white/8 p-3">
                 <SidebarMenu>
@@ -145,7 +170,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent className="px-1 py-4">
-                <NavMain items={mainNavItems} />
+                <NavMain groups={navGroups} />
             </SidebarContent>
 
             <SidebarFooter className="border-t border-white/8 p-3">

@@ -41,12 +41,11 @@ export default function Welcome() {
         <>
             <Head title="Lead intelligence, organized" />
             <div className="min-h-screen overflow-hidden bg-[#07111f] text-white selection:bg-cyan-300 selection:text-slate-950">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_5%,rgba(34,211,238,0.14),transparent_30%),radial-gradient(circle_at_85%_20%,rgba(99,102,241,0.16),transparent_28%)]" />
                 <div className="pointer-events-none absolute inset-0 [background-image:linear-gradient(rgba(148,163,184,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,.12)_1px,transparent_1px)] [background-size:54px_54px] opacity-20" />
 
                 <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-5 py-6 lg:px-8">
                     <Link href="/" className="flex items-center gap-3">
-                        <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-300 to-indigo-500 shadow-lg shadow-cyan-500/20">
+                        <span className="flex size-10 items-center justify-center rounded-xl bg-cyan-300">
                             <AppLogoIcon className="size-6 text-slate-950" />
                         </span>
                         <span className="text-lg font-semibold tracking-tight">
@@ -90,7 +89,7 @@ export default function Welcome() {
                             </div>
                             <h1 className="max-w-3xl text-5xl leading-[1.04] font-semibold tracking-[-0.045em] sm:text-6xl lg:text-7xl">
                                 Turn scattered data into{' '}
-                                <span className="bg-gradient-to-r from-cyan-300 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
+                                <span className="text-cyan-300">
                                     qualified opportunities.
                                 </span>
                             </h1>
@@ -103,7 +102,7 @@ export default function Welcome() {
                             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                                 <Link
                                     href={auth.user ? dashboard() : register()}
-                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-300 to-sky-400 px-6 text-sm font-semibold text-slate-950 shadow-xl shadow-cyan-500/15 transition hover:-translate-y-0.5"
+                                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-6 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
                                 >
                                     {auth.user
                                         ? 'Go to dashboard'
@@ -136,7 +135,7 @@ export default function Welcome() {
 
                         <div className="relative mx-auto w-full max-w-2xl">
                             <div className="absolute -inset-8 rounded-full bg-cyan-400/10 blur-3xl" />
-                            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
+                            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-3 backdrop-blur-xl">
                                 <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
                                     <div className="flex gap-1.5">
                                         <span className="size-2.5 rounded-full bg-rose-400" />
@@ -189,7 +188,7 @@ export default function Welcome() {
                                             ].map((height, index) => (
                                                 <div
                                                     key={index}
-                                                    className="flex-1 rounded-t-md bg-gradient-to-t from-indigo-500/40 to-cyan-300"
+                                                    className="flex-1 rounded-t-md bg-cyan-300"
                                                     style={{
                                                         height: `${height}%`,
                                                     }}

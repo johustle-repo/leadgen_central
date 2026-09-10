@@ -13,12 +13,33 @@
         th { background-color: #f3f4f6; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; }
         td { font-size: 11px; }
         .empty { color: #9ca3af; font-style: italic; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+        h2 { page-break-after: avoid; }
+        .database-section { page-break-before: always; }
+        .database-section td { overflow-wrap: anywhere; }
     </style>
 </head>
 <body>
     <h1>LeadGen Central &mdash; Analytics Report</h1>
     <p class="subtitle">{{ $data['filters']['date_from'] }} to {{ $data['filters']['date_to'] }} &middot; Generated {{ now()->format('Y-m-d H:i') }}</p>
 
+    @foreach ($data['databaseSections'] as $title => $rows)
+        <div class="database-section">
+            <h2>{{ $title }}</h2>
+            <p class="subtitle">{{ $data['filters']['date_from'] }} to {{ $data['filters']['date_to'] }} unless labeled all time.</p>
+            <table>
+                <thead><tr>@foreach ($rows[0] as $heading)<th>{{ $heading }}</th>@endforeach</tr></thead>
+                <tbody>
+                    @foreach (array_slice($rows, 1) as $row)
+                        <tr>@foreach ($row as $cell)<td>{{ $cell }}</td>@endforeach</tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endforeach
+
+    <h2>Additional legacy analytics</h2>
     <h2>Summary</h2>
     <table>
         <tr><th>Metric</th><th>Value</th></tr>

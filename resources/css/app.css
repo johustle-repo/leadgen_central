@@ -190,34 +190,12 @@
 
     body {
         @apply bg-background text-foreground;
-        background-image:
-            radial-gradient(
-                circle at 88% 4%,
-                color-mix(in oklab, var(--color-cyan-400) 8%, transparent),
-                transparent 28rem
-            ),
-            radial-gradient(
-                circle at 18% 95%,
-                color-mix(in oklab, var(--color-indigo-500) 6%, transparent),
-                transparent 30rem
-            );
-        background-attachment: fixed;
     }
 }
 
 @layer components {
     .app-workspace {
-        background: linear-gradient(
-            145deg,
-            color-mix(in oklab, var(--background) 94%, transparent),
-            color-mix(in oklab, var(--color-cyan-500) 3%, var(--background))
-        );
-    }
-
-    .app-workspace [class*='rounded-xl'][class*='bg-card'] {
-        box-shadow:
-            0 1px 2px color-mix(in oklab, var(--foreground) 5%, transparent),
-            0 14px 40px color-mix(in oklab, var(--foreground) 4%, transparent);
+        background: var(--background);
     }
 
     .app-workspace tbody tr {

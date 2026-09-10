@@ -10,6 +10,7 @@ use App\Models\User;
 use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 class AnalyticsReport
@@ -34,6 +35,7 @@ class AnalyticsReport
         $summary = [...$current, 'lead_change' => $this->change($current['total_leads'], $previous['total_leads']), 'reply_change' => $this->change($current['replies'], $previous['replies'])];
 
         return [
+            'databaseReport' => app(DatabaseIntelligenceReport::class)->for($user, [...$filters, 'period' => 'custom', 'date_from' => $from->toDateString(), 'date_to' => $to->toDateString()]),
             'period' => $period,
             'filters' => ['date_from' => $from->toDateString(), 'date_to' => $to->toDateString()],
             'summary' => $canViewReplies ? $summary : [...$summary, 'replies' => 0, 'replied_leads' => 0, 'reply_rate' => 0.0, 'interested_replies' => 0, 'reply_change' => 0.0],
@@ -62,6 +64,12 @@ class AnalyticsReport
         $period = $filters['period'] ?? '30_days';
         $to = CarbonImmutable::today()->endOfDay();
         $from = match ($period) {
+            'today' => $to->startOfDay(),
+            'week' => $to->startOfWeek(),
+            'last_week' => $to->startOfWeek()->subWeek(),
+            'month' => $to->startOfMonth(),
+            'last_month' => $to->startOfMonth()->subMonth(),
+            'quarter' => $to->startOfQuarter(),
             '7_days' => $to->subDays(6)->startOfDay(),
             '90_days' => $to->subDays(89)->startOfDay(),
             'custom' => CarbonImmutable::parse($filters['date_from'] ?? throw new LogicException('A custom analytics start date is required.'))->startOfDay(),
@@ -69,6 +77,11 @@ class AnalyticsReport
         };
         if ($period === 'custom') {
             $to = CarbonImmutable::parse($filters['date_to'] ?? throw new LogicException('A custom analytics end date is required.'))->endOfDay();
+        }
+        if ($period === 'last_week') {
+            $to = $to->startOfWeek()->subSecond();
+        } elseif ($period === 'last_month') {
+            $to = $to->startOfMonth()->subSecond();
         }
 
         return [$from, $to, $period];
@@ -289,22 +302,29 @@ class AnalyticsReport
 
     /**
      * Day-of-week x hour-of-day upload volume, using the application timezone
-     * (not each agent's local timezone). Bucketed in PHP (rather than SQL
-     * DAYOFWEEK()/HOUR()) so it works the same on every database driver.
+     * (not each agent's local timezone). Bucketed in SQL (DAYOFWEEK()/HOUR() on
+     * MySQL, strftime() on SQLite) so a large batch history doesn't have to be
+     * pulled into PHP just to be counted.
      *
      * @param  Builder<UploadBatch>  $batches
-     * @return array<int, array{day: string, hours: array<int, int>}>
+     * @return list<array{day: string, hours: list<int>}>
      */
     private function uploadTimingHeatmap(Builder $batches): array
     {
         $dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        $grid = array_map(fn (string $label): array => ['day' => $label, 'hours' => array_fill(0, 24, 0)], $dayLabels);
+        $sqlite = DB::connection()->getDriverName() === 'sqlite';
+        $day = $sqlite ? "CAST(strftime('%w', created_at) AS INTEGER)" : 'DAYOFWEEK(created_at) - 1';
+        $hour = $sqlite ? "CAST(strftime('%H', created_at) AS INTEGER)" : 'HOUR(created_at)';
+        /** @var array<int, array<int, int>> $counts */
+        $counts = [];
+        foreach ((clone $batches)->selectRaw("{$day} as weekday, {$hour} as upload_hour, COUNT(*) as aggregate")->groupBy('weekday', 'upload_hour')->toBase()->get() as $row) {
+            $counts[(int) $row->weekday][(int) $row->upload_hour] = (int) $row->aggregate;
+        }
 
-        (clone $batches)->select('created_at')->get()->each(function (UploadBatch $batch) use (&$grid): void {
-            $grid[$batch->created_at->dayOfWeek]['hours'][$batch->created_at->hour]++;
-        });
-
-        return array_values($grid);
+        return array_map(fn (int $weekday, string $label): array => [
+            'day' => $label,
+            'hours' => array_map(fn (int $hour): int => $counts[$weekday][$hour] ?? 0, range(0, 23)),
+        ], array_keys($dayLabels), $dayLabels);
     }
 
     private function change(int $current, int $previous): float

@@ -13,3 +13,8 @@ export type NavItem = {
     isActive?: boolean;
     badge?: number;
 };
+
+export type NavGroup = {
+    label: string;
+    items: NavItem[];
+};

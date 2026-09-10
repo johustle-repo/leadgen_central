@@ -10,7 +10,7 @@ export function ImpersonationBanner() {
     }
 
     return (
-        <div className="relative z-30 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-1.5 text-center text-xs font-semibold text-white">
+        <div className="relative z-30 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-amber-500 px-4 py-1.5 text-center text-xs font-semibold text-white">
             <UserRoundCog className="size-3.5 shrink-0" />
             <span>
                 {impersonator.name} is viewing as {auth.user.name}

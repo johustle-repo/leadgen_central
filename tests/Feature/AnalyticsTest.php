@@ -8,15 +8,15 @@ use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('redirects guests from analytics to login', function () {
-    $this->get(route('analytics.index'))->assertRedirect(route('login'));
+    $this->get(route('report.index'))->assertRedirect(route('login'));
 });
 
 it('redirects guests from the analytics report export to login', function () {
-    $this->get(route('analytics.export'))->assertRedirect(route('login'));
+    $this->get(route('report.export'))->assertRedirect(route('login'));
 });
 
 it('redirects guests from the analytics PDF export to login', function () {
-    $this->get(route('analytics.export-pdf'))->assertRedirect(route('login'));
+    $this->get(route('report.export-pdf'))->assertRedirect(route('login'));
 });
 
 it('downloads a report PDF and logs the export', function () {
@@ -28,7 +28,7 @@ it('downloads a report PDF and logs the export', function () {
         'created_at' => '2026-08-30 10:00:00',
     ]);
 
-    $response = $this->actingAs($agent)->get(route('analytics.export-pdf', ['period' => '7_days']));
+    $response = $this->actingAs($agent)->get(route('report.export-pdf', ['period' => '7_days']));
 
     $response->assertOk();
     expect($response->headers->get('Content-Type'))->toBe('application/pdf');
@@ -56,18 +56,26 @@ it('downloads a report CSV scoped to the agents own leads and logs the export', 
         'created_at' => '2026-08-30 10:00:00',
     ]);
 
-    $response = $this->actingAs($agent)->get(route('analytics.export', ['period' => '7_days']));
+    $response = $this->actingAs($agent)->get(route('report.export', ['period' => '7_days']));
 
     $response->assertOk()->assertDownload('Analytics-Report-2026-08-26-to-2026-09-01.csv');
-    expect($response->streamedContent())
+    $content = (string) $response->streamedContent();
+    expect($content)
         ->toContain('"Report period","2026-08-26 to 2026-09-01"')
         ->toContain('Summary')
         ->toContain('"Leads created",1')
         ->toContain('"Qualified leads",1')
         ->toContain('"Lead status"')
         ->toContain('Tendata')
-        ->not->toContain('Lusha')
         ->not->toContain('Agent performance');
+    // "Source quality" always lists every known source category, including Lusha, as a
+    // reference row even with zero records - so the CSV legitimately contains the word
+    // "Lusha" now. What must still hold is that the *count* next to it is 0, proving the
+    // other agent's Lusha-sourced lead isn't counted in this agent's scoped export.
+    $rows = array_map('str_getcsv', explode("\n", trim($content)));
+    $lushaRow = collect($rows)->first(fn (array $row): bool => ($row[0] ?? null) === 'Lusha');
+    expect($lushaRow)->not->toBeNull()
+        ->and((int) $lushaRow[1])->toBe(0);
     $this->assertDatabaseHas(AuditLog::class, [
         'user_id' => $agent->id,
         'action' => 'analytics.exported',
@@ -84,7 +92,7 @@ it('includes the agent performance section in an administrators report export', 
         'created_at' => '2026-08-30 10:00:00',
     ]);
 
-    $response = $this->actingAs($administrator)->get(route('analytics.export', ['period' => '7_days']));
+    $response = $this->actingAs($administrator)->get(route('report.export', ['period' => '7_days']));
 
     $response->assertOk();
     expect($response->streamedContent())
@@ -96,7 +104,7 @@ it('rejects a report export when the custom end date precedes the start date', f
     $agent = User::factory()->create();
 
     $this->actingAs($agent)
-        ->get(route('analytics.export', ['period' => 'custom', 'date_from' => '2026-09-02', 'date_to' => '2026-09-01']))
+        ->get(route('report.export', ['period' => 'custom', 'date_from' => '2026-09-02', 'date_to' => '2026-09-01']))
         ->assertSessionHasErrors('date_to');
 });
 
@@ -136,7 +144,7 @@ it('shows an agent analytics only for their owned leads and replies', function (
     ]);
     UploadBatch::factory()->for($agent)->create(['duplicate_rows' => 3, 'created_at' => '2026-08-31 09:00:00']);
 
-    $response = $this->actingAs($agent)->get(route('analytics.index', ['period' => '7_days']));
+    $response = $this->actingAs($agent)->get(route('report.index', ['period' => '7_days']));
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('analytics/index')
@@ -175,7 +183,7 @@ it('only shows real reply figures in analytics to a super administrator', functi
         'received_at' => '2026-08-31 11:00:00',
     ]);
 
-    $response = $this->actingAs($superAdministrator)->get(route('analytics.index', ['period' => '7_days']));
+    $response = $this->actingAs($superAdministrator)->get(route('report.index', ['period' => '7_days']));
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('analytics/index')
@@ -199,7 +207,7 @@ it('shows administrator agent performance without leaking records outside the se
         'created_at' => '2026-06-01 10:00:00',
     ]);
 
-    $response = $this->actingAs($administrator)->get(route('analytics.index', ['period' => '7_days']));
+    $response = $this->actingAs($administrator)->get(route('report.index', ['period' => '7_days']));
 
     $response->assertInertia(fn (Assert $page) => $page
         ->where('summary.total_leads', 2)
@@ -226,7 +234,7 @@ it('shows administrators the lead funnel, data quality trend, upload timing heat
         'created_at' => '2026-08-31 09:00:00',
     ]);
 
-    $response = $this->actingAs($administrator)->get(route('analytics.index', ['period' => '7_days']));
+    $response = $this->actingAs($administrator)->get(route('report.index', ['period' => '7_days']));
 
     $response->assertInertia(fn (Assert $page) => $page
         ->where('funnel.0.stage', 'Raw')
@@ -259,6 +267,6 @@ it('validates a complete chronological custom analytics range', function () {
     $agent = User::factory()->create();
 
     $this->actingAs($agent)
-        ->get(route('analytics.index', ['period' => 'custom', 'date_from' => '2026-09-02', 'date_to' => '2026-09-01']))
+        ->get(route('report.index', ['period' => 'custom', 'date_from' => '2026-09-02', 'date_to' => '2026-09-01']))
         ->assertSessionHasErrors('date_to');
 });

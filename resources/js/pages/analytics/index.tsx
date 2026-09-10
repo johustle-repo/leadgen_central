@@ -1,1061 +1,908 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import {
-    BarChart3,
-    Download,
-    FileSpreadsheet,
-    FileText,
-    MailCheck,
-    ShieldAlert,
-    SlidersHorizontal,
-    Target,
-    TrendingDown,
-    TrendingUp,
-    UsersRound,
-} from 'lucide-react';
 import { useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import {
+    Bar,
+    BarChart,
     CartesianGrid,
-    Cell,
-    Funnel,
-    FunnelChart,
-    LabelList,
-    Line,
-    LineChart,
     ResponsiveContainer,
-    Tooltip as RechartsTooltip,
+    Tooltip,
     XAxis,
     YAxis,
 } from 'recharts';
-import { EmptyState } from '@/components/empty-state';
-import { FilterBar } from '@/components/filter-bar';
-import { HeaderActionsPortal } from '@/components/header-actions';
-import { StatTile } from '@/components/stat-tile';
+import {
+    changeLabel,
+    ChartLegend,
+    ChartTooltip,
+    DistributionChart,
+    formatLabel,
+    GrowthChart,
+    percent,
+    summarize,
+} from '@/components/database-charts';
+import { Section } from '@/components/report-section';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import {
-    Tooltip as UiTooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-    exportMethod as analyticsExport,
-    exportPdf as analyticsExportPdf,
-    index as analyticsIndex,
-} from '@/routes/analytics';
+    exportMethod as reportExport,
+    exportPdf as reportExportPdf,
+    index as reportIndex,
+} from '@/routes/report';
 import type { Auth } from '@/types';
+import type { DatabaseReport } from '@/types/database-report';
 
-type Distribution = { label: string; value: number };
-type DailyActivity = {
-    date: string;
-    label: string;
-    leads: number;
-    replies: number;
-};
-type Summary = {
-    total_leads: number;
-    qualified_leads: number;
-    qualification_rate: number;
-    replies: number;
-    replied_leads: number;
-    reply_rate: number;
-    interested_replies: number;
-    duplicates: number;
-    lead_change: number;
-    reply_change: number;
-};
-type AgentPerformance = {
-    id: number;
-    name: string;
-    leads: number;
-    qualified: number;
-    replies: number;
-    interested: number;
-    qualification_rate: number;
-    uploads: number;
-    avg_batch_size: number;
-    duplicate_rate: number;
-    error_rate: number;
-};
-type FunnelStage = {
-    stage: string;
-    count: number;
-    percent_of_total: number;
-    conversion_from_previous: number;
-};
-type QualityTrendPoint = {
-    date: string;
-    label: string;
-    duplicate_rate: number;
-    error_rate: number;
-    location_error_rate: number;
-};
-type HeatmapRow = { day: string; hours: number[] };
 type Props = {
     period: string;
     filters: { date_from: string; date_to: string };
-    summary: Summary;
-    dailyActivity: DailyActivity[];
-    leadStatuses: Distribution[];
-    sources: Distribution[];
-    countries: Distribution[];
-    replyClassifications: Distribution[];
-    agentPerformance: AgentPerformance[];
-    funnel: FunnelStage[];
-    funnelExcluded: Distribution[];
-    dataQualityTrend: QualityTrendPoint[];
-    uploadTimingHeatmap: HeatmapRow[];
-    industries: Distribution[];
-};
-
-const prettyLabel = (value: string) =>
-    value
-        .replaceAll('_', ' ')
-        .replace(/\b\w/g, (letter) => letter.toUpperCase());
-
-// Ordinal ramp (single hue, light -> dark) for the funnel's ordered stages.
-// --funnel-1..5 in app.css already swap per theme, same as --color-chart-*.
-const FUNNEL_COLORS = [
-    'var(--color-funnel-1)',
-    'var(--color-funnel-2)',
-    'var(--color-funnel-3)',
-    'var(--color-funnel-4)',
-    'var(--color-funnel-5)',
-];
-
-function Change({ value }: { value: number }) {
-    const positive = value >= 0;
-    const Icon = positive ? TrendingUp : TrendingDown;
-
-    return (
-        <span
-            className={`inline-flex items-center gap-1 text-xs font-semibold ${positive ? 'text-emerald-500' : 'text-red-500'}`}
-        >
-            <Icon className="size-3.5" />
-            {Math.abs(value)}% vs previous period
-        </span>
-    );
-}
-
-function ChartTooltip({
-    active,
-    payload,
-    label,
-    formatter,
-}: {
-    active?: boolean;
-    payload?: { name: string; value: number; color: string }[];
-    label?: string;
-    formatter?: (name: string, value: number) => string;
-}) {
-    if (!active || !payload?.length) {
-        return null;
-    }
-
-    return (
-        <div className="rounded-md border bg-card p-2.5 text-xs shadow-md">
-            <p className="mb-1.5 font-medium">{label}</p>
-            <div className="flex flex-col gap-1">
-                {payload.map((entry) => (
-                    <div key={entry.name} className="flex items-center gap-2">
-                        <i
-                            className="size-2 shrink-0 rounded-full"
-                            style={{ backgroundColor: entry.color }}
-                        />
-                        <span className="text-muted-foreground">
-                            {entry.name}
-                        </span>
-                        <span className="ml-auto font-medium tabular-nums">
-                            {formatter
-                                ? formatter(entry.name, entry.value)
-                                : entry.value}
-                        </span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function Breakdown({
-    title,
-    items,
-    color,
-    className,
-}: {
-    title: string;
-    items: Distribution[];
-    color: string;
-    className?: string;
-}) {
-    const maximum = Math.max(...items.map((item) => item.value), 1);
-    const total = items.reduce((sum, item) => sum + item.value, 0);
-
-    return (
-        <Card className={className}>
-            <CardHeader className="flex-row items-center justify-between">
-                <CardTitle>{title}</CardTitle>
-                <span className="text-xs text-muted-foreground">
-                    {total.toLocaleString()} total
-                </span>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-                {items.length ? (
-                    items.map((item) => (
-                        <div key={item.label} className="flex flex-col gap-1.5">
-                            <div className="flex items-center justify-between gap-3 text-sm">
-                                <span className="truncate font-medium">
-                                    {prettyLabel(item.label)}
-                                </span>
-                                <span className="text-muted-foreground tabular-nums">
-                                    {item.value.toLocaleString()}
-                                </span>
-                            </div>
-                            <div className="h-2 overflow-hidden rounded-full bg-muted">
-                                <div
-                                    className="h-full rounded-full"
-                                    style={{
-                                        width: `${Math.max((item.value / maximum) * 100, 3)}%`,
-                                        backgroundColor: color,
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    <EmptyState
-                        icon={BarChart3}
-                        title="No data for this period"
-                    />
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
-function LeadFunnel({
-    stages,
-    excluded,
-}: {
-    stages: FunnelStage[];
-    excluded: Distribution[];
-}) {
-    const data = stages.map((stage, index) => ({
-        name: stage.stage,
-        value: stage.count,
-        label: `${stage.stage} (${stage.count.toLocaleString()})`,
-        percent: stage.percent_of_total,
-        conversion: stage.conversion_from_previous,
-        fill: FUNNEL_COLORS[index] ?? FUNNEL_COLORS.at(-1),
-    }));
-    const excludedTotal = excluded.reduce((sum, item) => sum + item.value, 0);
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Lead lifecycle funnel</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                    Leads created in the period, by furthest stage reached.
-                    Snapshot of current status, not a step-by-step timeline.
-                </p>
-            </CardHeader>
-            <CardContent>
-                {data.length ? (
-                    <>
-                        <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <FunnelChart>
-                                    <RechartsTooltip
-                                        content={({ active, payload }) => {
-                                            if (!active || !payload?.length) {
-                                                return null;
-                                            }
-
-                                            const item = payload[0]
-                                                .payload as (typeof data)[number];
-
-                                            return (
-                                                <div className="rounded-md border bg-card p-2.5 text-xs shadow-md">
-                                                    <p className="font-medium">
-                                                        {item.name}
-                                                    </p>
-                                                    <p className="text-muted-foreground">
-                                                        {item.value.toLocaleString()}{' '}
-                                                        leads ({item.percent}%
-                                                        of total)
-                                                    </p>
-                                                </div>
-                                            );
-                                        }}
-                                    />
-                                    <Funnel
-                                        dataKey="value"
-                                        data={data}
-                                        isAnimationActive={false}
-                                    >
-                                        {data.map((entry) => (
-                                            <Cell
-                                                key={entry.name}
-                                                fill={entry.fill}
-                                            />
-                                        ))}
-                                        <LabelList
-                                            dataKey="label"
-                                            position="right"
-                                            fill="var(--color-foreground)"
-                                            stroke="none"
-                                            fontSize={12}
-                                        />
-                                    </Funnel>
-                                </FunnelChart>
-                            </ResponsiveContainer>
-                        </div>
-                        <div className="mt-2 grid grid-cols-2 gap-3 border-t pt-4 sm:grid-cols-4">
-                            {stages.slice(1).map((stage) => (
-                                <div key={stage.stage} className="text-xs">
-                                    <p className="text-muted-foreground">
-                                        {stage.stage}
-                                    </p>
-                                    <p className="font-semibold tabular-nums">
-                                        {stage.conversion_from_previous}%{' '}
-                                        <span className="font-normal text-muted-foreground">
-                                            conversion
-                                        </span>
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                        {excludedTotal > 0 && (
-                            <p className="mt-4 text-xs text-muted-foreground">
-                                {excludedTotal.toLocaleString()} leads left the
-                                funnel this period (
-                                {excluded
-                                    .map(
-                                        (item) =>
-                                            `${prettyLabel(item.label)}: ${item.value}`,
-                                    )
-                                    .join(', ')}
-                                ).
-                            </p>
-                        )}
-                    </>
-                ) : (
-                    <EmptyState
-                        icon={BarChart3}
-                        title="No data for this period"
-                    />
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
-function UploadTimingHeatmap({ data }: { data: HeatmapRow[] }) {
-    const maximum = Math.max(...data.flatMap((row) => row.hours), 1);
-    const bucket = (value: number) => {
-        if (value === 0) {
-            return 'var(--color-heat-0)';
-        }
-
-        const ratio = value / maximum;
-
-        if (ratio > 0.75) {
-            return 'var(--color-heat-4)';
-        }
-
-        if (ratio > 0.5) {
-            return 'var(--color-heat-3)';
-        }
-
-        if (ratio > 0.25) {
-            return 'var(--color-heat-2)';
-        }
-
-        return 'var(--color-heat-1)';
+    databaseReport: DatabaseReport;
+    uploadTimingHeatmap: { day: string; hours: number[] }[];
+    summary: {
+        replies: number;
+        interested_replies: number;
+        reply_rate: number;
     };
-
+    replyClassifications: { label: string; value: number }[];
+};
+const periods: Record<string, string> = {
+    today: 'Today',
+    week: 'This Week',
+    last_week: 'Last Week',
+    month: 'This Month',
+    last_month: 'Last Month',
+    '30_days': 'Last 30 Days',
+    quarter: 'This Quarter',
+    custom: 'Custom Range',
+    '7_days': 'Last 7 Days',
+    '90_days': 'Last 90 Days',
+};
+const selectClass =
+    'h-9 rounded-md border border-input bg-background px-3 text-sm';
+const regions = new Intl.DisplayNames(['en'], { type: 'region' });
+function countryName(value: string) {
+    return /^[A-Z]{2}$/.test(value)
+        ? (regions.of(value) ?? value)
+        : formatLabel(value);
+}
+function Metric({
+    label,
+    value,
+    note,
+}: {
+    label: string;
+    value: number | string | null;
+    note?: string;
+}) {
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Upload timing</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                    When agents submit upload batches, by day and hour (server
-                    time).
+            <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums">
+                    {value === null
+                        ? 'N/A'
+                        : typeof value === 'number'
+                          ? value.toLocaleString()
+                          : value}
                 </p>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-                <div className="min-w-2xl">
-                    <div
-                        className="grid gap-1"
-                        style={{
-                            gridTemplateColumns:
-                                '3rem repeat(24, minmax(0, 1fr))',
-                        }}
-                    >
-                        <span />
-                        {Array.from({ length: 24 }, (_, hour) => (
-                            <span
-                                key={hour}
-                                className="text-center text-[10px] text-muted-foreground"
-                            >
-                                {hour % 3 === 0 ? hour : ''}
-                            </span>
-                        ))}
-                        {data.map((row) => (
-                            <div key={row.day} className="contents">
-                                <span className="text-xs text-muted-foreground">
-                                    {row.day}
-                                </span>
-                                {row.hours.map((value, hour) => (
-                                    <UiTooltip key={hour}>
-                                        <TooltipTrigger asChild>
-                                            <div
-                                                className="aspect-square rounded-sm"
-                                                style={{
-                                                    backgroundColor:
-                                                        bucket(value),
-                                                }}
-                                            />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            {row.day} {hour}:00 &mdash; {value}{' '}
-                                            upload
-                                            {value === 1 ? '' : 's'}
-                                        </TooltipContent>
-                                    </UiTooltip>
-                                ))}
-                            </div>
-                        ))}
-                    </div>
-                    <div className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        Fewer
-                        {[
-                            'var(--color-heat-0)',
-                            'var(--color-heat-1)',
-                            'var(--color-heat-2)',
-                            'var(--color-heat-3)',
-                            'var(--color-heat-4)',
-                        ].map((color) => (
-                            <span
-                                key={color}
-                                className="size-3 rounded-sm border"
-                                style={{ backgroundColor: color }}
-                            />
-                        ))}
-                        More
-                    </div>
-                </div>
+                {note && (
+                    <p className="mt-2 text-xs text-muted-foreground">{note}</p>
+                )}
             </CardContent>
         </Card>
+    );
+}
+function ReportTable({
+    headings,
+    rows,
+}: {
+    headings: string[];
+    rows: ReactNode[][];
+}) {
+    return (
+        <div className="overflow-x-auto rounded-xl border bg-card">
+            <table className="w-full text-left text-sm">
+                <thead className="bg-muted/50">
+                    <tr>
+                        {headings.map((h) => (
+                            <th
+                                className="px-4 py-3 whitespace-nowrap"
+                                key={h}
+                                scope="col"
+                            >
+                                {h}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody className="divide-y">
+                    {rows.map((row, index) => (
+                        <tr key={index}>
+                            {row.map((cell, column) => (
+                                <td
+                                    className="px-4 py-3 tabular-nums"
+                                    key={column}
+                                >
+                                    {cell}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                    {rows.length === 0 && (
+                        <tr>
+                            <td
+                                colSpan={headings.length}
+                                className="p-6 text-center text-muted-foreground"
+                            >
+                                No data for this period.
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
     );
 }
 
 export default function Analytics({
     period,
     filters,
-    summary,
-    dailyActivity,
-    leadStatuses,
-    sources,
-    countries,
-    replyClassifications,
-    agentPerformance,
-    funnel,
-    funnelExcluded,
-    dataQualityTrend,
+    databaseReport: data,
     uploadTimingHeatmap,
-    industries,
+    summary,
+    replyClassifications,
 }: Props) {
-    const { auth } = usePage<{ auth: Auth }>().props;
-    const canViewReplies = auth.user.role === 'super_administrator';
-    const applyFilters = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        router.get(
-            analyticsIndex.url(),
-            Object.fromEntries(new FormData(event.currentTarget)),
-            { preserveState: true, replace: true },
-        );
-    };
-    const [exportOpen, setExportOpen] = useState(false);
-    const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>(
-        'excel',
-    );
-    const exportQuery = {
+    const { auth, errors } = usePage<{
+        auth: Auth;
+        errors: Record<string, string>;
+    }>().props;
+    const [selectedPeriod, setSelectedPeriod] = useState(period);
+    const [granularity, setGranularity] = useState(data.growth.granularity);
+    const [mode, setMode] = useState<'count' | 'rate'>('count');
+    const [processing, setProcessing] = useState(false);
+    const selected = `${filters.date_from} – ${filters.date_to}`;
+    const quality = data.quality;
+    const appliedQuery = {
         period,
-        date_from: filters.date_from,
-        date_to: filters.date_to,
+        ...filters,
+        granularity: data.growth.granularity,
+        ...data.geographic_detail.filters,
     };
-    const exportHref =
-        exportFormat === 'pdf'
-            ? analyticsExportPdf.url({ query: exportQuery })
-            : analyticsExport.url({ query: exportQuery });
-    const metrics = [
-        {
-            label: 'Leads created',
-            value: summary.total_leads,
-            detail: <Change value={summary.lead_change} />,
-            icon: UsersRound,
-            tone: 'text-chart-1',
-        },
-        {
-            label: 'Qualified leads',
-            value: summary.qualified_leads,
-            detail: `${summary.qualification_rate}% qualification rate`,
-            icon: Target,
-            tone: 'text-chart-3',
-        },
-        // Email replies / Reply rate / Interested replies are a Super
-        // Administrator-only feature, hidden entirely for every other role.
-        ...(canViewReplies
-            ? [
-                  {
-                      label: 'Email replies',
-                      value: summary.replies,
-                      detail: <Change value={summary.reply_change} />,
-                      icon: MailCheck,
-                      tone: 'text-chart-2',
-                  },
-                  {
-                      label: 'Reply rate',
-                      value: `${summary.reply_rate}%`,
-                      detail: `${summary.replied_leads} unique leads replied`,
-                      icon: BarChart3,
-                      tone: 'text-chart-1',
-                  },
-                  {
-                      label: 'Interested replies',
-                      value: summary.interested_replies,
-                      detail: 'Interested or possible lead',
-                      icon: TrendingUp,
-                      tone: 'text-chart-3',
-                  },
-              ]
-            : []),
-        {
-            label: 'Duplicates flagged',
-            value: summary.duplicates,
-            detail: 'Detected during uploads',
-            icon: ShieldAlert,
-            tone: 'text-chart-4',
-        },
-    ];
-    const isAdmin = agentPerformance.length > 0 || funnel.length > 0;
-    const periodHint =
-        period === 'custom'
-            ? 'Showing the custom date range below.'
-            : `Showing the last ${period.replace('_days', '')} days.`;
+    const qualitySeries = [
+        'duplicates',
+        'rejected',
+        'errors',
+        'location_issues',
+    ] as const;
+    function applyPeriod(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        router.get(
+            reportIndex.url(),
+            {
+                period: selectedPeriod,
+                granularity,
+                ...(selectedPeriod === 'custom'
+                    ? {
+                          date_from: String(form.get('date_from')),
+                          date_to: String(form.get('date_to')),
+                      }
+                    : {}),
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
+            },
+        );
+    }
+    function drill(country = '', province = '', city = '') {
+        router.get(
+            reportIndex.url(),
+            {
+                ...appliedQuery,
+                geo_country: country,
+                geo_province: province,
+                geo_city: city,
+            },
+            { preserveScroll: true },
+        );
+    }
+    const geo = data.geographic_detail;
 
     return (
         <>
-            <Head title="Reports" />
-            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <HeaderActionsPortal>
-                    <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-                        <DialogTrigger asChild>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+            <Head title="Database reports" />
+            <div className="flex min-w-0 flex-1 flex-col gap-8 p-4 md:p-6">
+                <header className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-semibold tracking-tight">
+                            Database intelligence reports
+                        </h1>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            Representation, quality, growth and contribution ·{' '}
+                            {auth.user.role === 'agent'
+                                ? 'Your data only'
+                                : 'All-owner data'}
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" asChild>
+                            <a
+                                href={reportExport.url({
+                                    query: appliedQuery,
+                                })}
                             >
-                                <Download />
-                                Export reports
-                            </Button>
-                        </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Export report</DialogTitle>
-                                    <DialogDescription>
-                                        Choose a file format for the current
-                                        reporting period (
-                                        {exportQuery.date_from} to{' '}
-                                        {exportQuery.date_to}).
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <ToggleGroup
-                                    type="single"
-                                    variant="outline"
-                                    value={exportFormat}
-                                    onValueChange={(value) =>
-                                        value &&
-                                        setExportFormat(
-                                            value as 'excel' | 'pdf',
-                                        )
-                                    }
-                                    className="w-full"
-                                >
-                                    <ToggleGroupItem
-                                        value="excel"
-                                        className="h-16 flex-1 flex-col gap-1 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 data-[state=on]:border-emerald-500/60 data-[state=on]:bg-emerald-500/15 data-[state=on]:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200 dark:data-[state=on]:bg-emerald-500/20 dark:data-[state=on]:text-emerald-200"
-                                    >
-                                        <FileSpreadsheet className="size-4" />
-                                        Excel (CSV)
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem
-                                        value="pdf"
-                                        className="h-16 flex-1 flex-col gap-1 border-rose-500/30 text-rose-700 hover:bg-rose-500/10 hover:text-rose-800 data-[state=on]:border-rose-500/60 data-[state=on]:bg-rose-500/15 data-[state=on]:text-rose-800 dark:text-rose-300 dark:hover:text-rose-200 dark:data-[state=on]:bg-rose-500/20 dark:data-[state=on]:text-rose-200"
-                                    >
-                                        <FileText className="size-4" />
-                                        PDF
-                                    </ToggleGroupItem>
-                                </ToggleGroup>
-                                <DialogFooter>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setExportOpen(false)}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button asChild>
-                                        <a
-                                            href={exportHref}
-                                            download
-                                            onClick={() =>
-                                                setExportOpen(false)
-                                            }
-                                        >
-                                            <Download />
-                                            Download
-                                        </a>
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                </HeaderActionsPortal>
-
-                <FilterBar
-                    as="form"
-                    onSubmit={applyFilters}
-                    icon={SlidersHorizontal}
-                    label="Reporting period"
-                    gridClassName="md:grid-cols-[minmax(180px,0.8fr)_1fr_1fr_auto]"
-                    hint={periodHint}
-                >
-                    <div className="flex flex-col gap-1.5">
-                        <label
-                            htmlFor="analytics-period"
-                            className="text-xs text-muted-foreground"
-                        >
-                            Period
-                        </label>
-                        <Select name="period" defaultValue={period}>
-                            <SelectTrigger
-                                id="analytics-period"
-                                className="w-full"
+                                Export CSV
+                            </a>
+                        </Button>
+                        <Button variant="outline" asChild>
+                            <a
+                                href={reportExportPdf.url({
+                                    query: appliedQuery,
+                                })}
                             >
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="7_days">
-                                    Last 7 days
-                                </SelectItem>
-                                <SelectItem value="30_days">
-                                    Last 30 days
-                                </SelectItem>
-                                <SelectItem value="90_days">
-                                    Last 90 days
-                                </SelectItem>
-                                <SelectItem value="custom">
-                                    Custom range
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                        <label
-                            htmlFor="analytics-date-from"
-                            className="text-xs text-muted-foreground"
-                        >
-                            From
-                        </label>
-                        <Input
-                            id="analytics-date-from"
-                            type="date"
-                            name="date_from"
-                            defaultValue={filters.date_from}
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                        <label
-                            htmlFor="analytics-date-to"
-                            className="text-xs text-muted-foreground"
-                        >
-                            To
-                        </label>
-                        <Input
-                            id="analytics-date-to"
-                            type="date"
-                            name="date_to"
-                            defaultValue={filters.date_to}
-                        />
-                    </div>
-                    <div className="flex flex-col justify-end">
-                        <Button type="submit" variant="secondary">
-                            Update analytics
+                                Export PDF
+                            </a>
                         </Button>
                     </div>
-                </FilterBar>
+                </header>
+                <Section
+                    title="Reporting period"
+                    note={`All panels follow ${selected}, except values explicitly labeled All time. Reporting timezone: ${data.timezone}.`}
+                >
+                    <form
+                        onSubmit={applyPeriod}
+                        className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4"
+                        aria-busy={processing}
+                    >
+                        <label className="flex flex-col gap-1.5 text-xs">
+                            Period
+                            <select
+                                className={selectClass}
+                                value={selectedPeriod}
+                                onChange={(e) =>
+                                    setSelectedPeriod(e.target.value)
+                                }
+                            >
+                                {Object.entries(periods)
+                                    .filter(
+                                        ([key]) =>
+                                            !['7_days', '90_days'].includes(
+                                                key,
+                                            ) || period === key,
+                                    )
+                                    .map(([value, label]) => (
+                                        <option key={value} value={value}>
+                                            {label}
+                                        </option>
+                                    ))}
+                            </select>
+                        </label>
+                        <label className="flex flex-col gap-1.5 text-xs">
+                            Group growth and quality by
+                            <select
+                                className={selectClass}
+                                value={granularity}
+                                onChange={(e) =>
+                                    setGranularity(
+                                        e.target.value as typeof granularity,
+                                    )
+                                }
+                            >
+                                <option value="day">Daily</option>
+                                <option value="week">Weekly</option>
+                                <option value="month">Monthly</option>
+                            </select>
+                        </label>
+                        {selectedPeriod === 'custom' && (
+                            <>
+                                <label className="flex flex-col gap-1.5 text-xs">
+                                    From
+                                    <Input
+                                        name="date_from"
+                                        type="date"
+                                        defaultValue={filters.date_from}
+                                        required
+                                    />
+                                </label>
+                                <label className="flex flex-col gap-1.5 text-xs">
+                                    Through
+                                    <Input
+                                        name="date_to"
+                                        type="date"
+                                        defaultValue={filters.date_to}
+                                        required
+                                    />
+                                </label>
+                            </>
+                        )}
+                        <Button type="submit" disabled={processing}>
+                            {processing ? 'Applying…' : 'Apply'}
+                        </Button>
+                        {Object.entries(errors).map(([key, message]) => (
+                            <p
+                                role="alert"
+                                className="w-full text-sm text-destructive"
+                                key={key}
+                            >
+                                {message}
+                            </p>
+                        ))}
+                    </form>
+                </Section>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {metrics.map((metric) => (
-                        <StatTile
-                            key={metric.label}
-                            label={metric.label}
-                            value={metric.value}
-                            detail={metric.detail}
-                            icon={metric.icon}
-                            tone={metric.tone}
-                        />
-                    ))}
+                <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-4">
+                    <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
+                    <p className="pl-3 text-sm leading-relaxed font-medium text-foreground">
+                        {summarize(data)}
+                    </p>
                 </div>
 
-                <Card>
-                    <CardHeader className="flex-row items-center justify-between">
-                        <div className="flex flex-col gap-1">
-                            <CardTitle>
-                                {canViewReplies
-                                    ? 'Lead and reply activity'
-                                    : 'Lead activity'}
-                            </CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                                Daily volume for the selected period
-                            </p>
-                        </div>
-                        <div className="flex gap-4 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1.5">
-                                <i
-                                    className="size-2 rounded-full"
-                                    style={{
-                                        backgroundColor: 'var(--color-chart-1)',
-                                    }}
-                                />
-                                Leads
-                            </span>
-                            {canViewReplies && (
-                                <span className="flex items-center gap-1.5">
-                                    <i
-                                        className="size-2 rounded-full"
-                                        style={{
-                                            backgroundColor:
-                                                'var(--color-chart-2)',
-                                        }}
-                                    />
-                                    Replies
-                                </span>
-                            )}
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="h-64 min-w-0">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={dailyActivity}>
-                                    <CartesianGrid
-                                        vertical={false}
-                                        stroke="var(--color-border)"
-                                        strokeOpacity={0.6}
-                                    />
-                                    <XAxis
-                                        dataKey="label"
-                                        tick={{ fontSize: 11 }}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        interval="preserveStartEnd"
-                                        stroke="var(--color-muted-foreground)"
-                                    />
-                                    <YAxis
-                                        tick={{ fontSize: 11 }}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        width={32}
-                                        allowDecimals={false}
-                                        stroke="var(--color-muted-foreground)"
-                                    />
-                                    <RechartsTooltip
-                                        content={<ChartTooltip />}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="leads"
-                                        name="Leads"
-                                        stroke="var(--color-chart-1)"
-                                        strokeWidth={2}
-                                        dot={false}
-                                        activeDot={{ r: 4 }}
-                                    />
-                                    {canViewReplies && (
-                                        <Line
-                                            type="monotone"
-                                            dataKey="replies"
-                                            name="Replies"
-                                            stroke="var(--color-chart-2)"
-                                            strokeWidth={2}
-                                            dot={false}
-                                            activeDot={{ r: 4 }}
-                                        />
+                <Section
+                    title="Database summary"
+                    note={`Selected period · ${selected}. Counts exclude soft-deleted leads. Unique emails are addresses, not verified individual people.`}
+                >
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <Metric
+                            label="Records added · selected period"
+                            value={data.overview.records}
+                            note={`${data.all_time.records.toLocaleString()} total records · All time`}
+                        />
+                        <Metric
+                            label="Unique companies · selected period"
+                            value={data.overview.companies}
+                            note={`${data.all_time.companies.toLocaleString()} · All time`}
+                        />
+                        <Metric
+                            label="Unique emails · selected period"
+                            value={data.overview.emails}
+                            note={`${data.all_time.emails.toLocaleString()} · All time`}
+                        />
+                        <Metric
+                            label="Duplicates detected · selected period"
+                            value={quality.duplicates}
+                            note="Exact and possible duplicate import rows"
+                        />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <Metric
+                            label="Countries represented"
+                            value={data.overview.countries}
+                        />
+                        <Metric
+                            label="Raw data sources represented"
+                            value={data.overview.sources}
+                        />
+                        <Metric
+                            label="Upload batches"
+                            value={data.overview.uploads}
+                        />
+                        <Metric
+                            label="Import rows with issues"
+                            value={quality.issues}
+                            note="Each affected row counted once"
+                        />
+                    </div>
+                </Section>
+                <Section
+                    title="Database growth"
+                    note={`Selected period compared with ${data.previous_period.from} – ${data.previous_period.to}. Company and email growth uses first-seen identities across surviving, scoped records.`}
+                >
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        {(['records', 'companies', 'emails'] as const).map(
+                            (key) => (
+                                <Metric
+                                    key={key}
+                                    label={`${key === 'records' ? 'Contact records' : `First-seen ${key}`} added`}
+                                    value={data.growth.totals[key]}
+                                    note={changeLabel(
+                                        data.growth.totals[`${key}_change`],
                                     )}
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <div className="grid gap-6 xl:grid-cols-2">
-                    <Breakdown
-                        title="Lead status"
-                        items={leadStatuses}
-                        color="var(--color-chart-3)"
-                    />
-                    {canViewReplies && (
-                        <Breakdown
-                            title="Reply classification"
-                            items={replyClassifications}
-                            color="var(--color-chart-5)"
+                                />
+                            ),
+                        )}
+                    </div>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <GrowthChart growth={data.growth} />
+                        </CardContent>
+                    </Card>
+                </Section>
+                <Section
+                    title="Database distribution"
+                    note={`Share of period-created records · ${selected}. Classifications describe current status; they do not imply sequential conversion.`}
+                >
+                    <div className="grid items-start gap-4 lg:grid-cols-3">
+                        <DistributionChart
+                            title="Country distribution"
+                            rows={data.distributions.countries.map((row) => ({
+                                ...row,
+                                label: countryName(row.label),
+                            }))}
+                            description="Country codes take priority; name-only historical values may remain separate."
+                        />
+                        <DistributionChart
+                            title="Data sources"
+                            rows={data.distributions.sources}
+                            description="Conservative analytical grouping; original source values are preserved."
+                        />
+                        <DistributionChart
+                            title="Database classification distribution"
+                            rows={data.distributions.statuses}
+                        />
+                    </div>
+                    {data.show_industries && (
+                        <DistributionChart
+                            title="Industry distribution"
+                            rows={data.distributions.industries}
+                            description={`${percent(data.industry_coverage)} of period records have a known industry. Shown when coverage reaches 20%.`}
                         />
                     )}
-                    <Breakdown
-                        title="Top countries"
-                        items={countries}
-                        color="var(--color-chart-2)"
-                        className={canViewReplies ? 'xl:col-span-2' : undefined}
+                </Section>
+                <Section
+                    title="Company and contact analysis"
+                    note="Selected period · normalized company names group contact records. Repeated company names alone do not establish duplication."
+                >
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                        <Metric
+                            label="Unique companies"
+                            value={data.overview.companies}
+                        />
+                        <Metric
+                            label="Unique contact emails"
+                            value={data.overview.emails}
+                        />
+                        <Metric
+                            label="Average contact records per company"
+                            value={data.company_analysis.average_contacts}
+                        />
+                        <Metric
+                            label="Companies with one contact record"
+                            value={data.company_analysis.single_contact}
+                        />
+                        <Metric
+                            label="Companies with multiple contact records"
+                            value={data.company_analysis.multiple_contacts}
+                        />
+                    </div>
+                    <DistributionChart
+                        title="Top companies by contact records"
+                        rows={data.companies.map((company) => ({
+                            label: company.label,
+                            value: company.contacts,
+                            percent:
+                                data.overview.records > 0
+                                    ? Math.round(
+                                          (1000 * company.contacts) /
+                                              data.overview.records,
+                                      ) / 10
+                                    : null,
+                        }))}
+                        description={`Top 15 · percentage of all period-created records. ${data.company_analysis.unnamed_records.toLocaleString()} unnamed records excluded from company averages.`}
                     />
-                    <Breakdown
-                        title="Lead sources"
-                        items={sources}
-                        color="var(--color-chart-1)"
-                        className="xl:col-span-2"
-                    />
-                </div>
-
-                {isAdmin && (
-                    <>
-                        <div className="grid gap-6 xl:grid-cols-2">
-                            <LeadFunnel
-                                stages={funnel}
-                                excluded={funnelExcluded}
+                </Section>
+                <Section
+                    title="Data quality"
+                    note="Rows from uploads created in the selected period. Accepted includes Needs Review; possible duplicates can overlap review rows. Rates use processed rows and N/A means no denominator."
+                >
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {(
+                            [
+                                'accepted',
+                                'needs_review',
+                                'duplicates',
+                                'rejected',
+                                'errors',
+                                'location_issues',
+                            ] as const
+                        ).map((key) => (
+                            <Metric
+                                key={key}
+                                label={formatLabel(key)}
+                                value={quality[key]}
+                                note={
+                                    key === 'needs_review'
+                                        ? 'Included in accepted rows'
+                                        : percent(quality[`${key}_rate`])
+                                }
                             />
-                            <Breakdown
-                                title="Industries"
-                                items={industries}
-                                color="var(--color-chart-4)"
-                            />
-                        </div>
-
-                        <Card>
-                            <CardHeader className="flex-row items-center justify-between">
-                                <div className="flex flex-col gap-1">
-                                    <CardTitle>Data quality trend</CardTitle>
-                                    <p className="text-sm text-muted-foreground">
-                                        Share of uploaded rows flagged as
-                                        duplicate, rejected, or location errors
-                                    </p>
-                                </div>
-                                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                                    <span className="flex items-center gap-1.5">
-                                        <i
-                                            className="size-2 rounded-full"
-                                            style={{
-                                                backgroundColor:
-                                                    'var(--color-chart-1)',
-                                            }}
-                                        />
-                                        Duplicate rate
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <i
-                                            className="size-2 rounded-full"
-                                            style={{
-                                                backgroundColor:
-                                                    'var(--color-chart-2)',
-                                            }}
-                                        />
-                                        Error rate
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <i
-                                            className="size-2 rounded-full"
-                                            style={{
-                                                backgroundColor:
-                                                    'var(--color-chart-3)',
-                                            }}
-                                        />
-                                        Location error rate
-                                    </span>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="h-64 min-w-0">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <LineChart data={dataQualityTrend}>
-                                            <CartesianGrid
-                                                vertical={false}
-                                                stroke="var(--color-border)"
-                                                strokeOpacity={0.6}
-                                            />
-                                            <XAxis
-                                                dataKey="label"
-                                                tick={{ fontSize: 11 }}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                interval="preserveStartEnd"
-                                                stroke="var(--color-muted-foreground)"
-                                            />
-                                            <YAxis
-                                                tick={{ fontSize: 11 }}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                width={40}
-                                                unit="%"
-                                                stroke="var(--color-muted-foreground)"
-                                            />
-                                            <RechartsTooltip
-                                                content={
-                                                    <ChartTooltip
-                                                        formatter={(_, value) =>
-                                                            `${value}%`
-                                                        }
-                                                    />
-                                                }
-                                            />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="duplicate_rate"
-                                                name="Duplicate rate"
-                                                stroke="var(--color-chart-1)"
-                                                strokeWidth={2}
-                                                dot={false}
-                                                activeDot={{ r: 4 }}
-                                            />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="error_rate"
-                                                name="Error rate"
-                                                stroke="var(--color-chart-2)"
-                                                strokeWidth={2}
-                                                dot={false}
-                                                activeDot={{ r: 4 }}
-                                            />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="location_error_rate"
-                                                name="Location error rate"
-                                                stroke="var(--color-chart-3)"
-                                                strokeWidth={2}
-                                                dot={false}
-                                                activeDot={{ r: 4 }}
-                                            />
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <UploadTimingHeatmap data={uploadTimingHeatmap} />
-                    </>
-                )}
-
-                {agentPerformance.length > 0 && (
+                        ))}
+                    </div>
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Agent performance</CardTitle>
+                        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+                            <CardTitle>Data quality trend</CardTitle>
+                            <label className="flex items-center gap-2 text-xs">
+                                Display
+                                <select
+                                    className={selectClass}
+                                    value={mode}
+                                    onChange={(e) =>
+                                        setMode(e.target.value as typeof mode)
+                                    }
+                                >
+                                    <option value="count">Count</option>
+                                    <option value="rate">Rate</option>
+                                </select>
+                            </label>
                         </CardHeader>
-                        <CardContent className="overflow-x-auto p-0">
-                            <table className="w-full text-sm">
-                                <thead className="bg-muted/60 text-left text-xs tracking-wide text-muted-foreground uppercase">
-                                    <tr>
-                                        {[
-                                            'Agent',
-                                            'Leads',
-                                            'Qualified',
-                                            'Qualification rate',
-                                            ...(canViewReplies
-                                                ? ['Replies', 'Interested']
-                                                : []),
-                                            'Uploads',
-                                            'Avg batch size',
-                                            'Duplicate rate',
-                                            'Error rate',
-                                        ].map((heading) => (
-                                            <th
-                                                key={heading}
-                                                className="px-5 py-3"
-                                            >
-                                                {heading}
-                                            </th>
+                        <CardContent>
+                            <p className="mb-4 text-xs text-muted-foreground">
+                                Grouped by upload creation date. Location issues
+                                reflect recorded location flags; other review
+                                flags can mask additional location problems.
+                            </p>
+                            <div
+                                className="h-64 min-w-0"
+                                role="img"
+                                aria-label={`Data quality trend by ${mode}, one bar group per period; exact values in table below`}
+                            >
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={data.quality_trend}
+                                        barGap={2}
+                                        barCategoryGap="20%"
+                                        accessibilityLayer
+                                    >
+                                        <CartesianGrid
+                                            vertical={false}
+                                            stroke="var(--color-border)"
+                                        />
+                                        <XAxis
+                                            dataKey="date"
+                                            tick={{ fontSize: 11 }}
+                                            minTickGap={40}
+                                        />
+                                        <YAxis
+                                            unit={mode === 'rate' ? '%' : ''}
+                                            allowDecimals={mode === 'rate'}
+                                            tick={{ fontSize: 11 }}
+                                        />
+                                        <Tooltip
+                                            content={ChartTooltip}
+                                            cursor={{
+                                                fill: 'var(--color-muted)',
+                                                opacity: 0.4,
+                                            }}
+                                        />
+                                        {qualitySeries.map((key, index) => (
+                                            <Bar
+                                                key={key}
+                                                dataKey={
+                                                    mode === 'rate'
+                                                        ? `${key}_rate`
+                                                        : key
+                                                }
+                                                name={formatLabel(key)}
+                                                fill={`var(--color-chart-${index + 1})`}
+                                                maxBarSize={20}
+                                                radius={[4, 4, 0, 0]}
+                                                isAnimationActive={false}
+                                            />
                                         ))}
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <ChartLegend
+                                items={qualitySeries.map((key, index) => ({
+                                    key,
+                                    label: formatLabel(key),
+                                    color: `var(--color-chart-${index + 1})`,
+                                }))}
+                            />
+                            <details className="mt-4">
+                                <summary className="cursor-pointer text-sm text-primary">
+                                    View quality data
+                                </summary>
+                                <ReportTable
+                                    headings={[
+                                        'Period start',
+                                        'Processed',
+                                        ...qualitySeries.map(formatLabel),
+                                    ]}
+                                    rows={data.quality_trend.map((point) => [
+                                        point.date,
+                                        point.processed,
+                                        ...qualitySeries.map((key) =>
+                                            mode === 'rate'
+                                                ? percent(point[`${key}_rate`])
+                                                : point[key],
+                                        ),
+                                    ])}
+                                />
+                            </details>
+                        </CardContent>
+                    </Card>
+                </Section>
+                <Section
+                    title="Upload quality analysis"
+                    note="Selected-period uploads · submitted rows use batch totals; observed and processed counts use retained import rows. Unstarted uploads may not yet have row outcomes."
+                    collapsible
+                    defaultOpen={false}
+                >
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <Metric
+                            label="Total uploads"
+                            value={data.overview.uploads}
+                        />
+                        <Metric
+                            label="Rows submitted · batch totals"
+                            value={quality.submitted_rows}
+                        />
+                        <Metric
+                            label="Observed import rows"
+                            value={quality.observed_rows}
+                        />
+                        <Metric
+                            label="Average batch size"
+                            value={quality.average_batch_size}
+                        />
+                    </div>
+                    <ReportTable
+                        headings={[
+                            'Processed',
+                            'Pending',
+                            'Accepted',
+                            'Duplicates',
+                            'Rejected',
+                            'Errors',
+                            'Acceptance rate',
+                            'Duplicate rate',
+                            'Rejection rate',
+                            'Error rate',
+                        ]}
+                        rows={[
+                            [
+                                quality.processed,
+                                quality.observed_rows - quality.processed,
+                                quality.accepted,
+                                quality.duplicates,
+                                quality.rejected,
+                                quality.errors,
+                                percent(quality.accepted_rate),
+                                percent(quality.duplicates_rate),
+                                percent(quality.rejected_rate),
+                                percent(quality.errors_rate),
+                            ],
+                        ]}
+                    />
+                </Section>
+                <Section
+                    title="Source quality analysis"
+                    note="Selected period · Total records uses current lead sources. Import outcomes use saved source snapshots, including updates to existing leads. These are distinct populations; accepted rows are not necessarily new records. Missing snapshots are Unknown; manual records have no import-quality rate."
+                    collapsible
+                    defaultOpen={false}
+                >
+                    <ReportTable
+                        headings={[
+                            'Source',
+                            'Total records',
+                            'Import rows',
+                            'Processed rows',
+                            'Accepted rows',
+                            'Duplicate rate',
+                            'Rejection rate',
+                            'Error rate',
+                        ]}
+                        rows={data.source_quality.map((source) => [
+                            source.label,
+                            source.records,
+                            source.observed_rows,
+                            source.processed,
+                            source.accepted,
+                            percent(source.duplicates_rate),
+                            percent(source.rejected_rate),
+                            percent(source.errors_rate),
+                        ])}
+                    />
+                </Section>
+                <Section
+                    title="Geographic analysis"
+                    note="Selected period · click a country, then a state/province, then a city to narrow the location combinations. Historical City values are shown as stored and may contain province names."
+                    collapsible
+                    defaultOpen={false}
+                >
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <button
+                            className="text-primary hover:underline"
+                            onClick={() => drill()}
+                        >
+                            All locations
+                        </button>
+                        {geo.filters.geo_country && (
+                            <>
+                                <span>→</span>
+                                <button
+                                    className="text-primary hover:underline"
+                                    onClick={() =>
+                                        drill(geo.filters.geo_country)
+                                    }
+                                >
+                                    {countryName(geo.filters.geo_country)}
+                                </button>
+                            </>
+                        )}
+                        {geo.filters.geo_province && (
+                            <>
+                                <span>→</span>
+                                <button
+                                    className="text-primary hover:underline"
+                                    onClick={() =>
+                                        drill(
+                                            geo.filters.geo_country,
+                                            geo.filters.geo_province,
+                                        )
+                                    }
+                                >
+                                    {geo.filters.geo_province}
+                                </button>
+                            </>
+                        )}
+                        {geo.filters.geo_city && (
+                            <>
+                                <span>→</span>
+                                <span>{geo.filters.geo_city}</span>
+                            </>
+                        )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        Top 50 combinations · {geo.records.toLocaleString()}{' '}
+                        matching records.{' '}
+                        {data.geography.unverified_city_records.toLocaleString()}{' '}
+                        period records have an unverified city label. Drill-down
+                        filters affect this section only.
+                    </p>
+                    <ReportTable
+                        headings={[
+                            'Country',
+                            'State / province',
+                            'City as stored',
+                            'Timezone',
+                            'Records',
+                        ]}
+                        rows={geo.rows.map((row) => [
+                            <button
+                                className="text-primary hover:underline"
+                                onClick={() => drill(row.country)}
+                            >
+                                {countryName(row.country)}
+                            </button>,
+                            <button
+                                className="text-primary hover:underline"
+                                onClick={() => drill(row.country, row.province)}
+                            >
+                                {row.province}
+                            </button>,
+                            <button
+                                className="text-primary hover:underline"
+                                onClick={() =>
+                                    drill(row.country, row.province, row.city)
+                                }
+                            >
+                                {row.city}
+                            </button>,
+                            row.timezone,
+                            row.records,
+                        ])}
+                    />
+                </Section>
+                {data.can_compare_agents && (
+                    <Section
+                        title="Database contribution by agent"
+                        note="Selected period · top 20 agents by currently owned records, including historical owners. Upload quality follows the uploader. Data quality rate = accepted rows with no recorded issue ÷ processed rows; it does not verify deliverability."
+                        collapsible
+                        defaultOpen={false}
+                    >
+                        <ReportTable
+                            headings={[
+                                'Agent',
+                                'Records added',
+                                'Unique companies',
+                                'Uploads',
+                                'Average batch size',
+                                'Duplicate rate',
+                                'Rejection rate',
+                                'Error rate',
+                                'Data quality rate',
+                            ]}
+                            rows={data.contribution.map((agent) => [
+                                agent.name,
+                                agent.records,
+                                agent.companies,
+                                agent.uploads,
+                                agent.average_batch_size ?? 'N/A',
+                                percent(agent.duplicates_rate),
+                                percent(agent.rejected_rate),
+                                percent(agent.errors_rate),
+                                percent(agent.clean_rate),
+                            ])}
+                        />
+                    </Section>
+                )}
+                {uploadTimingHeatmap.length > 0 && (
+                    <Section
+                        title="Upload timing"
+                        note={`Selected period · uploads by weekday and hour in ${data.timezone}. Each cell shows the number of batches.`}
+                        collapsible
+                        defaultOpen={false}
+                    >
+                        <div className="overflow-x-auto rounded-xl border bg-card p-4">
+                            <table className="w-full text-center text-xs">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Day / hour</th>
+                                        {Array.from(
+                                            { length: 24 },
+                                            (_, hour) => (
+                                                <th
+                                                    key={hour}
+                                                    className="min-w-8 p-1"
+                                                    scope="col"
+                                                >
+                                                    {hour}
+                                                </th>
+                                            ),
+                                        )}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y">
-                                    {agentPerformance.map((agent) => (
-                                        <tr
-                                            key={agent.id}
-                                            className="hover:bg-muted/30"
-                                        >
-                                            <td className="px-5 py-3 font-medium">
-                                                {agent.name}
-                                            </td>
-                                            <td className="px-5 py-3 tabular-nums">
-                                                {agent.leads}
-                                            </td>
-                                            <td className="px-5 py-3 tabular-nums">
-                                                {agent.qualified}
-                                            </td>
-                                            <td className="px-5 py-3 tabular-nums">
-                                                {agent.qualification_rate}%
-                                            </td>
-                                            {canViewReplies && (
-                                                <>
-                                                    <td className="px-5 py-3 tabular-nums">
-                                                        {agent.replies}
-                                                    </td>
-                                                    <td className="px-5 py-3 tabular-nums">
-                                                        {agent.interested}
-                                                    </td>
-                                                </>
-                                            )}
-                                            <td className="px-5 py-3 tabular-nums">
-                                                {agent.uploads}
-                                            </td>
-                                            <td className="px-5 py-3 tabular-nums">
-                                                {agent.avg_batch_size}
-                                            </td>
-                                            <td className="px-5 py-3 tabular-nums">
-                                                {agent.duplicate_rate}%
-                                            </td>
-                                            <td className="px-5 py-3 tabular-nums">
-                                                {agent.error_rate}%
-                                            </td>
+                                <tbody>
+                                    {uploadTimingHeatmap.map((row) => (
+                                        <tr key={row.day}>
+                                            <th scope="row" className="p-2">
+                                                {row.day}
+                                            </th>
+                                            {row.hours.map((count, hour) => (
+                                                <td
+                                                    key={hour}
+                                                    title={`${row.day} ${hour}:00 · ${count} uploads`}
+                                                    className={`border-2 border-card p-1 tabular-nums ${count > 0 ? 'bg-primary/20 font-medium text-foreground' : 'bg-muted/40 text-muted-foreground'}`}
+                                                >
+                                                    {count || '·'}
+                                                </td>
+                                            ))}
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </Section>
+                )}
+                {auth.user.role === 'super_administrator' && (
+                    <Section
+                        title="Reply activity"
+                        note={`Existing restricted reply analytics · ${selected}.`}
+                        collapsible
+                        defaultOpen={false}
+                    >
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <Metric label="Replies" value={summary.replies} />
+                            <Metric
+                                label="Interested replies"
+                                value={summary.interested_replies}
+                            />
+                            <Metric
+                                label="Reply rate"
+                                value={percent(summary.reply_rate)}
+                            />
+                        </div>
+                        <DistributionChart
+                            title="Reply classifications"
+                            rows={replyClassifications.map((row) => ({
+                                ...row,
+                                percent:
+                                    summary.replies > 0
+                                        ? Math.round(
+                                              (1000 * row.value) /
+                                                  summary.replies,
+                                          ) / 10
+                                        : null,
+                            }))}
+                        />
+                    </Section>
                 )}
             </div>
         </>
     );
 }
-
 Analytics.layout = {
-    breadcrumbs: [{ title: 'Reports', href: analyticsIndex() }],
+    breadcrumbs: [{ title: 'Lead Reports', href: reportIndex() }],
 };

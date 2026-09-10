@@ -3,10 +3,9 @@
 namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class AnalyticsRequest extends FormRequest
+class AnalyticsRequest extends DashboardRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -24,9 +23,11 @@ class AnalyticsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'period' => ['nullable', Rule::in(['7_days', '30_days', '90_days', 'custom'])],
-            'date_from' => ['nullable', 'required_if:period,custom', 'date'],
-            'date_to' => ['nullable', 'required_if:period,custom', 'date', 'after_or_equal:date_from'],
+            ...parent::rules(),
+            'period' => ['nullable', Rule::in(['today', 'week', 'last_week', 'month', 'last_month', '30_days', 'quarter', 'custom', '7_days', '90_days'])],
+            'geo_country' => ['nullable', 'string', 'max:255'],
+            'geo_province' => ['nullable', 'string', 'max:255'],
+            'geo_city' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

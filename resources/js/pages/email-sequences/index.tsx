@@ -252,7 +252,7 @@ export default function EmailSequencesIndex({
                                 key={step.day}
                                 className="relative overflow-hidden"
                             >
-                                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 to-blue-500" />
+                                <div className="absolute inset-x-0 top-0 h-1 bg-cyan-400" />
                                 <CardHeader>
                                     <div className="flex items-center justify-between">
                                         <CardTitle>

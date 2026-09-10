@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\AnalyticsReport;
 use App\Services\CsvCellSanitizer;
+use App\Services\DatabaseIntelligenceReport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
@@ -49,6 +50,9 @@ class AnalyticsController extends Controller
 
             fputcsv($stream, ['Report period', "{$data['filters']['date_from']} to {$data['filters']['date_to']}"], escape: '');
             fputcsv($stream, [], escape: '');
+            foreach ($data['databaseSections'] as $title => $rows) {
+                $writeSection($title, $rows);
+            }
             $writeSection('Summary', [
                 ['Metric', 'Value'],
                 ['Leads created', $data['summary']['total_leads']],
@@ -94,7 +98,10 @@ class AnalyticsController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
-        return [$user, $analytics->for($user, $request->validated())];
+        $data = $analytics->for($user, $request->validated());
+        $data['databaseSections'] = app(DatabaseIntelligenceReport::class)->exportSections($data['databaseReport']);
+
+        return [$user, $data];
     }
 
     /** @param  array<string, mixed>  $metadata */
