@@ -53,6 +53,7 @@ type Batch = {
     error_rows: number;
     duplicate_rows: number;
     processing_status: string;
+    failure_message: string | null;
     created_at: string;
     user: { name: string } | null;
 };
@@ -453,6 +454,18 @@ export default function UploadIndex({
                                         <StatusBadge
                                             value={batch.processing_status}
                                         />
+                                        {batch.processing_status ===
+                                            'failed' &&
+                                            batch.failure_message && (
+                                                <p
+                                                    className="mt-1 max-w-48 truncate text-xs text-destructive"
+                                                    title={
+                                                        batch.failure_message
+                                                    }
+                                                >
+                                                    {batch.failure_message}
+                                                </p>
+                                            )}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">

@@ -7,6 +7,7 @@ use App\Models\SystemSetting;
 use App\Models\UploadBatch;
 use App\Models\UploadRow;
 use App\Models\User;
+use App\Services\UploadBatchProcessor;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -461,6 +462,26 @@ it('fully reprocesses a failed upload even when it has no rejected or duplicate 
         ->and($batch->failure_message)->toBeNull()
         ->and($batch->accepted_rows)->toBe(1);
     $this->assertDatabaseHas('leads', ['upload_batch_id' => $batch->id, 'company_name' => 'Acme', 'email' => 'ada@acme.test']);
+});
+
+it('marks a batch failed without rethrowing, so the queue does not auto-retry a permanent failure', function () {
+    // Regression test: the job used to rethrow after recording the failure, which
+    // made Laravel's queue retry the same unrecoverable error (e.g. a missing
+    // stored file) up to $tries times with backoff. On the cron-driven worker this
+    // project uses on shared hosting, that wasted real time out of the
+    // once-a-minute processing window for no benefit - the user can already
+    // retry explicitly via Re-analyze.
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $batch = UploadBatch::factory()->for($agent)->create([
+        'stored_filename' => 'lead-imports/missing.csv',
+        'processing_status' => 'pending',
+    ]);
+
+    (new ProcessUploadBatch($batch->id))->handle(app(UploadBatchProcessor::class));
+
+    expect($batch->refresh()->processing_status->value)->toBe('failed')
+        ->and($batch->failure_message)->toBe('The uploaded file could not be read.');
 });
 
 it('prevents an agent from re-analyzing another agents upload', function () {

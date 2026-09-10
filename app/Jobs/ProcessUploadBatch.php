@@ -53,7 +53,14 @@ class ProcessUploadBatch implements ShouldBeUniqueUntilProcessing, ShouldQueue
             $processor->process($batch);
         } catch (Throwable $exception) {
             $batch->update(['processing_status' => UploadBatchStatus::Failed, 'failure_message' => $exception->getMessage(), 'completed_at' => now()]);
-            throw $exception;
+            report($exception);
+            // Deliberately not rethrown: the failure is already recorded on the
+            // batch above, so there's nothing left for Laravel's own retry/backoff
+            // to accomplish - it would only repeat the same failure (e.g. a missing
+            // stored file) up to `$tries` times. On the constrained cron-driven
+            // worker this project runs on shared hosting (see DEPLOYMENT.md), those
+            // extra attempts cost real time out of the once-a-minute processing
+            // window. A user can still explicitly retry via Re-analyze.
         }
     }
 
