@@ -53,18 +53,30 @@ export default function UploadCreate({
                 >
                     <Card>
                         <CardHeader>
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                                    <UploadCloud className="size-5" />
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                        <UploadCloud className="size-5" />
+                                    </div>
+                                    <div>
+                                        <CardTitle>Raw CSV files</CardTitle>
+                                        <CardDescription>
+                                            A single file goes to column
+                                            mapping review; multiple files are
+                                            cleaned together. Columns are
+                                            auto-detected, and any that don&apos;t
+                                            match are left blank rather than
+                                            rejecting the file.
+                                        </CardDescription>
+                                    </div>
                                 </div>
-                                <div>
-                                    <CardTitle>Raw CSV files</CardTitle>
-                                    <CardDescription>
-                                        A single file goes to column mapping
-                                        review; multiple files are cleaned
-                                        together.
-                                    </CardDescription>
-                                </div>
+                                <a
+                                    href="/templates/lead-upload-template.csv"
+                                    download
+                                    className="shrink-0 rounded-md border px-3 py-1.5 text-sm font-medium whitespace-nowrap hover:bg-muted"
+                                >
+                                    Download CSV template
+                                </a>
                             </div>
                         </CardHeader>
                         <CardContent>

@@ -177,6 +177,35 @@ it('uploads maps and processes valid and invalid CSV rows', function () {
     $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 3, 'processing_status' => 'rejected']);
 });
 
+it('accepts a lead when the CSV is missing some of the default template columns', function () {
+    // The default template (public/templates/lead-upload-template.csv) has Date, Company,
+    // Website, First Name, Email, Country, City, Import Trades, LinkedIn, Sources of Data,
+    // and Source Link - but a CSV missing some of those columns entirely must still process:
+    // the missing fields are simply left blank rather than rejecting the row.
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent('minimal.csv', "Company,Email\nAcme,ada@acme.test\n");
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email',
+    ]])->assertRedirect(route('uploads.show', $batch));
+
+    $batch->refresh();
+    expect($batch->accepted_rows)->toBe(1)->and($batch->rejected_rows)->toBe(0);
+    $this->assertDatabaseHas('leads', [
+        'agent_id' => $agent->id,
+        'company_name' => 'Acme',
+        'email' => 'ada@acme.test',
+        'website' => null,
+        'country' => null,
+        'city' => null,
+        'linkedin_url' => null,
+        'source_url' => null,
+    ]);
+});
+
 it('uploads and processes multiple compatible raw files together', function () {
     Storage::fake('local');
     $agent = User::factory()->create();
