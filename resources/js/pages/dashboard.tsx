@@ -25,6 +25,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { dashboard } from '@/routes';
+import { index as duplicatesIndex } from '@/routes/duplicates';
+import { index as emailRepliesIndex } from '@/routes/email-replies';
 import { edit as leadEdit, index as leadsIndex } from '@/routes/leads';
 import { index as uploadsIndex, show as uploadShow } from '@/routes/uploads';
 import type { Auth } from '@/types';
@@ -77,6 +79,10 @@ export default function Dashboard({
 }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const isSuperAdministrator = auth.user.role === 'super_administrator';
+    // Agents can't reach the Duplicate Review page (see app-sidebar.tsx), so
+    // their "Duplicates flagged" tile links to Upload History instead, where
+    // their own batches' duplicate counts are still visible.
+    const canReviewDuplicates = auth.user.role !== 'agent';
     const [selectedPeriod, setSelectedPeriod] = useState(period);
     const isCustomPeriod = selectedPeriod === 'custom';
 
@@ -99,6 +105,7 @@ export default function Dashboard({
             value: totalLeads,
             icon: Database,
             tone: 'text-info',
+            href: leadsIndex(),
         },
         {
             label: 'Unique companies',
@@ -108,12 +115,16 @@ export default function Dashboard({
                 : undefined,
             icon: Building2,
             tone: 'text-chart-1',
+            href: leadsIndex({
+                query: { sort: 'company_name', direction: 'asc' },
+            }),
         },
         {
             label: 'Qualified leads',
             value: qualifiedLeads,
             icon: Target,
             tone: 'text-success',
+            href: leadsIndex({ query: { status: 'qualified_lead' } }),
         },
         {
             label: 'Qualification rate',
@@ -121,6 +132,7 @@ export default function Dashboard({
             detail: `${qualifiedLeads.toLocaleString()} of ${totalLeads.toLocaleString()} leads`,
             icon: TrendingUp,
             tone: 'text-chart-2',
+            href: leadsIndex({ query: { status: 'qualified_lead' } }),
         },
     ];
 
@@ -131,6 +143,7 @@ export default function Dashboard({
             detail: 'Exact + possible matches caught on import',
             icon: ShieldAlert,
             tone: 'text-warning',
+            href: canReviewDuplicates ? duplicatesIndex() : uploadsIndex(),
         },
         {
             label: 'Data issues',
@@ -138,6 +151,7 @@ export default function Dashboard({
             detail: 'Rejected, location, or processing errors',
             icon: FileWarning,
             tone: 'text-destructive',
+            href: uploadsIndex(),
         },
         // Unread replies / possible leads from replies are a Super
         // Administrator-only feature, hidden entirely for every other role.
@@ -148,12 +162,16 @@ export default function Dashboard({
                       value: stats.unread_replies ?? 0,
                       icon: MailCheck,
                       tone: 'text-chart-4',
+                      href: emailRepliesIndex({
+                          query: { unread: '1' },
+                      }),
                   },
                   {
                       label: 'Possible leads from replies',
                       value: stats.possible_reply_leads ?? 0,
                       icon: Sparkles,
                       tone: 'text-chart-5',
+                      href: emailRepliesIndex(),
                   },
               ]
             : []),
@@ -263,6 +281,7 @@ export default function Dashboard({
                                 detail={metric.detail}
                                 icon={metric.icon}
                                 tone={metric.tone}
+                                href={metric.href}
                             />
                         ))}
                     </div>
@@ -285,6 +304,7 @@ export default function Dashboard({
                                 detail={metric.detail}
                                 icon={metric.icon}
                                 tone={metric.tone}
+                                href={metric.href}
                             />
                         ))}
                     </div>
