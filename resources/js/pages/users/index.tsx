@@ -360,7 +360,14 @@ export default function UsersIndex({
                                                             <Button
                                                                 type="button"
                                                                 variant="destructive"
-                                                                onClick={() =>
+                                                                onClick={() => {
+                                                                    if (
+                                                                        !window.confirm(
+                                                                            `Last chance: this permanently deletes ${user.leads_count.toLocaleString()} lead(s) and ${user.upload_batches_count.toLocaleString()} upload record(s) owned by ${user.name}. This cannot be undone. Continue?`,
+                                                                        )
+                                                                    ) {
+                                                                        return;
+                                                                    }
                                                                     router.delete(
                                                                         clearRecords.url(
                                                                             user.id,
@@ -368,8 +375,8 @@ export default function UsersIndex({
                                                                         {
                                                                             preserveScroll: true,
                                                                         },
-                                                                    )
-                                                                }
+                                                                    );
+                                                                }}
                                                             >
                                                                 Clear records
                                                             </Button>
