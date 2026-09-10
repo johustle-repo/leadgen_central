@@ -42,7 +42,13 @@ class UploadBatchProcessor
         $rowNumber = 1;
         while (($values = fgetcsv($stream, escape: '')) !== false) {
             $rowNumber++;
-            if (count($values) === 1 && trim((string) $values[0]) === '') {
+            // A row where every cell is blank (a stray blank line, or a run of
+            // empty-but-comma-padded cells from an Excel export) carries no
+            // data to reject - it isn't a lead that failed validation, so it
+            // shouldn't be created, counted, or reported as a data issue.
+            if ($this->isBlankRow($values)) {
+                UploadRow::query()->where('upload_batch_id', $batch->id)->where('row_number', $rowNumber)->delete();
+
                 continue;
             }
             $raw = [];
@@ -107,6 +113,18 @@ class UploadBatchProcessor
         }
         fclose($stream);
         $this->updateSummary($batch);
+    }
+
+    /** @param list<string|null> $values */
+    private function isBlankRow(array $values): bool
+    {
+        foreach ($values as $value) {
+            if (trim((string) $value) !== '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @param array<string, string|null> $raw

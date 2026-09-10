@@ -470,6 +470,31 @@ it('accepts a file whose rows are padded with trailing blank columns', function 
     $this->assertDatabaseHas('leads', ['agent_id' => $agent->id, 'company_name' => 'VFive Group', 'email' => 'aerian@vfive.test', 'lead_date' => '2026-09-03 00:00:00']);
 });
 
+it('disregards fully blank data rows instead of rejecting them for a missing company name', function () {
+    // Regression test: spreadsheet exports often leave stray blank rows (every cell
+    // empty, but still comma-padded to the header count) at the end of the sheet.
+    // Those aren't failed leads, so they shouldn't be created, counted, or reported
+    // as a "company name field is required" rejection.
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'with-blanks.csv',
+        "Company,Email,Website\nAcme,hello@acme.test,acme.test\n,,\n,,\n",
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'website',
+    ]])->assertRedirect(route('uploads.show', $batch));
+
+    $batch->refresh();
+    expect($batch->total_rows)->toBe(1)
+        ->and($batch->accepted_rows)->toBe(1)
+        ->and($batch->rejected_rows)->toBe(0)
+        ->and($batch->invalid_rows)->toBe(0);
+    $this->assertDatabaseCount('upload_rows', 1);
+});
+
 it('still rejects a file whose named columns repeat', function () {
     Storage::fake('local');
     $agent = User::factory()->create();
