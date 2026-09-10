@@ -155,7 +155,11 @@ export default function UploadShow({
                             },
                             {
                                 label: 'Other Errors',
-                                value: batch.invalid_rows + batch.error_rows,
+                                value:
+                                    batch.invalid_rows +
+                                    batch.error_rows +
+                                    batch.exact_duplicate_rows +
+                                    batch.possible_duplicate_rows,
                                 icon: AlertTriangle,
                                 tone: 'text-destructive',
                             },

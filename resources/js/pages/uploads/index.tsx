@@ -449,7 +449,8 @@ export default function UploadIndex({
                                         className="text-destructive"
                                     >
                                         {batch.rejected_rows +
-                                            batch.error_rows}
+                                            batch.error_rows +
+                                            batch.duplicate_rows}
                                     </TableCell>
                                     <TableCell>
                                         <StatusBadge
