@@ -21,7 +21,8 @@ class UploadBatchReanalyzer
             // too - that cap is disabled for now, so those contacts should go
             // through if re-run. Rows rejected by field validation are retried as
             // well, since that's where an old required/format-checked LinkedIn URL
-            // would have cost a row its place before LinkedIn became optional.
+            // or source link would have cost a row its place before both became
+            // optional, format-unchecked fields.
             $rows = $batch->rows()
                 ->where(function ($query): void {
                     $query->where('processing_status', UploadRowStatus::Duplicate)

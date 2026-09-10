@@ -65,9 +65,10 @@ class UploadBatchProcessor
                 continue;
             }
             $processed = $this->mappedData($batch, $raw);
-            // LinkedIn is optional and never blocks a row: a missing or
-            // malformed LinkedIn value should never cost a lead its place.
-            $validator = Validator::make($processed, ['lead_date' => ['nullable', 'date'], 'company_name' => ['required', 'string', 'max:255'], 'website' => ['nullable', 'string', 'max:255'], 'country_code' => ['nullable', 'string', 'size:2'], 'email' => ['nullable', 'email', 'max:255'], 'linkedin_url' => ['nullable', 'string', 'max:255'], 'source_url' => ['nullable', 'url:http,https', 'max:255']]);
+            // LinkedIn and the source link are both optional and never block a
+            // row: a missing or malformed value in either should never cost a
+            // lead its place - it's still stored as submitted.
+            $validator = Validator::make($processed, ['lead_date' => ['nullable', 'date'], 'company_name' => ['required', 'string', 'max:255'], 'website' => ['nullable', 'string', 'max:255'], 'country_code' => ['nullable', 'string', 'size:2'], 'email' => ['nullable', 'email', 'max:255'], 'linkedin_url' => ['nullable', 'string', 'max:255'], 'source_url' => ['nullable', 'string', 'max:255']]);
             if ($validator->fails()) {
                 $row->update(['processed_data' => $processed, 'processing_status' => UploadRowStatus::Rejected, 'error_category' => 'validation', 'error_message' => $validator->errors()->first()]);
 

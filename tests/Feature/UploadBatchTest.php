@@ -336,6 +336,25 @@ it('retains a lead whose LinkedIn value is empty or badly formatted', function (
     $this->assertDatabaseMissing('upload_rows', ['upload_batch_id' => $batch->id, 'error_category' => 'validation']);
 });
 
+it('retains a lead whose source link is empty or badly formatted', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'source-link.csv',
+        "Company,Email,Link\nAcme,ada@acme.test,not-a-valid-url\nOther Co,other@acme.test,\n",
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'source_url',
+    ]]);
+
+    $this->assertDatabaseHas('leads', ['company_name' => 'Acme', 'email' => 'ada@acme.test', 'source_url' => 'not-a-valid-url']);
+    $this->assertDatabaseHas('leads', ['company_name' => 'Other Co', 'email' => 'other@acme.test', 'source_url' => null]);
+    $this->assertDatabaseMissing('upload_rows', ['upload_batch_id' => $batch->id, 'error_category' => 'validation']);
+});
+
 it('auto-detects a lead date from the upload date when none is provided', function () {
     Storage::fake('local');
     $this->travelTo('2026-08-25 09:00:00');
@@ -436,6 +455,34 @@ it('re-analyzes rows previously rejected by validation, such as an old LinkedIn 
     expect($batch->refresh()->accepted_rows)->toBe(1)
         ->and($batch->rejected_rows)->toBe(0);
     $this->assertDatabaseHas('leads', ['upload_batch_id' => $batch->id, 'contact_person' => 'Ada Lovelace', 'email' => 'ada@acme.test', 'linkedin_url' => 'not-a-valid-url']);
+});
+
+it('re-analyzes rows previously rejected by validation for an old source link format check', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    Storage::disk('local')->put('lead-imports/reanalyze-source-link.csv', "Company,Name,Email,Link\nAcme,Ada Lovelace,ada@acme.test,not-a-valid-url\n");
+    $batch = UploadBatch::factory()->for($agent)->create([
+        'stored_filename' => 'lead-imports/reanalyze-source-link.csv',
+        'headers' => ['Company', 'Name', 'Email', 'Link'],
+        'column_mapping' => ['Company' => 'company_name', 'Name' => 'contact_person', 'Email' => 'email', 'Link' => 'source_url'],
+        'processing_status' => 'completed',
+        'total_rows' => 1,
+        'rejected_rows' => 1,
+        'invalid_rows' => 1,
+    ]);
+    UploadRow::factory()->for($batch)->create([
+        'row_number' => 2,
+        'processing_status' => 'rejected',
+        'error_category' => 'validation',
+        'error_message' => 'The source url field must be a valid URL.',
+    ]);
+
+    $response = $this->actingAs($agent)->post(route('uploads.reanalyze', $batch));
+
+    $response->assertRedirect()->assertSessionHas('toast');
+    expect($batch->refresh()->accepted_rows)->toBe(1)
+        ->and($batch->rejected_rows)->toBe(0);
+    $this->assertDatabaseHas('leads', ['upload_batch_id' => $batch->id, 'contact_person' => 'Ada Lovelace', 'email' => 'ada@acme.test', 'source_url' => 'not-a-valid-url']);
 });
 
 it('fully reprocesses a failed upload even when it has no rejected or duplicate rows to reset', function () {
