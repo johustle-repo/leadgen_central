@@ -178,6 +178,25 @@ const fields = [
     { name: 'source_url', label: 'Link', type: 'url' },
 ];
 const dataSources = ['Tendata', 'Lusha', 'Tendata/Lusha', 'Email', 'Manual'];
+const fieldLabel = (name: string) =>
+    fields.find((field) => field.name === name)?.label ??
+    name
+        .replaceAll('_', ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+const historyValue = (value: string | number | null) =>
+    value === null || value === '' ? '(empty)' : String(value);
+type ChangeHistoryEntry = {
+    id: number;
+    description: string;
+    created_at: string;
+    user: { id: number; name: string } | null;
+    metadata: {
+        changes?: Record<
+            string,
+            { old: string | number | null; new: string | number | null }
+        >;
+    } | null;
+};
 const titleCaseName = (value: string) =>
     value
         .trim()
@@ -190,12 +209,14 @@ export default function LeadForm({
     formVersion,
     agents,
     companyContactCount,
+    changeHistory = [],
 }: {
     lead: Lead | null;
     defaults: Record<string, string | number | null>;
     formVersion: number;
     companyContactCount: CompanyContactCount;
     agents: Array<{ id: number; name: string }>;
+    changeHistory?: ChangeHistoryEntry[];
 }) {
     const form = lead ? update.form(lead.id) : store.form();
     const isCreating = !lead;
@@ -486,6 +507,63 @@ export default function LeadForm({
                         </>
                     )}
                 </Form>
+                {!isCreating && changeHistory.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Change history</CardTitle>
+                            <CardDescription>
+                                Field edits recorded for this lead, most
+                                recent first.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="divide-y">
+                            {changeHistory.map((entry) => {
+                                const changes = Object.entries(
+                                    entry.metadata?.changes ?? {},
+                                );
+
+                                return (
+                                    <div key={entry.id} className="py-3">
+                                        <p className="text-sm font-medium">
+                                            {entry.description}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {entry.user?.name ??
+                                                'Deleted user'}{' '}
+                                            ·{' '}
+                                            {new Date(
+                                                entry.created_at,
+                                            ).toLocaleString()}
+                                        </p>
+                                        {changes.length > 0 && (
+                                            <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                                {changes.map(
+                                                    ([field, change]) => (
+                                                        <li key={field}>
+                                                            <span className="font-medium text-foreground">
+                                                                {fieldLabel(
+                                                                    field,
+                                                                )}
+                                                                :
+                                                            </span>{' '}
+                                                            {historyValue(
+                                                                change.old,
+                                                            )}{' '}
+                                                            →{' '}
+                                                            {historyValue(
+                                                                change.new,
+                                                            )}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </>
     );

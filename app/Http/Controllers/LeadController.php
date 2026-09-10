@@ -254,7 +254,15 @@ class LeadController extends Controller
     {
         Gate::authorize('update', $lead);
 
-        return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $lead->company_name, $lead->agent_id), 'lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : []]);
+        $changeHistory = AuditLog::query()
+            ->where('auditable_type', 'lead')
+            ->where('auditable_id', $lead->id)
+            ->with('user:id,name')
+            ->latest()
+            ->limit(50)
+            ->get(['id', 'user_id', 'description', 'metadata', 'created_at']);
+
+        return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $lead->company_name, $lead->agent_id), 'lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : [], 'changeHistory' => $changeHistory]);
     }
 
     /**
@@ -264,7 +272,28 @@ class LeadController extends Controller
     {
         $data = $request->validated();
         unset($data['agent_id']);
+        // Snapshot the pre-update values for exactly the fields being written, so the
+        // audit entry below can pair each changed field with what it used to be -
+        // getOriginal() is unreliable for this once update() has already synced it.
+        $original = $lead->only(array_keys($data));
         $lead->update([...$data, 'updated_by' => $request->user()->id]);
+
+        $changes = collect($lead->getChanges())
+            ->except(['updated_at', 'updated_by'])
+            ->mapWithKeys(fn (mixed $new, string $field): array => [$field => ['old' => $original[$field] ?? null, 'new' => $new]])
+            ->all();
+        if ($changes !== []) {
+            AuditLog::query()->create([
+                'user_id' => $request->user()->id,
+                'action' => 'leads.updated',
+                'auditable_type' => 'lead',
+                'auditable_id' => $lead->id,
+                'description' => 'Updated lead fields.',
+                'metadata' => ['changes' => $changes],
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+        }
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Lead updated successfully.']);
     }

@@ -291,6 +291,40 @@ it('allows a lead owner to edit and update their own lead', function () {
     $this->assertDatabaseHas('leads', ['id' => $lead->id, 'agent_id' => $agent->id, 'company_name' => 'Updated Company', 'updated_by' => $agent->id]);
 });
 
+it('records a change history entry when a lead is updated and surfaces it on the edit form', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Original Company', 'website' => 'original.test', 'created_by' => $agent->id]);
+
+    $this->actingAs($agent)->put(route('leads.update', $lead), ['company_name' => 'Updated Company', 'website' => 'original.test']);
+
+    $this->assertDatabaseHas('audit_logs', [
+        'user_id' => $agent->id,
+        'action' => 'leads.updated',
+        'auditable_type' => 'lead',
+        'auditable_id' => $lead->id,
+    ]);
+
+    $this->actingAs($agent)->get(route('leads.edit', $lead))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('changeHistory', 1)
+            ->where('changeHistory.0.description', 'Updated lead fields.')
+            ->where('changeHistory.0.metadata.changes.company_name.old', 'Original Company')
+            ->where('changeHistory.0.metadata.changes.company_name.new', 'Updated Company')
+            ->missing('changeHistory.0.metadata.changes.website'));
+});
+
+it('does not record a change history entry when nothing actually changed', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Same Company', 'created_by' => $agent->id]);
+
+    $this->actingAs($agent)->put(route('leads.update', $lead), ['company_name' => 'Same Company']);
+
+    $this->assertDatabaseMissing('audit_logs', [
+        'auditable_type' => 'lead',
+        'auditable_id' => $lead->id,
+    ]);
+});
+
 it('prevents an agent from updating another agents lead', function () {
     $agent = User::factory()->create();
     $otherAgent = User::factory()->create();

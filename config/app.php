@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Version
+    |--------------------------------------------------------------------------
+    |
+    | Displayed in the app UI (sidebar footer) and available to any part of
+    | the app that needs to know the current release. Bump this alongside an
+    | entry in CHANGELOG.md and a matching git tag when cutting a release.
+    |
+    */
+
+    'version' => env('APP_VERSION', '1.0.0'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

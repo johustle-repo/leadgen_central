@@ -47,9 +47,10 @@ import type { Auth } from '@/types';
 export function AppSidebar() {
     usePoll(60000, { only: ['notificationCounts'] });
 
-    const { auth, notificationCounts } = usePage<{
+    const { auth, notificationCounts, appVersion } = usePage<{
         auth: Auth;
         notificationCounts: { unread_email_replies: number };
+        appVersion: string;
     }>().props;
     const isSuperAdministrator = auth.user.role === 'super_administrator';
     const navGroups: NavGroup[] = [
@@ -175,6 +176,9 @@ export function AppSidebar() {
 
             <SidebarFooter className="border-t border-white/8 p-3">
                 <NavUser />
+                <p className="mt-2 px-1 text-center text-[10px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">
+                    v{appVersion}
+                </p>
             </SidebarFooter>
         </Sidebar>
     );
