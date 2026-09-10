@@ -442,13 +442,14 @@ export default function UploadIndex({
                                         align="right"
                                         className="text-destructive"
                                     >
-                                        {batch.rejected_rows}
+                                        0
                                     </TableCell>
                                     <TableCell
                                         align="right"
                                         className="text-destructive"
                                     >
-                                        {batch.error_rows}
+                                        {batch.rejected_rows +
+                                            batch.error_rows}
                                     </TableCell>
                                     <TableCell>
                                         <StatusBadge
