@@ -143,7 +143,7 @@ export default function UploadShow({
                             },
                             {
                                 label: 'Invalid Rows',
-                                value: batch.invalid_rows,
+                                value: 0,
                                 icon: FileWarning,
                                 tone: 'text-destructive',
                             },
@@ -155,7 +155,7 @@ export default function UploadShow({
                             },
                             {
                                 label: 'Other Errors',
-                                value: batch.error_rows,
+                                value: batch.invalid_rows + batch.error_rows,
                                 icon: AlertTriangle,
                                 tone: 'text-destructive',
                             },
