@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import { UploadCloud } from 'lucide-react';
 import { useState } from 'react';
+import type { DragEvent } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,17 +21,36 @@ import {
 } from '@/components/ui/dialog';
 import { index, store } from '@/routes/uploads';
 
-export default function UploadCreate({
-    maximumFiles,
-}: {
-    maximumFiles: number;
-}) {
+const ACCEPTED_EXTENSIONS = ['.csv', '.txt'];
+
+const isAcceptedFile = (file: File) =>
+    ACCEPTED_EXTENSIONS.some((extension) =>
+        file.name.toLowerCase().endsWith(extension),
+    );
+
+export default function UploadCreate() {
     const [confirmationOpen, setConfirmationOpen] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const upload = useForm<{
-        files: File[];
+        file: File | null;
         duplicate_handling: 'flag' | 'update_missing';
-    }>({ files: [], duplicate_handling: 'flag' });
-    const selectedFileCount = upload.data.files.length;
+    }>({ file: null, duplicate_handling: 'flag' });
+    const selectedFile = upload.data.file;
+
+    const selectFile = (file: File | undefined | null) => {
+        if (!file) {
+            return;
+        }
+
+        if (!isAcceptedFile(file)) {
+            upload.setError('file', 'Select a CSV or TXT file.');
+
+            return;
+        }
+
+        upload.clearErrors('file');
+        upload.setData('file', file);
+    };
 
     const confirmUpload = (duplicateHandling: 'flag' | 'update_missing') => {
         setConfirmationOpen(false);
@@ -59,14 +79,13 @@ export default function UploadCreate({
                                         <UploadCloud className="size-5" />
                                     </div>
                                     <div>
-                                        <CardTitle>Raw CSV files</CardTitle>
+                                        <CardTitle>Raw CSV file</CardTitle>
                                         <CardDescription>
-                                            A single file goes to column
-                                            mapping review; multiple files are
-                                            cleaned together. Columns are
-                                            auto-detected, and any that don&apos;t
-                                            match are left blank rather than
-                                            rejecting the file.
+                                            Goes to column mapping review.
+                                            Columns are auto-detected, and any
+                                            that don&apos;t match are left
+                                            blank rather than rejecting the
+                                            file.
                                         </CardDescription>
                                     </div>
                                 </div>
@@ -81,61 +100,63 @@ export default function UploadCreate({
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-col gap-5">
-                                <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-12 text-center focus-within:ring-2 focus-within:ring-ring hover:bg-muted/40">
+                                <label
+                                    onDragOver={(
+                                        event: DragEvent<HTMLLabelElement>,
+                                    ) => {
+                                        event.preventDefault();
+                                        setIsDragging(true);
+                                    }}
+                                    onDragLeave={(
+                                        event: DragEvent<HTMLLabelElement>,
+                                    ) => {
+                                        event.preventDefault();
+                                        setIsDragging(false);
+                                    }}
+                                    onDrop={(
+                                        event: DragEvent<HTMLLabelElement>,
+                                    ) => {
+                                        event.preventDefault();
+                                        setIsDragging(false);
+                                        selectFile(
+                                            event.dataTransfer.files?.[0],
+                                        );
+                                    }}
+                                    className={`flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-12 text-center transition-colors focus-within:ring-2 focus-within:ring-ring hover:bg-muted/40 ${
+                                        isDragging
+                                            ? 'border-primary bg-primary/5'
+                                            : ''
+                                    }`}
+                                >
                                     <UploadCloud className="size-10 text-primary" />
                                     <span className="font-medium">
-                                        Choose raw CSV files
+                                        Drag and drop a raw CSV file
                                     </span>
                                     <span className="text-sm text-muted-foreground">
-                                        Select up to {maximumFiles} CSV or TXT
-                                        files
+                                        or choose a CSV or TXT file below
                                     </span>
                                     <input
                                         type="file"
                                         accept=".csv,text/csv"
-                                        multiple
                                         required
                                         className="sr-only"
-                                        onChange={(event) => {
-                                            const files = Array.from(
-                                                event.target.files ?? [],
-                                            );
-
-                                            upload.setData(
-                                                'files',
-                                                files.slice(0, maximumFiles),
-                                            );
-
-                                            if (files.length > maximumFiles) {
-                                                upload.setError(
-                                                    'files',
-                                                    `Select no more than ${maximumFiles} files.`,
-                                                );
-                                            } else {
-                                                upload.clearErrors('files');
-                                            }
-                                        }}
+                                        onChange={(event) =>
+                                            selectFile(event.target.files?.[0])
+                                        }
                                     />
                                     <span className="inline-flex min-w-36 items-center justify-center rounded-md border bg-background px-4 py-2 text-sm font-medium shadow-xs hover:bg-muted">
-                                        Choose files
+                                        Choose file
                                     </span>
                                     <span
                                         className={
-                                            selectedFileCount > 0
+                                            selectedFile
                                                 ? 'rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary'
                                                 : 'text-sm text-muted-foreground'
                                         }
                                     >
-                                        {selectedFileCount > 0 ? (
-                                            <>
-                                                {selectedFileCount}{' '}
-                                                {selectedFileCount === 1
-                                                    ? 'file selected'
-                                                    : 'files selected'}
-                                            </>
-                                        ) : (
-                                            'No files selected'
-                                        )}
+                                        {selectedFile
+                                            ? selectedFile.name
+                                            : 'No file selected'}
                                     </span>
                                 </label>
                                 <InputError
@@ -154,15 +175,12 @@ export default function UploadCreate({
                                 <Button
                                     type="submit"
                                     disabled={
-                                        upload.processing ||
-                                        selectedFileCount === 0
+                                        upload.processing || !selectedFile
                                     }
                                 >
                                     {upload.processing
                                         ? 'Uploading…'
-                                        : selectedFileCount > 1
-                                          ? `Upload and clean ${selectedFileCount} files`
-                                          : 'Review column mapping'}
+                                        : 'Review column mapping'}
                                 </Button>
                             </div>
                         </CardContent>
