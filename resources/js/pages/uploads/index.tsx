@@ -474,8 +474,9 @@ export default function UploadIndex({
                                                     </Link>
                                                 </Button>
                                             )}
-                                            {batch.processing_status ===
-                                                'completed' && (
+                                            {['completed', 'failed'].includes(
+                                                batch.processing_status,
+                                            ) && (
                                                 <Button
                                                     asChild
                                                     size="sm"
