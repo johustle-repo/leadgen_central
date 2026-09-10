@@ -135,15 +135,19 @@ class UploadBatchController extends Controller
     public function reanalyze(UploadBatch $uploadBatch, UploadBatchReanalyzer $reanalyzer): RedirectResponse
     {
         Gate::authorize('reanalyze', $uploadBatch);
+        $wasFailed = $uploadBatch->processing_status === UploadBatchStatus::Failed;
         $rowCount = $reanalyzer->prepare($uploadBatch);
 
-        if ($rowCount === 0) {
+        // A Completed batch with nothing to reset genuinely has no work to do. A
+        // Failed batch, though, is requeued regardless - it never finished, so it
+        // needs a full pass even when it has no rejected/duplicate rows of its own.
+        if ($rowCount === 0 && ! $wasFailed) {
             return back()->with('toast', ['type' => 'info', 'message' => 'This upload has no duplicate, capped, or rejected rows to re-analyze.']);
         }
 
         ProcessUploadBatch::dispatch($uploadBatch->id);
 
-        return back()->with('toast', ['type' => 'success', 'message' => "{$rowCount} rows queued for re-analysis."]);
+        return back()->with('toast', ['type' => 'success', 'message' => $rowCount > 0 ? "{$rowCount} rows queued for re-analysis." : 'Upload queued for re-analysis.']);
     }
 
     public function retry(UploadBatch $uploadBatch): RedirectResponse

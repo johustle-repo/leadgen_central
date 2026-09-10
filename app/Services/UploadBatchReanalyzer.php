@@ -29,24 +29,32 @@ class UploadBatchReanalyzer
                 })
                 ->get();
 
-            if ($rows->isEmpty()) {
+            // A batch that never finished (its job crashed, timed out, or the file
+            // couldn't be read) still needs to be requeued even when it has no
+            // rejected/duplicate rows of its own to reset - it may have rows stuck
+            // at Pending, or none created at all. Only bail out with "nothing to
+            // re-analyze" for a Completed batch with no qualifying rows.
+            $wasFailed = $batch->processing_status === UploadBatchStatus::Failed;
+            if ($rows->isEmpty() && ! $wasFailed) {
                 return 0;
             }
 
-            $rowIds = $rows->modelKeys();
-            $leadIds = $rows->where('error_category', 'possible_duplicate')->pluck('lead_id')->filter()->all();
+            if ($rows->isNotEmpty()) {
+                $rowIds = $rows->modelKeys();
+                $leadIds = $rows->where('error_category', 'possible_duplicate')->pluck('lead_id')->filter()->all();
 
-            DuplicateLog::query()->whereIn('upload_row_id', $rowIds)->delete();
-            DuplicateMatch::query()->whereIn('upload_row_id', $rowIds)->delete();
-            Lead::query()->where('upload_batch_id', $batch->id)->whereKey($leadIds)->delete();
-            $batch->rows()->whereKey($rowIds)->update([
-                'processed_data' => null,
-                'processing_status' => UploadRowStatus::Pending,
-                'error_category' => null,
-                'error_message' => null,
-                'lead_id' => null,
-                'duplicate_match_id' => null,
-            ]);
+                DuplicateLog::query()->whereIn('upload_row_id', $rowIds)->delete();
+                DuplicateMatch::query()->whereIn('upload_row_id', $rowIds)->delete();
+                Lead::query()->where('upload_batch_id', $batch->id)->whereKey($leadIds)->delete();
+                $batch->rows()->whereKey($rowIds)->update([
+                    'processed_data' => null,
+                    'processing_status' => UploadRowStatus::Pending,
+                    'error_category' => null,
+                    'error_message' => null,
+                    'lead_id' => null,
+                    'duplicate_match_id' => null,
+                ]);
+            }
             $batch->update([
                 'duplicate_rows' => 0,
                 'exact_duplicate_rows' => 0,

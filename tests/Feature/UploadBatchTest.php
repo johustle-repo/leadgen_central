@@ -437,6 +437,32 @@ it('re-analyzes rows previously rejected by validation, such as an old LinkedIn 
     $this->assertDatabaseHas('leads', ['upload_batch_id' => $batch->id, 'contact_person' => 'Ada Lovelace', 'email' => 'ada@acme.test', 'linkedin_url' => 'not-a-valid-url']);
 });
 
+it('fully reprocesses a failed upload even when it has no rejected or duplicate rows to reset', function () {
+    // Regression test: a batch can land on "failed" before any row was ever
+    // processed (e.g. the job crashed reading the file), so it has none of the
+    // duplicate/validation rows the reanalyzer normally resets. Re-analyze must
+    // still requeue it for a full pass instead of reporting "nothing to do".
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    Storage::disk('local')->put('lead-imports/reanalyze-failed.csv', "Company,Email\nAcme,ada@acme.test\n");
+    $batch = UploadBatch::factory()->for($agent)->create([
+        'stored_filename' => 'lead-imports/reanalyze-failed.csv',
+        'headers' => ['Company', 'Email'],
+        'column_mapping' => ['Company' => 'company_name', 'Email' => 'email'],
+        'processing_status' => 'failed',
+        'failure_message' => 'The uploaded file could not be read.',
+        'total_rows' => 0,
+    ]);
+
+    $response = $this->actingAs($agent)->post(route('uploads.reanalyze', $batch));
+
+    $response->assertRedirect()->assertSessionHas('toast');
+    expect($batch->refresh()->processing_status->value)->toBe('completed')
+        ->and($batch->failure_message)->toBeNull()
+        ->and($batch->accepted_rows)->toBe(1);
+    $this->assertDatabaseHas('leads', ['upload_batch_id' => $batch->id, 'company_name' => 'Acme', 'email' => 'ada@acme.test']);
+});
+
 it('prevents an agent from re-analyzing another agents upload', function () {
     $owner = User::factory()->create();
     $otherAgent = User::factory()->create();
