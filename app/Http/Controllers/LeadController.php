@@ -262,7 +262,17 @@ class LeadController extends Controller
             ->limit(50)
             ->get(['id', 'user_id', 'description', 'metadata', 'created_at']);
 
-        return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $lead->company_name, $lead->agent_id), 'lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : [], 'changeHistory' => $changeHistory]);
+        $user = $request->user();
+        $nextLead = Lead::query()
+            ->when(! $user->canViewAllLeads(), fn ($query) => $query->whereBelongsTo($user, 'agent'))
+            ->where(fn ($query) => $query
+                ->where('created_at', '<', $lead->created_at)
+                ->orWhere(fn ($query) => $query->where('created_at', $lead->created_at)->where('id', '<', $lead->id)))
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first(['id']);
+
+        return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $lead->company_name, $lead->agent_id), 'lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : [], 'changeHistory' => $changeHistory, 'nextLeadId' => $nextLead?->id]);
     }
 
     /**
@@ -295,7 +305,55 @@ class LeadController extends Controller
             ]);
         }
 
+        $this->syncCompanyWideFields($request, $lead, $changes);
+
         return back()->with('toast', ['type' => 'success', 'message' => 'Lead updated successfully.']);
+    }
+
+    /**
+     * Import trades, sources of data, and the link are attributes of the
+     * company, not the individual contact, so editing one contact's value
+     * keeps every other contact at the same company (for the same agent) in
+     * sync instead of requiring the agent to repeat the edit on each one.
+     *
+     * @param  array<string, array{old: mixed, new: mixed}>  $changes
+     */
+    private function syncCompanyWideFields(Request $request, Lead $lead, array $changes): void
+    {
+        $syncFields = ['import_trades', 'data_source', 'source_url'];
+        $syncChanges = array_intersect_key($changes, array_flip($syncFields));
+        if ($syncChanges === [] || $lead->normalized_company_name === '') {
+            return;
+        }
+
+        $syncData = collect($syncChanges)->map(fn (array $change): mixed => $change['new'])->all();
+        $siblings = Lead::query()
+            ->where('agent_id', $lead->agent_id)
+            ->where('normalized_company_name', $lead->normalized_company_name)
+            ->where('id', '!=', $lead->id)
+            ->get(array_merge(['id'], $syncFields));
+
+        foreach ($siblings as $sibling) {
+            $siblingOriginal = $sibling->only($syncFields);
+            $sibling->forceFill([...$syncData, 'updated_by' => $request->user()->id])->save();
+
+            $siblingChanges = collect($sibling->getChanges())
+                ->only($syncFields)
+                ->mapWithKeys(fn (mixed $new, string $field): array => [$field => ['old' => $siblingOriginal[$field] ?? null, 'new' => $new]])
+                ->all();
+            if ($siblingChanges !== []) {
+                AuditLog::query()->create([
+                    'user_id' => $request->user()->id,
+                    'action' => 'leads.updated',
+                    'auditable_type' => 'lead',
+                    'auditable_id' => $sibling->id,
+                    'description' => "Synced from another contact at {$lead->company_name}.",
+                    'metadata' => ['changes' => $siblingChanges],
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
+            }
+        }
     }
 
     /**

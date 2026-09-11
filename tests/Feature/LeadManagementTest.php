@@ -467,6 +467,72 @@ it('requires at least one valid lead for bulk deletion', function () {
     $this->assertDatabaseCount('audit_logs', 0);
 });
 
+it('points the edit form to the next older lead in the agents default list order', function () {
+    $agent = User::factory()->create();
+    $older = Lead::factory()->for($agent, 'agent')->create(['created_at' => '2026-08-01 00:00:00']);
+    $newer = Lead::factory()->for($agent, 'agent')->create(['created_at' => '2026-08-02 00:00:00']);
+    Lead::factory()->create(['created_at' => '2026-08-01 12:00:00']);
+
+    $this->actingAs($agent)->get(route('leads.edit', $newer))
+        ->assertInertia(fn (Assert $page) => $page->where('nextLeadId', $older->id));
+
+    $this->actingAs($agent)->get(route('leads.edit', $older))
+        ->assertInertia(fn (Assert $page) => $page->where('nextLeadId', null));
+});
+
+it('propagates import trades, data source, and link to every other contact at the same company', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create([
+        'company_name' => 'Acme Ventures', 'normalized_company_name' => 'acme ventures',
+        'import_trades' => 'Old Trades', 'data_source' => 'Manual', 'source_url' => 'https://old.example.com',
+    ]);
+    $sibling = Lead::factory()->for($agent, 'agent')->create([
+        'normalized_company_name' => 'acme ventures', 'email' => 'sibling@acme.test',
+        'import_trades' => 'Old Trades', 'data_source' => 'Manual', 'source_url' => 'https://old.example.com',
+    ]);
+    $otherCompany = Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'other company']);
+    $otherAgentSameCompany = Lead::factory()->create(['normalized_company_name' => 'acme ventures']);
+
+    $this->actingAs($agent)->put(route('leads.update', $lead), [
+        'company_name' => 'Acme Ventures',
+        'import_trades' => 'New Trades',
+        'data_source' => 'Lusha',
+        'source_url' => 'https://new.example.com',
+    ]);
+
+    $this->assertDatabaseHas('leads', [
+        'id' => $sibling->id,
+        'import_trades' => 'New Trades',
+        'data_source' => 'Lusha',
+        'source_url' => 'https://new.example.com',
+        'email' => 'sibling@acme.test',
+    ]);
+    $this->assertDatabaseHas('leads', ['id' => $otherCompany->id, 'import_trades' => null, 'data_source' => null, 'source_url' => null]);
+    $this->assertDatabaseHas('leads', ['id' => $otherAgentSameCompany->id, 'import_trades' => null, 'data_source' => null, 'source_url' => null]);
+    $this->assertDatabaseHas('audit_logs', [
+        'auditable_type' => 'lead',
+        'auditable_id' => $sibling->id,
+        'description' => 'Synced from another contact at Acme Ventures.',
+    ]);
+});
+
+it('does not propagate fields other than import trades, data source, and link', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create([
+        'company_name' => 'Acme Ventures', 'normalized_company_name' => 'acme ventures', 'website' => 'https://old.example.com',
+    ]);
+    $sibling = Lead::factory()->for($agent, 'agent')->create([
+        'normalized_company_name' => 'acme ventures', 'website' => 'https://sibling.example.com',
+    ]);
+
+    $this->actingAs($agent)->put(route('leads.update', $lead), [
+        'company_name' => 'Acme Ventures',
+        'website' => 'https://new.example.com',
+    ]);
+
+    $this->assertDatabaseHas('leads', ['id' => $sibling->id, 'website' => 'https://sibling.example.com']);
+});
+
 it('combines enhanced search filters and reaches every agents leads while searching', function () {
     $agent = User::factory()->create();
     $otherAgent = User::factory()->create();

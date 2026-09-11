@@ -1,5 +1,5 @@
-import { Form, Head, router } from '@inertiajs/react';
-import { FileText, UserRound } from 'lucide-react';
+import { Form, Head, Link, router } from '@inertiajs/react';
+import { ArrowRight, FileText, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import InputError from '@/components/input-error';
@@ -20,7 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { index, store, update } from '@/routes/leads';
+import { edit, index, store, update } from '@/routes/leads';
 
 const NO_DATA_SOURCE = '__none__';
 const DRAFT_STORAGE_KEY = 'leadgen:add-lead-draft';
@@ -210,6 +210,7 @@ export default function LeadForm({
     agents,
     companyContactCount,
     changeHistory = [],
+    nextLeadId = null,
 }: {
     lead: Lead | null;
     defaults: Record<string, string | number | null>;
@@ -217,6 +218,7 @@ export default function LeadForm({
     companyContactCount: CompanyContactCount;
     agents: Array<{ id: number; name: string }>;
     changeHistory?: ChangeHistoryEntry[];
+    nextLeadId?: number | null;
 }) {
     const form = lead ? update.form(lead.id) : store.form();
     const isCreating = !lead;
@@ -492,17 +494,29 @@ export default function LeadForm({
                                     </div>
                                 </CardContent>
                             </Card>
-                            <div className="flex justify-end gap-3">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => history.back()}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={processing}>
-                                    {processing ? 'Saving…' : 'Save lead'}
-                                </Button>
+                            <div className="flex items-center justify-between gap-3">
+                                {!isCreating && nextLeadId ? (
+                                    <Button asChild variant="outline">
+                                        <Link href={edit(nextLeadId)}>
+                                            Next lead
+                                            <ArrowRight />
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <div />
+                                )}
+                                <div className="flex gap-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => history.back()}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={processing}>
+                                        {processing ? 'Saving…' : 'Save lead'}
+                                    </Button>
+                                </div>
                             </div>
                         </>
                     )}
