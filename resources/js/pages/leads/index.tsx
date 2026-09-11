@@ -173,13 +173,15 @@ export default function LeadsIndex({
 
     // Sorting applies immediately on selection rather than waiting for
     // "Apply filters", since re-ordering the same result set is expected to
-    // react right away.
+    // react right away. It also drops the lead date filter so ascending and
+    // descending order every matching lead instead of just the ones from
+    // whatever date happens to still be selected.
     const applySort = (overrides: { sort?: string; direction?: string }) => {
+        setSelectedDate('');
         router.get(
             index.url(),
             {
                 search: searchTerm,
-                date: selectedDate,
                 agent_id: agentFilter === ALL_AGENTS ? '' : agentFilter,
                 per_page: filters.per_page,
                 sort,
