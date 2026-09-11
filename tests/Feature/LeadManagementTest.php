@@ -467,7 +467,7 @@ it('requires at least one valid lead for bulk deletion', function () {
     $this->assertDatabaseCount('audit_logs', 0);
 });
 
-it('points the edit form to the next contact at the same company for the same agent', function () {
+it('points the edit form to the next contact at the same company for the same agent, wrapping at the end', function () {
     $agent = User::factory()->create();
     $first = Lead::factory()->for($agent, 'agent')->create([
         'normalized_company_name' => 'acme ventures', 'created_at' => '2026-08-01 00:00:00',
@@ -482,6 +482,14 @@ it('points the edit form to the next contact at the same company for the same ag
         ->assertInertia(fn (Assert $page) => $page->where('nextLeadId', $second->id));
 
     $this->actingAs($agent)->get(route('leads.edit', $second))
+        ->assertInertia(fn (Assert $page) => $page->where('nextLeadId', $first->id));
+});
+
+it('hides the next lead button when the contact has no siblings at the same company', function () {
+    $agent = User::factory()->create();
+    $lonelyLead = Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'solo company']);
+
+    $this->actingAs($agent)->get(route('leads.edit', $lonelyLead))
         ->assertInertia(fn (Assert $page) => $page->where('nextLeadId', null));
 });
 

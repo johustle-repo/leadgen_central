@@ -266,16 +266,25 @@ class LeadController extends Controller
         // this same agent) rather than the agent's whole lead list, since
         // that's the group an agent is actually working through together -
         // the same grouping used for the contact count badge and the
-        // company-wide field sync below.
-        $nextLead = $lead->normalized_company_name === '' ? null : Lead::query()
-            ->where('agent_id', $lead->agent_id)
-            ->where('normalized_company_name', $lead->normalized_company_name)
-            ->where(fn ($query) => $query
-                ->where('created_at', '>', $lead->created_at)
-                ->orWhere(fn ($query) => $query->where('created_at', $lead->created_at)->where('id', '>', $lead->id)))
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->first(['id']);
+        // company-wide field sync below. It wraps back to the company's
+        // first contact once the last one is reached, so the button stays
+        // available instead of disappearing at the end of the list.
+        $nextLead = null;
+        if ($lead->normalized_company_name !== '') {
+            $companyContacts = fn () => Lead::query()
+                ->where('agent_id', $lead->agent_id)
+                ->where('normalized_company_name', $lead->normalized_company_name)
+                ->where('id', '!=', $lead->id);
+
+            $nextLead = $companyContacts()
+                ->where(fn ($query) => $query
+                    ->where('created_at', '>', $lead->created_at)
+                    ->orWhere(fn ($query) => $query->where('created_at', $lead->created_at)->where('id', '>', $lead->id)))
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->first(['id'])
+                ?? $companyContacts()->orderBy('created_at')->orderBy('id')->first(['id']);
+        }
 
         return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $lead->company_name, $lead->agent_id), 'lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : [], 'changeHistory' => $changeHistory, 'nextLeadId' => $nextLead?->id]);
     }
