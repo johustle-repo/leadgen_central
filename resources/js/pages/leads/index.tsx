@@ -111,6 +111,8 @@ export default function LeadsIndex({
     const [agentFilter, setAgentFilter] = useState(
         filters.agent_id || ALL_AGENTS,
     );
+    const [sort, setSort] = useState(filters.sort || 'created_at');
+    const [direction, setDirection] = useState(filters.direction || 'desc');
     const visibleLeadIds = leads.data.map((lead) => lead.id);
     const selectedVisibleLeadIds = selectedLeadIds.filter((id) =>
         visibleLeadIds.includes(id),
@@ -165,6 +167,25 @@ export default function LeadsIndex({
         router.get(
             index.url(),
             { search: searchTerm, per_page: '100' },
+            { preserveState: true, replace: true },
+        );
+    };
+
+    // Sorting applies immediately on selection rather than waiting for
+    // "Apply filters", since re-ordering the same result set is expected to
+    // react right away.
+    const applySort = (overrides: { sort?: string; direction?: string }) => {
+        router.get(
+            index.url(),
+            {
+                search: searchTerm,
+                date: selectedDate,
+                agent_id: agentFilter === ALL_AGENTS ? '' : agentFilter,
+                per_page: filters.per_page,
+                sort,
+                direction,
+                ...overrides,
+            },
             { preserveState: true, replace: true },
         );
     };
@@ -362,7 +383,11 @@ export default function LeadsIndex({
                         </label>
                         <Select
                             name="sort"
-                            defaultValue={filters.sort || 'created_at'}
+                            value={sort}
+                            onValueChange={(value) => {
+                                setSort(value);
+                                applySort({ sort: value });
+                            }}
                         >
                             <SelectTrigger id="leads-sort" className="w-full">
                                 <SelectValue />
@@ -397,7 +422,11 @@ export default function LeadsIndex({
                         </label>
                         <Select
                             name="direction"
-                            defaultValue={filters.direction || 'desc'}
+                            value={direction}
+                            onValueChange={(value) => {
+                                setDirection(value);
+                                applySort({ direction: value });
+                            }}
                         >
                             <SelectTrigger
                                 id="leads-direction"
