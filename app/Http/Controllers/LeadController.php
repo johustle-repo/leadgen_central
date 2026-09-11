@@ -262,14 +262,19 @@ class LeadController extends Controller
             ->limit(50)
             ->get(['id', 'user_id', 'description', 'metadata', 'created_at']);
 
-        $user = $request->user();
-        $nextLead = Lead::query()
-            ->when(! $user->canViewAllLeads(), fn ($query) => $query->whereBelongsTo($user, 'agent'))
+        // "Next" steps through the other contacts at this same company (for
+        // this same agent) rather than the agent's whole lead list, since
+        // that's the group an agent is actually working through together -
+        // the same grouping used for the contact count badge and the
+        // company-wide field sync below.
+        $nextLead = $lead->normalized_company_name === '' ? null : Lead::query()
+            ->where('agent_id', $lead->agent_id)
+            ->where('normalized_company_name', $lead->normalized_company_name)
             ->where(fn ($query) => $query
-                ->where('created_at', '<', $lead->created_at)
-                ->orWhere(fn ($query) => $query->where('created_at', $lead->created_at)->where('id', '<', $lead->id)))
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
+                ->where('created_at', '>', $lead->created_at)
+                ->orWhere(fn ($query) => $query->where('created_at', $lead->created_at)->where('id', '>', $lead->id)))
+            ->orderBy('created_at')
+            ->orderBy('id')
             ->first(['id']);
 
         return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $lead->company_name, $lead->agent_id), 'lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : [], 'changeHistory' => $changeHistory, 'nextLeadId' => $nextLead?->id]);

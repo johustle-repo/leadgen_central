@@ -467,16 +467,21 @@ it('requires at least one valid lead for bulk deletion', function () {
     $this->assertDatabaseCount('audit_logs', 0);
 });
 
-it('points the edit form to the next older lead in the agents default list order', function () {
+it('points the edit form to the next contact at the same company for the same agent', function () {
     $agent = User::factory()->create();
-    $older = Lead::factory()->for($agent, 'agent')->create(['created_at' => '2026-08-01 00:00:00']);
-    $newer = Lead::factory()->for($agent, 'agent')->create(['created_at' => '2026-08-02 00:00:00']);
-    Lead::factory()->create(['created_at' => '2026-08-01 12:00:00']);
+    $first = Lead::factory()->for($agent, 'agent')->create([
+        'normalized_company_name' => 'acme ventures', 'created_at' => '2026-08-01 00:00:00',
+    ]);
+    $second = Lead::factory()->for($agent, 'agent')->create([
+        'normalized_company_name' => 'acme ventures', 'created_at' => '2026-08-02 00:00:00',
+    ]);
+    Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'other company']);
+    Lead::factory()->create(['normalized_company_name' => 'acme ventures', 'created_at' => '2026-07-01 00:00:00']);
 
-    $this->actingAs($agent)->get(route('leads.edit', $newer))
-        ->assertInertia(fn (Assert $page) => $page->where('nextLeadId', $older->id));
+    $this->actingAs($agent)->get(route('leads.edit', $first))
+        ->assertInertia(fn (Assert $page) => $page->where('nextLeadId', $second->id));
 
-    $this->actingAs($agent)->get(route('leads.edit', $older))
+    $this->actingAs($agent)->get(route('leads.edit', $second))
         ->assertInertia(fn (Assert $page) => $page->where('nextLeadId', null));
 });
 
