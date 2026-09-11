@@ -407,7 +407,9 @@ export default function Dashboard({
                                 <tbody className="divide-y">
                                     {data.companies.map((row) => (
                                         <tr key={row.label}>
-                                            <td className="p-3">{row.label}</td>
+                                            <td className="p-3 uppercase">
+                                                {row.label}
+                                            </td>
                                             <td className="p-3 text-right tabular-nums">
                                                 {row.contacts.toLocaleString()}
                                             </td>
