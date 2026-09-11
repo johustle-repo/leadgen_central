@@ -26,6 +26,26 @@ it('maps the established cleaned lead file headings', function () {
     ]);
 });
 
+it('falls back to any header containing the word date when no exact alias matches', function (string $header) {
+    $mapping = (new CsvHeaderMapper)->map(['Company', $header, 'Email']);
+
+    expect($mapping[$header])->toBe('lead_date');
+})->with([
+    'Date (MM/DD/YYYY)',
+    'Record Date - US',
+    'Date of Contact',
+]);
+
+it('does not let a fuzzy date header override an exact alias match found earlier', function () {
+    $mapping = (new CsvHeaderMapper)->map(['Company', 'Date', 'Notes about update date']);
+
+    expect($mapping)->toBe([
+        'Company' => 'company_name',
+        'Date' => 'lead_date',
+        'Notes about update date' => null,
+    ]);
+});
+
 it('maps every column of the default lead upload template', function () {
     // This is the recommended standard header row for lead upload CSVs.
     $mapping = (new CsvHeaderMapper)->map([

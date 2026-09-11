@@ -8,7 +8,7 @@ class CsvHeaderMapper
 {
     /** @var array<string, list<string>> */
     private const ALIASES = [
-        'lead_date' => ['date', 'lead date', 'lead created date', 'created date', 'date created', 'date added'],
+        'lead_date' => ['date', 'lead date', 'lead created date', 'created date', 'date created', 'date added', 'date received', 'contact date', 'date contacted', 'record date', 'entry date', 'date recorded', 'upload date'],
         'company_name' => ['company', 'company name', 'business name'],
         'website' => ['website', 'url', 'company website'],
         'address' => ['address', 'street address'], 'city' => ['city'],
@@ -32,6 +32,7 @@ class CsvHeaderMapper
     public function map(array $headers): array
     {
         $mapping = [];
+        $normalizedHeaders = [];
         foreach ($headers as $header) {
             $normalized = Str::of($header)
                 ->replace("\xEF\xBB\xBF", '')
@@ -39,10 +40,25 @@ class CsvHeaderMapper
                 ->replace(['_', '-'], ' ')
                 ->squish()
                 ->toString();
+            $normalizedHeaders[$header] = $normalized;
             $mapping[$header] = null;
             foreach (self::ALIASES as $field => $aliases) {
                 if (in_array($normalized, $aliases, true)) {
                     $mapping[$header] = $field;
+                    break;
+                }
+            }
+        }
+
+        // A real-world date column doesn't always match one of the exact
+        // headings above (e.g. "Date (MM/DD/YYYY)", "Record Date - US").
+        // When nothing has already claimed lead_date, fall back to the
+        // first header that contains "date" as a whole word, so the row's
+        // own date still wins over the upload day.
+        if (! in_array('lead_date', $mapping, true)) {
+            foreach ($normalizedHeaders as $header => $normalized) {
+                if (preg_match('/\bdate\b/', $normalized) === 1) {
+                    $mapping[$header] = 'lead_date';
                     break;
                 }
             }
