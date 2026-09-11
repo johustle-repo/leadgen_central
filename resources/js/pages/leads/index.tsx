@@ -353,75 +353,66 @@ export default function LeadsIndex({
                             </Select>
                         </div>
                     )}
-                    {agents.length > 0 && (
-                        <div className="flex flex-col gap-1.5">
-                            <label
-                                htmlFor="leads-sort"
-                                className="text-xs text-muted-foreground"
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="leads-sort"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Sort by
+                        </label>
+                        <Select
+                            name="sort"
+                            defaultValue={filters.sort || 'created_at'}
+                        >
+                            <SelectTrigger id="leads-sort" className="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="created_at">
+                                    Date added
+                                </SelectItem>
+                                {agents.length > 0 && (
+                                    <SelectItem value="agent">
+                                        Agent
+                                    </SelectItem>
+                                )}
+                                <SelectItem value="company_name">
+                                    Company
+                                </SelectItem>
+                                <SelectItem value="status">Status</SelectItem>
+                                <SelectItem value="source">Source</SelectItem>
+                                <SelectItem value="country">
+                                    Country
+                                </SelectItem>
+                                <SelectItem value="city">City</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="leads-direction"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Direction
+                        </label>
+                        <Select
+                            name="direction"
+                            defaultValue={filters.direction || 'desc'}
+                        >
+                            <SelectTrigger
+                                id="leads-direction"
+                                className="w-full"
                             >
-                                Sort by
-                            </label>
-                            <Select
-                                name="sort"
-                                defaultValue={filters.sort || 'created_at'}
-                            >
-                                <SelectTrigger
-                                    id="leads-sort"
-                                    className="w-full"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="created_at">
-                                        Date added
-                                    </SelectItem>
-                                    <SelectItem value="agent">Agent</SelectItem>
-                                    <SelectItem value="company_name">
-                                        Company
-                                    </SelectItem>
-                                    <SelectItem value="status">
-                                        Status
-                                    </SelectItem>
-                                    <SelectItem value="source">
-                                        Source
-                                    </SelectItem>
-                                    <SelectItem value="country">
-                                        Country
-                                    </SelectItem>
-                                    <SelectItem value="city">City</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-                    {agents.length > 0 && (
-                        <div className="flex flex-col gap-1.5">
-                            <label
-                                htmlFor="leads-direction"
-                                className="text-xs text-muted-foreground"
-                            >
-                                Direction
-                            </label>
-                            <Select
-                                name="direction"
-                                defaultValue={filters.direction || 'desc'}
-                            >
-                                <SelectTrigger
-                                    id="leads-direction"
-                                    className="w-full"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="desc">
-                                        Descending
-                                    </SelectItem>
-                                    <SelectItem value="asc">
-                                        Ascending
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="desc">
+                                    Descending
+                                </SelectItem>
+                                <SelectItem value="asc">Ascending</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div className="flex flex-col gap-1.5">
                         <label
                             htmlFor="leads-date"
