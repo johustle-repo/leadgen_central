@@ -406,6 +406,25 @@ it('lets an administrator sort leads by agent name', function () {
             ->where('leads.data.1.agent.name', 'Zack Agent'));
 });
 
+it('sorts across every agents leads before paginating, not just the leads already on the page', function (string $direction, string $expected) {
+    $administrator = User::factory()->administrator()->create();
+    $agentA = User::factory()->create();
+    $agentB = User::factory()->create();
+    $leads = [
+        'oldest' => Lead::factory()->for($agentA, 'agent')->create(['created_at' => '2026-01-01 00:00:00']),
+        'newest' => Lead::factory()->for($agentB, 'agent')->create(['created_at' => '2026-06-01 00:00:00']),
+    ];
+    Lead::factory()->count(8)->for($agentA, 'agent')->create(['created_at' => '2026-03-01 00:00:00']);
+
+    $this->actingAs($administrator)->get(route('leads.index', ['sort' => 'created_at', 'direction' => $direction, 'per_page' => 10]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('leads.data', 10)
+            ->where('leads.data.0.id', $leads[$expected]->id));
+})->with([
+    'ascending shows the oldest lead across every agent first' => ['asc', 'oldest'],
+    'descending shows the newest lead across every agent first' => ['desc', 'newest'],
+]);
+
 it('exposes bulk lead deletion only to administrators', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create();
