@@ -6,9 +6,11 @@ import type { User } from '@/types';
 export function UserInfo({
     user,
     showEmail = false,
+    caption,
 }: {
     user: User;
     showEmail?: boolean;
+    caption?: string;
 }) {
     const getInitials = useInitials();
     const isSuperAdministrator = user.role === 'super_administrator';
@@ -27,9 +29,9 @@ export function UserInfo({
                     {getInitials(user.name)}
                 </AvatarFallback>
             </Avatar>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="flex items-center gap-1 truncate font-medium">
-                    {user.name}
+            <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                <span className="flex min-w-0 items-center gap-1 font-medium">
+                    <span className="truncate">{user.name}</span>
                     {isSuperAdministrator && (
                         <Crown className="size-3.5 shrink-0 fill-amber-400 text-amber-500" />
                     )}
@@ -37,6 +39,11 @@ export function UserInfo({
                 {showEmail && (
                     <span className="truncate text-xs text-muted-foreground">
                         {user.email}
+                    </span>
+                )}
+                {caption && (
+                    <span className="truncate text-[10px] text-sidebar-foreground/40">
+                        {caption}
                     </span>
                 )}
             </div>
