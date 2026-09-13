@@ -220,7 +220,7 @@ it('lets any authenticated user view their own self-service QR attendance page',
         ->component('settings/qr-attendance')
         ->has('recentCheckIns', 1)
         ->where('recentCheckIns.0.user_name', $agent->name));
-});
+})->skip('QR self-attendance is temporarily disabled - see routes/settings.php');
 
 it('lets an agent self-scan their own badge to record their own attendance', function () {
     $agent = User::factory()->create();
@@ -231,7 +231,7 @@ it('lets an agent self-scan their own badge to record their own attendance', fun
         ->assertSessionHas('toast.type', 'success');
 
     expect(Attendance::where('user_id', $agent->id)->count())->toBe(1);
-});
+})->skip('QR self-attendance is temporarily disabled - see routes/settings.php');
 
 it('forbids an agent from self-scanning someone else\'s badge', function () {
     $agent = User::factory()->create();
@@ -242,7 +242,7 @@ it('forbids an agent from self-scanning someone else\'s badge', function () {
         ->assertSessionHasErrors('code');
 
     expect(Attendance::where('user_id', $otherStaff->id)->count())->toBe(0);
-});
+})->skip('QR self-attendance is temporarily disabled - see routes/settings.php');
 
 it('keeps the self-service QR attendance page and self-scan agent-only', function () {
     $administrator = User::factory()->administrator()->create();
@@ -254,7 +254,7 @@ it('keeps the self-service QR attendance page and self-scan agent-only', functio
     $this->actingAs($administrator)
         ->post(route('qr-attendance.scan'), ['code' => $administrator->qr_value, 'entry_type' => 'time_in'])
         ->assertForbidden();
-});
+})->skip('QR self-attendance is temporarily disabled - see routes/settings.php');
 
 it('exports attendance records as a pdf', function () {
     $superAdministrator = User::factory()->superAdministrator()->create();

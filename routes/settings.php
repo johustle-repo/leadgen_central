@@ -12,8 +12,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
 
-    Route::get('settings/qr-attendance', [AttendanceController::class, 'qrAttendance'])->name('qr-attendance.edit');
-    Route::post('settings/qr-attendance/scan', [AttendanceController::class, 'selfScan'])->name('qr-attendance.scan');
+    // QR Attendance self-scanning is temporarily disabled for agents - re-add
+    // these two routes and the "QR Attendance" tab in resources/js/layouts/
+    // settings/layout.tsx to bring it back.
+    // Route::get('settings/qr-attendance', [AttendanceController::class, 'qrAttendance'])->name('qr-attendance.edit');
+    // Route::post('settings/qr-attendance/scan', [AttendanceController::class, 'selfScan'])->name('qr-attendance.scan');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

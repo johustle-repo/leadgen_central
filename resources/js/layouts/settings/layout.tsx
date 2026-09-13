@@ -1,4 +1,4 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
@@ -7,17 +7,11 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
-import { edit as editQrAttendance } from '@/routes/qr-attendance';
 import { edit as editSecurity } from '@/routes/security';
-import type { Auth, NavItem } from '@/types';
+import type { NavItem } from '@/types';
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
-    const { auth } = usePage<{ auth: Auth }>().props;
-    // The QR Attendance scanner needs a wide two-column layout (camera +
-    // recent check-ins); every other settings page is a narrow form, so
-    // only this page opts out of the shared max-width constraint.
-    const isQrAttendancePage = isCurrentOrParentUrl(editQrAttendance());
 
     const sidebarNavItems: NavItem[] = [
         {
@@ -35,17 +29,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             href: editAppearance(),
             icon: null,
         },
-        // Self-service badge scanning is an agent-only convenience -
-        // administrators already have the full scanner station.
-        ...(auth.user.role === 'agent'
-            ? [
-                  {
-                      title: 'QR Attendance',
-                      href: editQrAttendance(),
-                      icon: null,
-                  },
-              ]
-            : []),
+        // QR Attendance (agent self-service badge scanning) is temporarily
+        // disabled - see routes/settings.php.
     ];
 
     return (
@@ -84,18 +69,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
                 <Separator className="my-6 lg:hidden" />
 
-                <div
-                    className={cn(
-                        'flex-1',
-                        !isQrAttendancePage && 'md:max-w-2xl',
-                    )}
-                >
-                    <section
-                        className={cn(
-                            'space-y-12',
-                            isQrAttendancePage ? 'max-w-5xl' : 'max-w-xl',
-                        )}
-                    >
+                <div className="flex-1 md:max-w-2xl">
+                    <section className="max-w-xl space-y-12">
                         {children}
                     </section>
                 </div>
