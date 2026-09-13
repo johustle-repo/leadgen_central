@@ -78,10 +78,14 @@ class UploadBatchProcessor
                 $normalized = $this->normalizer->normalize($processed);
                 $location = $this->locations->match($processed['country_code'] ?? $processed['country'] ?? null, $processed['city'] ?? null);
                 $normalized = [...$normalized, ...$location->leadAttributes($processed['city'] ?? null, $processed['country'] ?? ($processed['country_code'] ?? null))];
+                // Duplicate detection runs on the row's true submitted values, before
+                // any blank field is defaulted below - a shared "N/A" placeholder must
+                // never make two otherwise-unrelated blank rows look like duplicates
+                // of each other.
                 $match = $this->duplicates->find($normalized);
                 if ($match && $match['type'] === 'exact') {
                     if ($this->isManualCleaningRoundTrip($batch, $match['lead'])) {
-                        $this->cleanExistingManualLead($batch, $row, $processed, $normalized, $match['lead'], $location->matchType);
+                        $this->cleanExistingManualLead($batch, $row, $processed, $normalized, $match['lead']);
 
                         continue;
                     }
@@ -95,7 +99,7 @@ class UploadBatchProcessor
 
                     continue;
                 }
-                $lead = $this->leadCreator->create($processed, $batch->user, $batch->user, $batch);
+                $lead = $this->leadCreator->create($this->applyFieldDefaults($processed), $batch->user, $batch->user, $batch);
                 if ($match) {
                     $duplicate = DuplicateMatch::query()->create(['incoming_lead_id' => $lead->id, 'upload_row_id' => $row->id, 'existing_lead_id' => $match['lead']->id, 'match_type' => 'possible', 'match_score' => $match['score'], 'matched_fields' => $match['fields'], 'status' => 'pending']);
                     $lead->update(['status' => 'needs_review', 'validation_status' => 'needs_review']);
@@ -103,8 +107,9 @@ class UploadBatchProcessor
 
                     continue;
                 }
-                $needsLocationReview = in_array($location->matchType, ['possible', 'not_found'], true);
-                $row->update(['processed_data' => $processed, 'processing_status' => $needsLocationReview ? UploadRowStatus::NeedsReview : UploadRowStatus::Accepted, 'error_category' => $needsLocationReview ? 'location' : null, 'error_message' => $needsLocationReview ? 'Location could not be matched exactly.' : null, 'lead_id' => $lead->id]);
+                // A completed, non-duplicate row is always accepted - location match
+                // quality no longer gates review; only a duplicate contact does.
+                $row->update(['processed_data' => $processed, 'processing_status' => UploadRowStatus::Accepted, 'error_category' => null, 'error_message' => null, 'lead_id' => $lead->id]);
             } catch (ValidationException $exception) {
                 $row->update(['processed_data' => $processed, 'processing_status' => UploadRowStatus::Rejected, 'error_category' => 'company_contact_limit', 'error_message' => $exception->errors()['company_name'][0] ?? 'The company contact limit was exceeded.']);
             } catch (Throwable $exception) {
@@ -144,6 +149,40 @@ class UploadBatchProcessor
             unset($processed['country']);
         }
         $processed['lead_date'] = $this->resolveLeadDate($processed['lead_date'] ?? null, $batch);
+        // A source link over the validator's 255-character limit would otherwise
+        // reject an entire row over one long tracking URL - shortening it keeps
+        // the row (and the rest of its data) instead of losing it.
+        if (isset($processed['source_url']) && mb_strlen((string) $processed['source_url']) > 255) {
+            $processed['source_url'] = mb_substr((string) $processed['source_url'], 0, 255);
+        }
+
+        return $processed;
+    }
+
+    /**
+     * Fills in the blanks a completed-but-partial row is still allowed to have.
+     * Applied only to the data a new lead is actually created from - never to
+     * the values duplicate detection compares, and never to email or lead_date,
+     * which already have their own null-handling and would otherwise break
+     * (an "N/A" email fails format validation; a fake shared value would also
+     * make unrelated blank-contact rows look like duplicates of each other).
+     *
+     * @param  array<string, mixed>  $processed
+     * @return array<string, mixed>
+     */
+    private function applyFieldDefaults(array $processed): array
+    {
+        foreach (['website', 'contact_person', 'city', 'linkedin_url', 'data_source', 'source_url'] as $field) {
+            if (blank($processed[$field] ?? null)) {
+                $processed[$field] = 'N/A';
+            }
+        }
+        if (blank($processed['country'] ?? null) && blank($processed['country_code'] ?? null)) {
+            $processed['country'] = 'N/A';
+        }
+        if (blank($processed['import_trades'] ?? null)) {
+            $processed['import_trades'] = '0';
+        }
 
         return $processed;
     }
@@ -213,15 +252,14 @@ class UploadBatchProcessor
     /** @param array<string, mixed> $processed
      * @param  array<string, mixed>  $normalized
      */
-    private function cleanExistingManualLead(UploadBatch $batch, UploadRow $row, array $processed, array $normalized, Lead $lead, string $locationMatchType): void
+    private function cleanExistingManualLead(UploadBatch $batch, UploadRow $row, array $processed, array $normalized, Lead $lead): void
     {
-        $needsLocationReview = in_array($locationMatchType, ['possible', 'not_found'], true);
-        $lead->update([...$normalized, 'status' => $needsLocationReview ? LeadStatus::NeedsReview : LeadStatus::Validated, 'updated_by' => $batch->user_id]);
+        $lead->update([...$normalized, 'status' => LeadStatus::Validated, 'updated_by' => $batch->user_id]);
         $row->update([
             'processed_data' => $processed,
-            'processing_status' => $needsLocationReview ? UploadRowStatus::NeedsReview : UploadRowStatus::Accepted,
-            'error_category' => $needsLocationReview ? 'location' : null,
-            'error_message' => $needsLocationReview ? 'Location could not be matched exactly.' : null,
+            'processing_status' => UploadRowStatus::Accepted,
+            'error_category' => null,
+            'error_message' => null,
             'lead_id' => $lead->id,
             'duplicate_match_id' => null,
         ]);

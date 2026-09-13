@@ -42,6 +42,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::get('uploads/create', [UploadBatchController::class, 'create'])->name('uploads.create');
     Route::post('uploads', [UploadBatchController::class, 'store'])->middleware('throttle:data-imports')->name('uploads.store');
     Route::delete('uploads/bulk', [UploadBatchController::class, 'bulkDestroy'])->name('uploads.bulk-destroy');
+    Route::post('uploads/reanalyze-all', [UploadBatchController::class, 'reanalyzeAll'])->name('uploads.reanalyze-all');
     Route::get('uploads/{uploadBatch}/mapping', [UploadBatchController::class, 'mapping'])->name('uploads.mapping');
     Route::post('uploads/{uploadBatch}/process', [UploadBatchController::class, 'process'])->name('uploads.process');
     Route::post('uploads/{uploadBatch}/reanalyze', [UploadBatchController::class, 'reanalyze'])->name('uploads.reanalyze');

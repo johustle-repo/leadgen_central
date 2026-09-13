@@ -181,7 +181,7 @@ it('accepts a lead when the CSV is missing some of the default template columns'
     // The recognized standard columns are Date, Company, Website, First Name, Email,
     // Country, City, Import Trades, LinkedIn, Sources of Data, and Source Link - but a
     // CSV missing some of those entirely must still process: the missing fields are
-    // simply left blank rather than rejecting the row.
+    // filled with "N/A" (or "0" for Import Trades) rather than rejecting the row.
     Storage::fake('local');
     $agent = User::factory()->create();
     $file = UploadedFile::fake()->createWithContent('minimal.csv', "Company,Email\nAcme,ada@acme.test\n");
@@ -198,11 +198,12 @@ it('accepts a lead when the CSV is missing some of the default template columns'
         'agent_id' => $agent->id,
         'company_name' => 'Acme',
         'email' => 'ada@acme.test',
-        'website' => null,
-        'country' => null,
-        'city' => null,
-        'linkedin_url' => null,
-        'source_url' => null,
+        'website' => 'N/A',
+        'country' => 'N/A',
+        'city' => 'N/A',
+        'linkedin_url' => 'N/A',
+        'source_url' => 'N/A',
+        'import_trades' => '0',
     ]);
 });
 
@@ -361,7 +362,7 @@ it('retains a lead whose LinkedIn value is empty or badly formatted', function (
     ]]);
 
     $this->assertDatabaseHas('leads', ['company_name' => 'Acme', 'email' => 'ada@acme.test', 'linkedin_url' => 'not-a-valid-url']);
-    $this->assertDatabaseHas('leads', ['company_name' => 'Other Co', 'email' => 'other@acme.test', 'linkedin_url' => null]);
+    $this->assertDatabaseHas('leads', ['company_name' => 'Other Co', 'email' => 'other@acme.test', 'linkedin_url' => 'N/A']);
     $this->assertDatabaseMissing('upload_rows', ['upload_batch_id' => $batch->id, 'error_category' => 'validation']);
 });
 
@@ -380,8 +381,55 @@ it('retains a lead whose source link is empty or badly formatted', function () {
     ]]);
 
     $this->assertDatabaseHas('leads', ['company_name' => 'Acme', 'email' => 'ada@acme.test', 'source_url' => 'not-a-valid-url']);
-    $this->assertDatabaseHas('leads', ['company_name' => 'Other Co', 'email' => 'other@acme.test', 'source_url' => null]);
+    $this->assertDatabaseHas('leads', ['company_name' => 'Other Co', 'email' => 'other@acme.test', 'source_url' => 'N/A']);
     $this->assertDatabaseMissing('upload_rows', ['upload_batch_id' => $batch->id, 'error_category' => 'validation']);
+});
+
+it('shortens a source link over 255 characters instead of rejecting the row', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $longLink = 'https://example.test/'.str_repeat('a', 300);
+    $file = UploadedFile::fake()->createWithContent(
+        'long-link.csv',
+        "Company,Email,Link\nAcme,ada@acme.test,{$longLink}\n",
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'source_url',
+    ]]);
+
+    $batch->refresh();
+    expect($batch->rejected_rows)->toBe(0)->and($batch->accepted_rows)->toBe(1);
+    $lead = Lead::query()->where('email', 'ada@acme.test')->firstOrFail();
+    expect(mb_strlen($lead->source_url))->toBe(255)
+        ->and($lead->source_url)->toBe(mb_substr($longLink, 0, 255));
+});
+
+it('accepts a completed row whose country and city do not match any reference location', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'unmatched-location.csv',
+        "Company,Email,Country,City\nAcme,ada@acme.test,Nowhereland,Notarealcity\n",
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'country', 3 => 'city',
+    ]]);
+
+    $batch->refresh();
+    expect($batch->accepted_rows)->toBe(1)->and($batch->location_error_rows)->toBe(0);
+    $this->assertDatabaseHas('leads', [
+        'company_name' => 'Acme',
+        'email' => 'ada@acme.test',
+        'validation_status' => 'validated',
+        'location_match_type' => 'not_found',
+    ]);
+    $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'processing_status' => 'accepted', 'error_category' => null]);
 });
 
 it('auto-detects a lead date from the upload date when none is provided', function () {
@@ -423,7 +471,7 @@ it('re-analyzes duplicate rows from the stored upload without uploading again', 
         ->and($batch->exact_duplicate_rows)->toBe(0)
         ->and($acceptedLead->refresh()->trashed())->toBeFalse();
     $this->assertDatabaseHas('leads', ['upload_batch_id' => $batch->id, 'contact_person' => 'John Jones', 'email' => 'john@acme.test']);
-    $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 3, 'processing_status' => 'needs_review', 'error_category' => 'location']);
+    $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 3, 'processing_status' => 'accepted', 'error_category' => null]);
 });
 
 it('re-analyzes rows previously rejected for the disabled company contact limit', function () {
@@ -453,9 +501,42 @@ it('re-analyzes rows previously rejected for the disabled company contact limit'
         ->and($batch->accepted_rows)->toBe(1)
         ->and($batch->rejected_rows)->toBe(0);
     $this->assertDatabaseHas('leads', ['upload_batch_id' => $batch->id, 'contact_person' => 'Eleventh Contact', 'email' => 'eleventh@acme.test']);
-    // No country/city column was mapped, so the row lands on "needs review" for its
-    // location rather than a clean "accepted" - either way, it's no longer rejected.
-    $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 2, 'processing_status' => 'needs_review', 'error_category' => 'location']);
+    // No country/city column was mapped, but a missing location no longer needs
+    // review by itself - the row is simply accepted.
+    $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 2, 'processing_status' => 'accepted', 'error_category' => null]);
+});
+
+it('clears a stale location flag in place instead of deleting and recreating the lead', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $batch = UploadBatch::factory()->for($agent)->create([
+        'processing_status' => 'completed',
+        'total_rows' => 1,
+        'accepted_rows' => 1,
+        'location_error_rows' => 1,
+    ]);
+    $lead = Lead::factory()->for($agent, 'agent')->for($batch, 'uploadBatch')->create([
+        'validation_status' => 'needs_review',
+        'location_match_type' => 'not_found',
+    ]);
+    $row = UploadRow::factory()->for($batch)->for($lead)->create([
+        'row_number' => 2,
+        'processing_status' => 'needs_review',
+        'error_category' => 'location',
+        'error_message' => 'Location could not be matched exactly.',
+    ]);
+    $note = $lead->structuredNotes()->create(['user_id' => $agent->id, 'note' => 'Already reviewed once.']);
+
+    $response = $this->actingAs($agent)->post(route('uploads.reanalyze', $batch));
+
+    $response->assertRedirect()->assertSessionHas('toast');
+    // The row is fixed in place - same lead, same id, same attached note - not
+    // deleted and recreated the way a duplicate/validation row is below.
+    $this->assertDatabaseHas('leads', ['id' => $lead->id, 'validation_status' => 'validated']);
+    $this->assertDatabaseHas('upload_rows', ['id' => $row->id, 'lead_id' => $lead->id, 'processing_status' => 'accepted', 'error_category' => null, 'error_message' => null]);
+    $this->assertDatabaseHas('lead_notes', ['id' => $note->id, 'lead_id' => $lead->id]);
+    expect($batch->refresh()->location_error_rows)->toBe(0)
+        ->and($batch->accepted_rows)->toBe(1);
 });
 
 it('re-analyzes rows previously rejected by validation, such as an old LinkedIn format check', function () {
@@ -566,6 +647,68 @@ it('prevents an agent from re-analyzing another agents upload', function () {
     $batch = UploadBatch::factory()->for($owner)->create(['processing_status' => 'completed']);
 
     $this->actingAs($otherAgent)->post(route('uploads.reanalyze', $batch))->assertForbidden();
+});
+
+it('lets an administrator re-analyze every eligible upload across every agent at once', function () {
+    $admin = User::factory()->administrator()->create();
+    $agentOne = User::factory()->create();
+    $agentTwo = User::factory()->create();
+
+    $locationBatch = UploadBatch::factory()->for($agentOne)->create([
+        'processing_status' => 'completed',
+        'total_rows' => 1,
+        'accepted_rows' => 1,
+        'location_error_rows' => 1,
+    ]);
+    $locationLead = Lead::factory()->for($agentOne, 'agent')->for($locationBatch, 'uploadBatch')->create([
+        'validation_status' => 'needs_review',
+        'location_match_type' => 'not_found',
+    ]);
+    UploadRow::factory()->for($locationBatch)->for($locationLead)->create([
+        'processing_status' => 'needs_review',
+        'error_category' => 'location',
+        'error_message' => 'Location could not be matched exactly.',
+    ]);
+
+    Storage::fake('local');
+    Storage::disk('local')->put('lead-imports/reanalyze-all-capped.csv', "Company,Name,Email\nAcme,Twelfth Contact,twelfth@acme.test\n");
+    $cappedBatch = UploadBatch::factory()->for($agentTwo)->create([
+        'stored_filename' => 'lead-imports/reanalyze-all-capped.csv',
+        'headers' => ['Company', 'Name', 'Email'],
+        'column_mapping' => ['Company' => 'company_name', 'Name' => 'contact_person', 'Email' => 'email'],
+        'processing_status' => 'completed',
+        'total_rows' => 1,
+        'rejected_rows' => 1,
+        'invalid_rows' => 1,
+    ]);
+    UploadRow::factory()->for($cappedBatch)->create([
+        'processing_status' => 'rejected',
+        'error_category' => 'company_contact_limit',
+        'error_message' => 'An agent can have a maximum of 10 contacts for the same company.',
+    ]);
+
+    $cleanBatch = UploadBatch::factory()->for($agentTwo)->create([
+        'processing_status' => 'completed',
+        'total_rows' => 1,
+        'accepted_rows' => 1,
+    ]);
+    UploadRow::factory()->for($cleanBatch)->create(['processing_status' => 'accepted']);
+
+    $response = $this->actingAs($admin)->post(route('uploads.reanalyze-all'));
+
+    $response->assertRedirect()->assertSessionHas('toast');
+    $this->assertDatabaseHas('leads', ['id' => $locationLead->id, 'validation_status' => 'validated']);
+    expect($locationBatch->refresh()->location_error_rows)->toBe(0);
+    $this->assertDatabaseHas('leads', ['upload_batch_id' => $cappedBatch->id, 'contact_person' => 'Twelfth Contact', 'email' => 'twelfth@acme.test']);
+    expect($cappedBatch->refresh()->rejected_rows)->toBe(0)
+        ->and($cleanBatch->refresh()->processing_status->value)->toBe('completed');
+});
+
+it('prevents a non-administrator from re-analyzing every upload at once', function () {
+    $agent = User::factory()->create();
+    UploadBatch::factory()->for($agent)->create(['processing_status' => 'completed']);
+
+    $this->actingAs($agent)->post(route('uploads.reanalyze-all'))->assertForbidden();
 });
 
 it('accepts a file whose rows are padded with trailing blank columns', function () {

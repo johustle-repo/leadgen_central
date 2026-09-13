@@ -16,6 +16,24 @@ class UploadBatchReanalyzer
     {
         return DB::transaction(function () use ($uploadBatch): int {
             $batch = UploadBatch::query()->lockForUpdate()->findOrFail($uploadBatch->id);
+
+            // A location that can't be matched exactly no longer needs review at
+            // all, so rows still stuck with the old "location" flag don't need the
+            // full pipeline re-run below - they're just flipped to accepted/
+            // validated in place. That avoids deleting and recreating the lead
+            // (unlike the categories below), which would lose any notes,
+            // attachments, or verification already recorded against it.
+            $locationRowIds = $batch->rows()->where('error_category', 'location')->pluck('id');
+            if ($locationRowIds->isNotEmpty()) {
+                $leadIdsToValidate = $batch->rows()->whereKey($locationRowIds)->pluck('lead_id')->filter();
+                Lead::query()->whereKey($leadIdsToValidate)->update(['validation_status' => 'validated']);
+                $batch->rows()->whereKey($locationRowIds)->update([
+                    'processing_status' => UploadRowStatus::Accepted,
+                    'error_category' => null,
+                    'error_message' => null,
+                ]);
+            }
+
             // Duplicate rows are re-checked against the latest matching rules. Rows
             // rejected only because the per-company contact cap was hit are retried
             // too - that cap is disabled for now, so those contacts should go
@@ -36,7 +54,7 @@ class UploadBatchReanalyzer
             // at Pending, or none created at all. Only bail out with "nothing to
             // re-analyze" for a Completed batch with no qualifying rows.
             $wasFailed = $batch->processing_status === UploadBatchStatus::Failed;
-            if ($rows->isEmpty() && ! $wasFailed) {
+            if ($rows->isEmpty() && $locationRowIds->isEmpty() && ! $wasFailed) {
                 return 0;
             }
 
@@ -60,12 +78,18 @@ class UploadBatchReanalyzer
                 'duplicate_rows' => 0,
                 'exact_duplicate_rows' => 0,
                 'possible_duplicate_rows' => 0,
+                // Every row carrying the old "location" flag for this batch was
+                // just cleared above, so this is exact, not an estimate - unlike
+                // the zeroed counters above, it doesn't depend on the dispatched
+                // job succeeding (e.g. if the original file is no longer stored).
+                'location_error_rows' => 0,
+                'valid_leads' => $batch->valid_leads + $locationRowIds->count(),
                 'processing_status' => UploadBatchStatus::Pending,
                 'failure_message' => null,
                 'completed_at' => null,
             ]);
 
-            return $rows->count();
+            return $rows->count() + $locationRowIds->count();
         });
     }
 }

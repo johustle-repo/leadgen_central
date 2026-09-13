@@ -46,6 +46,16 @@ class UploadBatchPolicy
             && in_array($uploadBatch->processing_status, [UploadBatchStatus::Completed, UploadBatchStatus::Failed], true);
     }
 
+    /**
+     * Determine whether the user can re-analyze every eligible upload at once,
+     * across every agent - unlike a single reanalyze, which an agent can also
+     * do for their own batch.
+     */
+    public function reanalyzeAll(User $user): bool
+    {
+        return $user->isAdministrator();
+    }
+
     public function retry(User $user, UploadBatch $uploadBatch): bool
     {
         return ($user->canViewAllLeads() || $uploadBatch->user_id === $user->id)

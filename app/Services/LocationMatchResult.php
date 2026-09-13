@@ -26,7 +26,10 @@ class LocationMatchResult
             'country_code' => $this->country === null ? (preg_match('/^[A-Za-z]{2}$/', trim((string) $rawCountry)) === 1 ? strtoupper(trim((string) $rawCountry)) : null) : $this->country->iso2,
             'timezone' => $this->city === null ? $this->country?->default_timezone : $this->city->timezone,
             'location_match_type' => $this->matchType,
-            'validation_status' => in_array($this->matchType, ['exact', 'alias', 'country'], true) ? 'validated' : 'needs_review',
+            // A location that can't be matched exactly no longer needs a human's
+            // review by itself - only a duplicate contact does. matchType is kept
+            // for diagnostics/reporting even though it no longer gates review.
+            'validation_status' => 'validated',
         ];
     }
 }

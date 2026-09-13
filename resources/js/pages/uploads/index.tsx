@@ -39,6 +39,7 @@ import {
     destroy,
     index,
     reanalyze,
+    reanalyzeAll,
     retry,
     show,
 } from '@/routes/uploads';
@@ -196,6 +197,52 @@ export default function UploadIndex({
                                         onClick={deleteSelectedBatches}
                                     >
                                         Delete
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
+                    {isAdministrator && (
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/15 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                                >
+                                    <RotateCcw />
+                                    Re-analyze all
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogTitle>
+                                    Re-analyze every eligible upload?
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Every completed or failed upload with
+                                    duplicate, capped, rejected, or
+                                    unmatched-location rows will be re-checked
+                                    against the latest rules. This can take a
+                                    while across a large history.
+                                </DialogDescription>
+                                <DialogFooter>
+                                    <DialogClose asChild>
+                                        <Button variant="secondary">
+                                            Cancel
+                                        </Button>
+                                    </DialogClose>
+                                    <Button
+                                        type="button"
+                                        onClick={() =>
+                                            router.post(
+                                                reanalyzeAll.url(),
+                                                {},
+                                                { preserveScroll: true },
+                                            )
+                                        }
+                                    >
+                                        Re-analyze all
                                     </Button>
                                 </DialogFooter>
                             </DialogContent>
