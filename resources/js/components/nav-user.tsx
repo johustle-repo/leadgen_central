@@ -36,7 +36,7 @@ export function NavUser() {
                         >
                             <UserInfo
                                 user={auth.user}
-                                caption={`v${appVersion} · Developed by jo_hustle`}
+                                caption={`v${appVersion} · by jo_hustle`}
                             />
                             <ChevronsUpDown className="ml-auto size-4" />
                         </SidebarMenuButton>
