@@ -112,6 +112,39 @@ const fileSize = (bytes: number) =>
         ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
         : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
+// AP-style month abbreviations (e.g. "Sept. 14, 2026") rather than the
+// three-letter "Sep" Intl.DateTimeFormat's short form would give.
+const AP_STYLE_MONTHS = [
+    'Jan.',
+    'Feb.',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'Aug.',
+    'Sept.',
+    'Oct.',
+    'Nov.',
+    'Dec.',
+];
+const formatApStyleDate = (value: string) => {
+    if (!value) {
+        return '';
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    // UTC getters, not local ones: a date-only value serializes as midnight
+    // UTC, which local getters can roll back to the previous day in any
+    // timezone behind UTC.
+    return `${AP_STYLE_MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+};
+
 export default function VerificationShow({
     lead,
     previousId,
@@ -153,7 +186,7 @@ export default function VerificationShow({
             `LinkedIn: ${field('linkedin_url')}`,
             `Source of Leads: ${field('data_source')}`,
             `Source Link: ${field('source_url')}`,
-            `Date Uploaded in Reply.io: ${field('lead_date').slice(0, 10)}`,
+            `Date Uploaded in Reply.io: ${formatApStyleDate(field('lead_date'))}`,
         ].join('\n');
 
         try {
