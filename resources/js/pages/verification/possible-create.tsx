@@ -182,6 +182,11 @@ export default function PossibleLeadCreate({
                                             'Business type',
                                             'text',
                                         ],
+                                        [
+                                            'product_requested',
+                                            'Product requested',
+                                            'text',
+                                        ],
                                         ['address', 'Address', 'text'],
                                         ['city', 'City / State', 'text'],
                                         [
@@ -319,7 +324,7 @@ export default function PossibleLeadCreate({
 
 PossibleLeadCreate.layout = {
     breadcrumbs: [
-        { title: 'Lead Verification', href: index() },
+        { title: 'Lead Review', href: index() },
         { title: 'Add Possible Lead', href: possibleLeads.create() },
     ],
 };

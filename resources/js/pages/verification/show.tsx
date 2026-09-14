@@ -103,6 +103,7 @@ const editableFields = [
     ['position', 'Position'],
     ['email', 'Email'],
     ['phone', 'Phone'],
+    ['product_requested', 'Product Requested'],
 ] as const;
 
 const fileSize = (bytes: number) =>
@@ -135,6 +136,7 @@ export default function VerificationShow({
             `Country: ${field('country')}`,
             `City/Capital: ${field('raw_city') || field('city')}`,
             `Import Trades: ${field('import_trades')}`,
+            `Product Requested: ${field('product_requested')}`,
             `LinkedIn: ${field('linkedin_url')}`,
             `Source of Leads: ${field('data_source')}`,
             `Source Link: ${field('source_url')}`,
@@ -649,5 +651,5 @@ export default function VerificationShow({
     );
 }
 VerificationShow.layout = {
-    breadcrumbs: [{ title: 'Lead Verification', href: index() }],
+    breadcrumbs: [{ title: 'Lead Review', href: index() }],
 };

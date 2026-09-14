@@ -22,7 +22,7 @@ class Lead extends Model
     /** @use HasFactory<LeadFactory> */
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['lead_code', 'agent_id', 'upload_batch_id', 'source', 'lead_date', 'company_name', 'normalized_company_name', 'website', 'original_website', 'website_domain', 'address', 'city', 'raw_city', 'state_province', 'country', 'raw_country', 'country_code', 'canonical_city_id', 'canonical_country_id', 'timezone', 'industry', 'business_type', 'contact_person', 'position', 'email', 'phone', 'linkedin_url', 'import_trades', 'data_source', 'source_url', 'status', 'validation_status', 'location_match_type', 'verified_at', 'verified_by', 'notes', 'created_by', 'updated_by'];
+    protected $fillable = ['lead_code', 'agent_id', 'upload_batch_id', 'source', 'lead_date', 'company_name', 'normalized_company_name', 'website', 'original_website', 'website_domain', 'address', 'city', 'raw_city', 'state_province', 'country', 'raw_country', 'country_code', 'canonical_city_id', 'canonical_country_id', 'timezone', 'industry', 'business_type', 'contact_person', 'position', 'email', 'phone', 'linkedin_url', 'import_trades', 'product_requested', 'data_source', 'source_url', 'status', 'validation_status', 'location_match_type', 'verified_at', 'verified_by', 'notes', 'created_by', 'updated_by'];
 
     protected $attributes = ['source' => 'manual', 'status' => 'raw', 'validation_status' => 'pending'];
 

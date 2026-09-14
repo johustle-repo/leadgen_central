@@ -22,6 +22,6 @@ class ConfirmUploadMappingRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['mapping' => ['required', 'array'], 'mapping.*' => ['nullable', 'string', 'in:lead_date,company_name,website,address,city,state_province,country,country_code,industry,business_type,contact_person,position,email,phone,linkedin_url,import_trades,data_source,source_url,notes']];
+        return ['mapping' => ['required', 'array'], 'mapping.*' => ['nullable', 'string', 'in:lead_date,company_name,website,address,city,state_province,country,country_code,industry,business_type,contact_person,position,email,phone,linkedin_url,import_trades,product_requested,data_source,source_url,notes']];
     }
 }

@@ -70,6 +70,21 @@ class UploadBatchProcessor
                 continue;
             }
             $processed = $this->mappedData($batch, $raw);
+            // A blank Company Name paired with a Product Requested value is a
+            // continuation row, not a row that failed to fill in the required
+            // field - some exports repeat a company across several lines to
+            // list an extra product rather than repeating every column.
+            // Requiring a product value here (rather than treating every
+            // blank-company row as a continuation) keeps this from silently
+            // swallowing a row that's genuinely just missing its company name.
+            if (blank($processed['company_name'] ?? null) && filled($processed['product_requested'] ?? null)) {
+                $parentRow = UploadRow::query()->where('upload_batch_id', $batch->id)->where('row_number', '<', $rowNumber)->whereNotNull('lead_id')->orderByDesc('row_number')->first();
+                if ($parentRow !== null && $parentRow->lead_id !== null) {
+                    $this->mergeContinuationRow($row, $processed, $parentRow->lead_id);
+
+                    continue;
+                }
+            }
             // LinkedIn and the source link are both optional and never block a
             // row: a missing or malformed value in either should never cost a
             // lead its place - it's still stored as submitted.
@@ -124,6 +139,42 @@ class UploadBatchProcessor
         }
         fclose($stream);
         $this->updateSummary($batch);
+    }
+
+    /**
+     * Folds a continuation row (blank Company Name, but carrying an extra
+     * product or an extra contact for the company directly above it) into
+     * that earlier lead instead of rejecting it for missing a required field.
+     *
+     * @param  array<string, mixed>  $processed
+     */
+    private function mergeContinuationRow(UploadRow $row, array $processed, int $parentLeadId): void
+    {
+        $lead = Lead::query()->find($parentLeadId);
+        if ($lead === null) {
+            $row->update(['processed_data' => $processed, 'processing_status' => UploadRowStatus::Rejected, 'error_category' => 'validation', 'error_message' => 'The Company Name field is required.']);
+
+            return;
+        }
+        $updates = [];
+        $product = trim((string) ($processed['product_requested'] ?? ''));
+        if ($product !== '') {
+            $existing = array_filter(array_map('trim', explode(',', (string) $lead->product_requested)));
+            if (! in_array($product, $existing, true)) {
+                $existing[] = $product;
+            }
+            $updates['product_requested'] = implode(', ', $existing);
+        }
+        $contactPerson = trim((string) ($processed['contact_person'] ?? ''));
+        $email = trim((string) ($processed['email'] ?? ''));
+        if (($contactPerson !== '' && $contactPerson !== $lead->contact_person) || ($email !== '' && $email !== $lead->email)) {
+            $contactLine = 'Additional contact from upload: '.trim($contactPerson.' <'.$email.'>');
+            $updates['notes'] = trim(($lead->notes !== null ? $lead->notes."\n" : '').$contactLine);
+        }
+        if ($updates !== []) {
+            $lead->update($updates);
+        }
+        $row->update(['processed_data' => $processed, 'processing_status' => UploadRowStatus::Accepted, 'error_category' => null, 'error_message' => 'Merged into '.$lead->lead_code.' as an additional product/contact line.', 'lead_id' => $lead->id]);
     }
 
     /** @param list<string|null> $values */

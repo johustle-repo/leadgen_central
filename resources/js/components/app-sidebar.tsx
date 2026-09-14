@@ -95,7 +95,7 @@ export function AppSidebar() {
                 ...(auth.user.role !== 'agent'
                     ? [
                           {
-                              title: 'Lead Verification',
+                              title: 'Lead Review',
                               href: verificationIndex(),
                               icon: ShieldCheck,
                           },

@@ -173,6 +173,7 @@ const fields = [
     { name: 'country_code', label: 'Country', maxLength: 2 },
     { name: 'city', label: 'City' },
     { name: 'import_trades', label: 'Import Trades' },
+    { name: 'product_requested', label: 'Product Requested' },
     { name: 'linkedin_url', label: 'LinkedIn', type: 'url' },
     { name: 'data_source', label: 'Sources of Data' },
     { name: 'source_url', label: 'Link', type: 'url' },

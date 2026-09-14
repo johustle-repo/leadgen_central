@@ -41,6 +41,7 @@ type Lead = {
     city: string | null;
     country: string | null;
     timezone: string | null;
+    product_requested: string | null;
     status: string;
     validation_status: string;
     structured_notes_count: number;
@@ -84,7 +85,7 @@ export default function VerificationIndex({
 
     return (
         <>
-            <Head title="Lead Verification" />
+            <Head title="Lead Review" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <HeaderActionsPortal>
                     <Button asChild size="sm">
@@ -179,6 +180,7 @@ export default function VerificationIndex({
                                 <TableHead>Company</TableHead>
                                 <TableHead>Contact</TableHead>
                                 <TableHead>Location</TableHead>
+                                <TableHead>Product requested</TableHead>
                                 <TableHead>Owner</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Activity</TableHead>
@@ -215,6 +217,9 @@ export default function VerificationIndex({
                                         <p className="text-xs text-muted-foreground">
                                             {lead.timezone}
                                         </p>
+                                    </TableCell>
+                                    <TableCell className="max-w-48 truncate">
+                                        {lead.product_requested || '—'}
                                     </TableCell>
                                     <TableCell>
                                         {lead.agent?.name || 'Unassigned'}
@@ -283,5 +288,5 @@ export default function VerificationIndex({
     );
 }
 VerificationIndex.layout = {
-    breadcrumbs: [{ title: 'Lead Verification', href: index() }],
+    breadcrumbs: [{ title: 'Lead Review', href: index() }],
 };

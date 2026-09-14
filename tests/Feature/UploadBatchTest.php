@@ -810,6 +810,76 @@ it('disregards fully blank data rows instead of rejecting them for a missing com
     $this->assertDatabaseCount('upload_rows', 1);
 });
 
+it('merges a continuation row with an extra product into the lead above it', function () {
+    // Regression test: some exports repeat a company across several lines to
+    // list an extra product rather than repeating every column - the
+    // continuation row's Company Name is left blank. That used to be rejected
+    // outright for missing a required field, losing the extra product entirely.
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'continuation.csv',
+        "Company,Email,Product Request\nAcme,ada@acme.test,Ringlock\n,,Cuplock\n",
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'product_requested',
+    ]])->assertRedirect(route('uploads.show', $batch));
+
+    $batch->refresh();
+    expect($batch->total_rows)->toBe(2)
+        ->and($batch->accepted_rows)->toBe(2)
+        ->and($batch->rejected_rows)->toBe(0);
+    $lead = Lead::query()->where('company_name', 'Acme')->firstOrFail();
+    expect($lead->product_requested)->toBe('Ringlock, Cuplock');
+    $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 3, 'processing_status' => 'accepted', 'lead_id' => $lead->id]);
+});
+
+it('records an extra contact from a continuation row as a note on the lead above it', function () {
+    // Matches the real-world pattern: a continuation row naming a different
+    // contact almost always also carries its own (or a repeated) product
+    // value, which is what actually marks it as a continuation rather than a
+    // row that's simply missing its company name.
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'continuation-contact.csv',
+        "Company,Contact,Email,Product Request\nAcme,Ada Lovelace,ada@acme.test,Ringlock\n,David Pour,david@acme.test,Cuplock\n",
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'contact_person', 2 => 'email', 3 => 'product_requested',
+    ]])->assertRedirect(route('uploads.show', $batch));
+
+    $batch->refresh();
+    expect($batch->accepted_rows)->toBe(2);
+    $lead = Lead::query()->where('company_name', 'Acme')->firstOrFail();
+    expect($lead->contact_person)->toBe('Ada Lovelace')
+        ->and($lead->product_requested)->toBe('Ringlock, Cuplock')
+        ->and($lead->notes)->toContain('David Pour')
+        ->and($lead->notes)->toContain('david@acme.test');
+});
+
+it('still rejects a blank-company row when there is no earlier lead in the batch to attach it to', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'no-parent.csv',
+        "Company,Email,Product Request\n,,Cuplock\n",
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'product_requested',
+    ]])->assertRedirect(route('uploads.show', $batch));
+
+    $batch->refresh();
+    expect($batch->rejected_rows)->toBe(1)
+        ->and($batch->accepted_rows)->toBe(0);
+});
+
 it('still rejects a file whose named columns repeat', function () {
     Storage::fake('local');
     $agent = User::factory()->create();

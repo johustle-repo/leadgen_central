@@ -20,6 +20,7 @@ class CsvHeaderMapper
         'phone' => ['phone', 'phone number', 'telephone'],
         'linkedin_url' => ['linkedin', 'linkedin url'],
         'import_trades' => ['import trades'],
+        'product_requested' => ['product request', 'product requested', 'material requested', 'material request', 'requested product', 'requested item', 'item requested'],
         'data_source' => ['sources of data', 'data source'],
         'source_url' => ['link', 'source link'],
         'notes' => ['notes', 'comments'],
