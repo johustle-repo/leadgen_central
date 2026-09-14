@@ -20,10 +20,18 @@ import {
     percent,
     summarize,
 } from '@/components/database-charts';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import { Section } from '@/components/report-section';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     exportMethod as reportExport,
     exportPdf as reportExportPdf,
@@ -212,6 +220,81 @@ export default function Analytics({
     return (
         <>
             <Head title="Database reports" />
+            <HeaderActionsPortal>
+                <form
+                    onSubmit={applyPeriod}
+                    className="flex flex-wrap items-center gap-2"
+                    aria-busy={processing}
+                >
+                    <Select
+                        value={selectedPeriod}
+                        onValueChange={setSelectedPeriod}
+                    >
+                        <SelectTrigger
+                            size="sm"
+                            className="w-36"
+                            aria-label="Reporting period"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {Object.entries(periods)
+                                .filter(
+                                    ([key]) =>
+                                        !['7_days', '90_days'].includes(key) ||
+                                        period === key,
+                                )
+                                .map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                        {label}
+                                    </SelectItem>
+                                ))}
+                        </SelectContent>
+                    </Select>
+                    {selectedPeriod === 'custom' && (
+                        <>
+                            <Input
+                                name="date_from"
+                                type="date"
+                                aria-label="From date"
+                                defaultValue={filters.date_from}
+                                required
+                                className="h-8 w-36"
+                            />
+                            <Input
+                                name="date_to"
+                                type="date"
+                                aria-label="Through date"
+                                defaultValue={filters.date_to}
+                                required
+                                className="h-8 w-36"
+                            />
+                        </>
+                    )}
+                    <Select
+                        value={granularity}
+                        onValueChange={(value) =>
+                            setGranularity(value as typeof granularity)
+                        }
+                    >
+                        <SelectTrigger
+                            size="sm"
+                            className="w-28"
+                            aria-label="Group growth and quality by"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="day">Daily</SelectItem>
+                            <SelectItem value="week">Weekly</SelectItem>
+                            <SelectItem value="month">Monthly</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Button type="submit" size="sm" disabled={processing}>
+                        {processing ? 'Applying…' : 'Apply'}
+                    </Button>
+                </form>
+            </HeaderActionsPortal>
             <div className="flex min-w-0 flex-1 flex-col gap-8 p-4 md:p-6">
                 <header className="flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -224,6 +307,20 @@ export default function Analytics({
                                 ? 'Your data only'
                                 : 'All-owner data'}
                         </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            All panels follow {selected}, except values
+                            explicitly labeled All time. Reporting timezone:{' '}
+                            {data.timezone}.
+                        </p>
+                        {Object.entries(errors).map(([key, message]) => (
+                            <p
+                                role="alert"
+                                className="mt-2 text-sm text-destructive"
+                                key={key}
+                            >
+                                {message}
+                            </p>
+                        ))}
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" asChild>
@@ -246,90 +343,6 @@ export default function Analytics({
                         </Button>
                     </div>
                 </header>
-                <Section
-                    title="Reporting period"
-                    note={`All panels follow ${selected}, except values explicitly labeled All time. Reporting timezone: ${data.timezone}.`}
-                >
-                    <form
-                        onSubmit={applyPeriod}
-                        className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4"
-                        aria-busy={processing}
-                    >
-                        <label className="flex flex-col gap-1.5 text-xs">
-                            Period
-                            <select
-                                className={selectClass}
-                                value={selectedPeriod}
-                                onChange={(e) =>
-                                    setSelectedPeriod(e.target.value)
-                                }
-                            >
-                                {Object.entries(periods)
-                                    .filter(
-                                        ([key]) =>
-                                            !['7_days', '90_days'].includes(
-                                                key,
-                                            ) || period === key,
-                                    )
-                                    .map(([value, label]) => (
-                                        <option key={value} value={value}>
-                                            {label}
-                                        </option>
-                                    ))}
-                            </select>
-                        </label>
-                        <label className="flex flex-col gap-1.5 text-xs">
-                            Group growth and quality by
-                            <select
-                                className={selectClass}
-                                value={granularity}
-                                onChange={(e) =>
-                                    setGranularity(
-                                        e.target.value as typeof granularity,
-                                    )
-                                }
-                            >
-                                <option value="day">Daily</option>
-                                <option value="week">Weekly</option>
-                                <option value="month">Monthly</option>
-                            </select>
-                        </label>
-                        {selectedPeriod === 'custom' && (
-                            <>
-                                <label className="flex flex-col gap-1.5 text-xs">
-                                    From
-                                    <Input
-                                        name="date_from"
-                                        type="date"
-                                        defaultValue={filters.date_from}
-                                        required
-                                    />
-                                </label>
-                                <label className="flex flex-col gap-1.5 text-xs">
-                                    Through
-                                    <Input
-                                        name="date_to"
-                                        type="date"
-                                        defaultValue={filters.date_to}
-                                        required
-                                    />
-                                </label>
-                            </>
-                        )}
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Applying…' : 'Apply'}
-                        </Button>
-                        {Object.entries(errors).map(([key, message]) => (
-                            <p
-                                role="alert"
-                                className="w-full text-sm text-destructive"
-                                key={key}
-                            >
-                                {message}
-                            </p>
-                        ))}
-                    </form>
-                </Section>
 
                 <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-4">
                     <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
