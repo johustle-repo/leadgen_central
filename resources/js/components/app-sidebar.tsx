@@ -1,7 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { usePage, usePoll } from '@inertiajs/react';
 import {
-    CopyCheck,
     CalendarClock,
     ChartNoAxesCombined,
     ClipboardList,
@@ -34,7 +33,6 @@ import {
     summary as attendanceSummary,
 } from '@/routes/attendance';
 import { index as auditLogIndex } from '@/routes/audit-logs';
-import { index as duplicateIndex } from '@/routes/duplicates';
 import { index as emailReplyIndex } from '@/routes/email-replies';
 import { index as leadIndex } from '@/routes/leads';
 import { index as reportIndex } from '@/routes/report';
@@ -100,19 +98,14 @@ export function AppSidebar() {
                     href: uploadIndex(),
                     icon: FileClock,
                 },
-                // Verification and duplicate review are review steps agents
-                // don't perform themselves, so they're hidden for that role.
+                // Verification is a review step agents don't perform
+                // themselves, so it's hidden for that role.
                 ...(auth.user.role !== 'agent'
                     ? [
                           {
                               title: 'Lead Review',
                               href: verificationIndex(),
                               icon: ShieldCheck,
-                          },
-                          {
-                              title: 'Duplicate Review',
-                              href: duplicateIndex(),
-                              icon: CopyCheck,
                           },
                       ]
                     : []),
