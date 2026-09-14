@@ -170,88 +170,89 @@ export default function VerificationIndex({
                     as="div"
                     icon={SlidersHorizontal}
                     label="Filters"
+                    gridClassName="grid-cols-1"
                     hint="Search matches contact, email, company, phone, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of the status tab and agent filter below."
                 >
-                    <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
-                        <label
-                            htmlFor="verification-search"
-                            className="text-xs text-muted-foreground"
-                        >
-                            Search
-                        </label>
-                        <div className="relative">
-                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                id="verification-search"
-                                name="search"
-                                value={searchTerm}
-                                onChange={(event) =>
-                                    setSearchTerm(event.target.value)
-                                }
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        searchAllLeads();
-                                    }
-                                }}
-                                placeholder="Search contact, email, company, phone, location, owner, or lead code..."
-                                className="pr-24 pl-9"
-                            />
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={searchAllLeads}
-                                className="absolute top-1/2 right-1 h-7 -translate-y-1/2"
-                            >
-                                <Search className="size-3.5" />
-                                Search
-                            </Button>
-                        </div>
-                    </div>
-                    {agents.length > 0 && (
-                        <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                             <label
-                                htmlFor="verification-agent"
+                                htmlFor="verification-search"
                                 className="text-xs text-muted-foreground"
                             >
-                                Agent
+                                Search
                             </label>
-                            <Select
-                                value={agentFilter}
-                                onValueChange={applyAgentFilter}
-                            >
-                                <SelectTrigger
-                                    id="verification-agent"
-                                    className="w-full"
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    id="verification-search"
+                                    name="search"
+                                    value={searchTerm}
+                                    onChange={(event) =>
+                                        setSearchTerm(event.target.value)
+                                    }
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter') {
+                                            event.preventDefault();
+                                            searchAllLeads();
+                                        }
+                                    }}
+                                    placeholder="Search contact, email, company, phone, location, owner, or lead code..."
+                                    className="pr-24 pl-9"
+                                />
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={searchAllLeads}
+                                    className="absolute top-1/2 right-1 h-7 -translate-y-1/2"
                                 >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={ALL_AGENTS}>
-                                        All agents
-                                    </SelectItem>
-                                    {agents.map((agent) => (
-                                        <SelectItem
-                                            key={agent.id}
-                                            value={String(agent.id)}
-                                        >
-                                            {agent.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                    <Search className="size-3.5" />
+                                    Search
+                                </Button>
+                            </div>
                         </div>
-                    )}
-                    {(filters.search ||
-                        filters.status ||
-                        filters.agent_id) && (
-                        <div className="flex items-end">
+                        {agents.length > 0 && (
+                            <div className="flex flex-col gap-1.5 lg:w-56">
+                                <label
+                                    htmlFor="verification-agent"
+                                    className="text-xs text-muted-foreground"
+                                >
+                                    Agent
+                                </label>
+                                <Select
+                                    value={agentFilter}
+                                    onValueChange={applyAgentFilter}
+                                >
+                                    <SelectTrigger
+                                        id="verification-agent"
+                                        className="w-full"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ALL_AGENTS}>
+                                            All agents
+                                        </SelectItem>
+                                        {agents.map((agent) => (
+                                            <SelectItem
+                                                key={agent.id}
+                                                value={String(agent.id)}
+                                            >
+                                                {agent.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        {(filters.search ||
+                            filters.status ||
+                            filters.agent_id) && (
                             <Button asChild type="button" variant="outline">
                                 <Link href={index()}>Clear</Link>
                             </Button>
-                        </div>
-                    )}
-                    <div className="sm:col-span-2 lg:col-span-4">
+                        )}
+                    </div>
+                    <div>
                         <FilterTabs
                             tabs={statuses.map(([value, label]) => ({
                                 label,
