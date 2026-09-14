@@ -57,8 +57,7 @@ type User = {
     created_at: string;
     leads_count: number;
     upload_batches_count: number;
-    gmail_status: string | null;
-    gmail_error: string | null;
+    errors_count: number;
     can_delete: boolean;
     can_impersonate: boolean;
     can_clear_records: boolean;
@@ -67,26 +66,6 @@ type PaginatedUsers = {
     data: User[];
     links: Array<{ url: string | null; label: string; active: boolean }>;
 };
-
-function GmailStatusCell({ user }: { user: User }) {
-    if (!user.gmail_status) {
-        return <span className="text-xs text-muted-foreground">Not connected</span>;
-    }
-
-    return (
-        <div>
-            <StatusBadge value={user.gmail_status} />
-            {user.gmail_error && (
-                <p
-                    className="mt-1 max-w-48 truncate text-xs text-destructive"
-                    title={user.gmail_error}
-                >
-                    {user.gmail_error}
-                </p>
-            )}
-        </div>
-    );
-}
 
 function UserActions({ user }: { user: User }) {
     return (
@@ -251,7 +230,7 @@ function UsersSection({
                                 <TableHead align="right">
                                     Total leads
                                 </TableHead>
-                                <TableHead>Gmail</TableHead>
+                                <TableHead align="right">Errors</TableHead>
                                 <TableHead>Created</TableHead>
                                 <TableHead align="right">Actions</TableHead>
                             </TableRow>
@@ -289,8 +268,15 @@ function UsersSection({
                                     >
                                         {user.leads_count.toLocaleString()}
                                     </TableCell>
-                                    <TableCell>
-                                        <GmailStatusCell user={user} />
+                                    <TableCell
+                                        align="right"
+                                        className={
+                                            user.errors_count > 0
+                                                ? 'font-medium text-destructive'
+                                                : 'text-muted-foreground'
+                                        }
+                                    >
+                                        {user.errors_count.toLocaleString()}
                                     </TableCell>
                                     <TableCell>
                                         {new Date(

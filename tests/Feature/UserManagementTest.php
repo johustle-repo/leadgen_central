@@ -65,16 +65,15 @@ it('lists administrators and agents as two separate collections', function () {
         ->where('administrators.data', fn ($data) => collect($data)->pluck('id')->contains($administrator->id)));
 });
 
-it('shows each users gmail connection status instead of a reply count', function () {
+it('shows each users total upload errors instead of a reply count', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create();
-    $connection = \App\Models\GmailConnection::factory()->for($agent)->create(['status' => 'error', 'last_error' => 'Token revoked']);
+    UploadBatch::factory()->for($agent)->create(['rejected_rows' => 2, 'error_rows' => 1, 'duplicate_rows' => 3]);
 
     $response = $this->actingAs($administrator)->get(route('users.index'));
 
     $response->assertInertia(fn (Assert $page) => $page
-        ->where('agents.data.0.gmail_status', 'error')
-        ->where('agents.data.0.gmail_error', 'Token revoked'));
+        ->where('agents.data.0.errors_count', 6));
 });
 
 it('lets a super administrator clear an agents leads and completed upload history', function () {

@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -42,6 +41,9 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read int|null $rejected_rows_sum
+ * @property-read int|null $error_rows_sum
+ * @property-read int|null $duplicate_rows_sum
  */
 #[Fillable(['name', 'company_alias', 'email', 'password', 'role', 'team', 'status', 'employee_code', 'alias_name', 'alias_email'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -144,12 +146,6 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function gmailConnections(): HasMany
     {
         return $this->hasMany(GmailConnection::class);
-    }
-
-    /** @return HasOne<GmailConnection, $this> */
-    public function latestGmailConnection(): HasOne
-    {
-        return $this->hasOne(GmailConnection::class)->latestOfMany();
     }
 
     /** @return HasMany<EmailReply, $this> */

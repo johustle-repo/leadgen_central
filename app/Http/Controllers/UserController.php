@@ -61,8 +61,10 @@ class UserController extends Controller
         $query = User::query()
             ->select(['id', 'name', 'email', 'role', 'team', 'status', 'created_at'])
             ->where('role', '!=', UserRole::SuperAdministrator)
-            ->with('latestGmailConnection')
-            ->withCount(['leads', 'uploadBatches']);
+            ->withCount(['leads', 'uploadBatches'])
+            ->withSum('uploadBatches as rejected_rows_sum', 'rejected_rows')
+            ->withSum('uploadBatches as error_rows_sum', 'error_rows')
+            ->withSum('uploadBatches as duplicate_rows_sum', 'duplicate_rows');
         if ($search !== '') {
             $query->where(fn (Builder $q) => $q->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
         }
@@ -76,14 +78,11 @@ class UserController extends Controller
     /** @return array<string, mixed> */
     private function mapUser(Request $request, User $user): array
     {
-        $connection = $user->latestGmailConnection;
-
         return [
             ...$user->only(['id', 'name', 'email', 'role', 'team', 'status', 'created_at']),
             'leads_count' => $user->leads_count,
             'upload_batches_count' => $user->upload_batches_count,
-            'gmail_status' => $connection?->status,
-            'gmail_error' => $connection?->last_error,
+            'errors_count' => (int) $user->rejected_rows_sum + (int) $user->error_rows_sum + (int) $user->duplicate_rows_sum,
             'can_delete' => $request->user()->can('delete', $user),
             'can_impersonate' => $request->user()->can('impersonate', $user),
             'can_clear_records' => $request->user()->can('clearRecords', $user),
