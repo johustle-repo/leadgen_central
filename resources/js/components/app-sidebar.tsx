@@ -7,6 +7,7 @@ import {
     LayoutGrid,
     MailSearch,
     QrCode,
+    Settings,
     ShieldCheck,
     Upload,
     Users,
@@ -34,6 +35,7 @@ import {
 import { index as emailReplyIndex } from '@/routes/email-replies';
 import { index as leadIndex } from '@/routes/leads';
 import { index as reportIndex } from '@/routes/report';
+import { edit as systemSettingsEdit } from '@/routes/system-settings';
 import { create as uploadCreate, index as uploadIndex } from '@/routes/uploads';
 import { index as userIndex } from '@/routes/users';
 import { index as verificationIndex } from '@/routes/verification';
@@ -114,7 +116,22 @@ export function AppSidebar() {
     if (isAdministratorRole(auth.user.role)) {
         navGroups.push({
             label: 'Administration',
-            items: [{ title: 'Users', href: userIndex(), icon: Users }],
+            items: [
+                { title: 'Users', href: userIndex(), icon: Users },
+                // System Settings covers site-wide maintenance mode, so it
+                // stays Super Administrator-only even though a regular
+                // Administrator can already manage the CSV upload limits on
+                // the same page if they know the URL.
+                ...(isSuperAdministrator
+                    ? [
+                          {
+                              title: 'System Settings',
+                              href: systemSettingsEdit(),
+                              icon: Settings,
+                          },
+                      ]
+                    : []),
+            ],
         });
     }
 

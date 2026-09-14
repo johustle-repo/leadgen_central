@@ -1,11 +1,13 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, router } from '@inertiajs/react';
 import {
     CheckCircle2,
     Database,
     FileSpreadsheet,
     HardDriveUpload,
     Info,
+    Power,
     Save,
+    ShieldAlert,
     ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -19,9 +21,19 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { edit, update } from '@/routes/system-settings';
+import { disable, enable } from '@/routes/system-settings/maintenance';
 
 const formatMegabytes = (kilobytes: number) => {
     const megabytes = kilobytes / 1024;
@@ -29,10 +41,105 @@ const formatMegabytes = (kilobytes: number) => {
     return `${Number.isInteger(megabytes) ? megabytes : megabytes.toFixed(1)} MB`;
 };
 
+function MaintenanceModeCard({ active }: { active: boolean }) {
+    const [processing, setProcessing] = useState(false);
+    const [open, setOpen] = useState(false);
+
+    return (
+        <Card className={active ? 'border-destructive/40' : undefined}>
+            <CardHeader className="border-b border-border/60">
+                <div className="flex items-start gap-3">
+                    <div
+                        className={`rounded-lg p-2 ${active ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'}`}
+                    >
+                        {active ? (
+                            <ShieldAlert className="size-5" />
+                        ) : (
+                            <Power className="size-5" />
+                        )}
+                    </div>
+                    <div className="space-y-1">
+                        <CardTitle>Maintenance mode</CardTitle>
+                        <CardDescription>
+                            {active
+                                ? 'The site is currently offline. Every visitor sees the maintenance page.'
+                                : 'The site is online and reachable by every visitor.'}
+                        </CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardFooter className="justify-between gap-4 border-t border-border/60 bg-muted/20 py-4">
+                <span
+                    className={`text-sm font-medium ${active ? 'text-destructive' : 'text-success'}`}
+                >
+                    {active ? 'Offline' : 'Online'}
+                </span>
+                <Dialog open={open} onOpenChange={setOpen}>
+                    <DialogTrigger asChild>
+                        <Button
+                            type="button"
+                            variant={active ? 'default' : 'destructive'}
+                        >
+                            <Power />
+                            {active
+                                ? 'Bring the site back online'
+                                : 'Put the site into maintenance'}
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogTitle>
+                            {active
+                                ? 'Bring the site back online?'
+                                : 'Put the whole site into maintenance mode?'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {active
+                                ? 'Every visitor and agent will be able to use the site again immediately.'
+                                : 'Every visitor and agent will see the maintenance page instead of the app until you turn this off again.'}
+                        </DialogDescription>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button variant="secondary">Cancel</Button>
+                            </DialogClose>
+                            <Button
+                                type="button"
+                                variant={active ? 'default' : 'destructive'}
+                                disabled={processing}
+                                onClick={() => {
+                                    setProcessing(true);
+                                    const options = {
+                                        preserveScroll: true,
+                                        onFinish: () => {
+                                            setProcessing(false);
+                                            setOpen(false);
+                                        },
+                                    };
+
+                                    if (active) {
+                                        router.delete(disable.url(), options);
+                                    } else {
+                                        router.post(enable.url(), {}, options);
+                                    }
+                                }}
+                            >
+                                {active
+                                    ? 'Bring site online'
+                                    : 'Enable maintenance mode'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </CardFooter>
+        </Card>
+    );
+}
+
 export default function SettingsEdit({
     settings,
+    maintenance,
 }: {
     settings: { csv_max_kilobytes: number; csv_max_files: number };
+    maintenance: { active: boolean; can_manage: boolean };
 }) {
     const [currentLimit, setCurrentLimit] = useState(
         settings.csv_max_kilobytes,
@@ -290,6 +397,10 @@ export default function SettingsEdit({
                         </CardContent>
                     </Card>
                 </div>
+
+                {maintenance.can_manage && (
+                    <MaintenanceModeCard active={maintenance.active} />
+                )}
             </div>
         </>
     );

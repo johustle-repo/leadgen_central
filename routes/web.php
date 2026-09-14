@@ -75,6 +75,8 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::delete('impersonate', [ImpersonationController::class, 'destroy'])->name('impersonate.stop');
     Route::get('system-settings', [SystemSettingController::class, 'edit'])->name('system-settings.edit');
     Route::put('system-settings', [SystemSettingController::class, 'update'])->middleware(['can:manage-settings', 'password.confirm'])->name('system-settings.update');
+    Route::post('system-settings/maintenance', [SystemSettingController::class, 'enableMaintenance'])->middleware('can:manage-maintenance')->name('system-settings.maintenance.enable');
+    Route::delete('system-settings/maintenance', [SystemSettingController::class, 'disableMaintenance'])->middleware('can:manage-maintenance')->name('system-settings.maintenance.disable');
     Route::get('audit-logs', AuditLogController::class)->name('audit-logs.index');
     Route::get('email-replies', [EmailReplyController::class, 'index'])->name('email-replies.index');
     Route::put('email-replies/read-all', [EmailReplyController::class, 'markAllRead'])->name('email-replies.mark-all-read');

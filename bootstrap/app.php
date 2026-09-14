@@ -26,6 +26,18 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
         $middleware->alias(['active' => EnsureUserIsActive::class]);
+        // A Super Administrator must always be able to log in and reach
+        // System Settings to turn maintenance mode back off - otherwise
+        // enabling it locks out the only person who can disable it.
+        $middleware->preventRequestsDuringMaintenance(except: [
+            'login',
+            'logout',
+            'two-factor-challenge',
+            'passkeys/login',
+            'passkeys/login/options',
+            'system-settings',
+            'system-settings/maintenance',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
