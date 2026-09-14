@@ -189,6 +189,28 @@ it('detects a tab-delimited CSV instead of reading its header as one unmappable 
     expect($batch->headers)->toBe(['Company', 'Email', 'Website']);
 });
 
+it('recovers a Windows-1252 encoded cell instead of failing the whole batch', function () {
+    // Regression test: json_encode()-ing UploadRow's array-cast raw_data column
+    // used to throw on the first row containing invalid UTF-8 (e.g. a curly quote
+    // saved as Windows-1252), and that throw happened outside the per-row
+    // try/catch, so it took the entire batch down with zero rows processed
+    // instead of just rejecting that one row.
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $companyName = mb_convert_encoding("O\u{2019}Brien Co", 'Windows-1252', 'UTF-8');
+    $file = UploadedFile::fake()->createWithContent('cp1252-leads.csv', "Company,Email\n{$companyName},obrien@acme.test\n");
+
+    $upload = $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [0 => 'company_name', 1 => 'email']])
+        ->assertRedirect(route('uploads.show', $batch));
+
+    $batch->refresh();
+    expect($batch->processing_status->value)->toBe('completed')
+        ->and($batch->accepted_rows)->toBe(1);
+    $this->assertDatabaseHas('leads', ['email' => 'obrien@acme.test', 'company_name' => "O\u{2019}Brien Co"]);
+});
+
 it('auto-maps and processes a tab-delimited CSV in a bulk multi-file upload', function () {
     Storage::fake('local');
     $agent = User::factory()->create();

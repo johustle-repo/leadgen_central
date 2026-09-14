@@ -15,7 +15,11 @@ use Throwable;
 
 class UploadBatchCreator
 {
-    public function __construct(private CsvHeaderMapper $mapper, private CsvDelimiterDetector $delimiters) {}
+    public function __construct(
+        private CsvHeaderMapper $mapper,
+        private CsvDelimiterDetector $delimiters,
+        private CsvEncodingSanitizer $encoding,
+    ) {}
 
     public function createForMapping(UploadedFile $file, User $owner, string $duplicateHandling): UploadBatch
     {
@@ -61,8 +65,12 @@ class UploadBatchCreator
             fclose($stream);
         }
 
+        if (is_array($headers)) {
+            $headers = $this->encoding->sanitizeRow(array_map('strval', $headers));
+        }
+
         $namedHeaders = is_array($headers)
-            ? array_values(array_filter(array_map('strval', $headers), fn (string $header): bool => trim($header) !== ''))
+            ? array_values(array_filter($headers, fn (string $header): bool => trim($header) !== ''))
             : [];
 
         if (! is_array($headers) || $namedHeaders === []) {

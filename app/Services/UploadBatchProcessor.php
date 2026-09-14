@@ -26,6 +26,7 @@ class UploadBatchProcessor
         private LocationMatchingService $locations,
         private DuplicateDetectionService $duplicates,
         private CsvDelimiterDetector $delimiters,
+        private CsvEncodingSanitizer $encoding,
     ) {}
 
     public function process(UploadBatch $batch): void
@@ -41,9 +42,11 @@ class UploadBatchProcessor
         if (! is_array($headers)) {
             throw new RuntimeException('The CSV file is empty.');
         }
+        $headers = $this->encoding->sanitizeRow(array_map('strval', $headers));
         $rowNumber = 1;
         while (($values = fgetcsv($stream, separator: $delimiter, escape: '')) !== false) {
             $rowNumber++;
+            $values = $this->encoding->sanitizeRow(array_map('strval', $values));
             // A row where every cell is blank (a stray blank line, or a run of
             // empty-but-comma-padded cells from an Excel export) carries no
             // data to reject - it isn't a lead that failed validation, so it

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\ProcessUploadBatch;
 use App\Models\UploadBatch;
 use App\Services\CsvDelimiterDetector;
+use App\Services\CsvEncodingSanitizer;
 use App\Services\CsvHeaderMapper;
 use App\UploadBatchStatus;
 use Illuminate\Console\Attributes\Description;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Storage;
 #[Description('Re-detect the CSV delimiter and rebuild the column mapping for batches whose header was misread as a single column')]
 class RepairMisparsedUploadHeaders extends Command
 {
-    public function handle(CsvHeaderMapper $mapper, CsvDelimiterDetector $delimiters): int
+    public function handle(CsvHeaderMapper $mapper, CsvDelimiterDetector $delimiters, CsvEncodingSanitizer $encoding): int
     {
         $ids = array_map('intval', $this->argument('ids'));
 
@@ -51,7 +52,7 @@ class RepairMisparsedUploadHeaders extends Command
                 continue;
             }
 
-            $stringHeaders = array_map('strval', $headers);
+            $stringHeaders = $encoding->sanitizeRow(array_map('strval', $headers));
             $mapping = $mapper->map($stringHeaders);
 
             if (! in_array('company_name', $mapping, true)) {
