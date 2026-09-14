@@ -6,6 +6,7 @@ import {
     Search,
     SlidersHorizontal,
     Sparkles,
+    Upload,
     UserCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -92,6 +93,12 @@ export default function VerificationIndex({
                         <Link href={possibleLeads.create()}>
                             <Plus />
                             Add Possible Lead
+                        </Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                        <Link href={possibleLeads.import()}>
+                            <Upload />
+                            Import Possible Leads
                         </Link>
                     </Button>
                     <Button asChild size="sm" variant="outline">

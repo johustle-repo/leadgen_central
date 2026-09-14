@@ -55,6 +55,8 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::get('verification/possible-leads/create', [VerificationController::class, 'createPossible'])->name('verification.possible-leads.create');
     Route::post('verification/possible-leads', [VerificationController::class, 'storePossible'])->name('verification.possible-leads.store');
     Route::get('verification/possible-leads.csv', [VerificationController::class, 'exportPossible'])->middleware('throttle:data-exports')->name('verification.possible-leads.export');
+    Route::get('verification/possible-leads/import', [VerificationController::class, 'importPossible'])->name('verification.possible-leads.import');
+    Route::post('verification/possible-leads/import', [VerificationController::class, 'storeImportPossible'])->middleware('throttle:data-imports')->name('verification.possible-leads.import.store');
     Route::put('verification/{lead}/possible', [VerificationController::class, 'markPossible'])->name('verification.possible');
     Route::get('verification/{lead}', [VerificationController::class, 'show'])->name('verification.show');
     Route::put('verification/{lead}', [VerificationController::class, 'update'])->name('verification.update');

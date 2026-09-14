@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\FilterVerificationRequest;
 use App\Http\Requests\MarkPossibleLeadRequest;
+use App\Http\Requests\StoreImportPossibleLeadsRequest;
 use App\Http\Requests\StorePossibleLeadRequest;
 use App\Http\Requests\VerifyLeadRequest;
 use App\Models\AuditLog;
@@ -13,6 +14,7 @@ use App\Models\User;
 use App\Services\CsvCellSanitizer;
 use App\Services\LeadCreator;
 use App\Services\LeadVerificationService;
+use App\Services\PossibleLeadImportService;
 use App\UserRole;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -74,6 +76,33 @@ class VerificationController extends Controller
         ], $request->user());
 
         return redirect()->route('verification.show', $lead)->with('toast', ['type' => 'success', 'message' => 'Possible lead added successfully.']);
+    }
+
+    public function importPossible(Request $request): Response
+    {
+        abort_unless($request->user()->canViewAllLeads(), 403);
+
+        return Inertia::render('verification/possible-leads/import', [
+            'agents' => User::query()->where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
+    public function storeImportPossible(StoreImportPossibleLeadsRequest $request, PossibleLeadImportService $importer): RedirectResponse
+    {
+        $owner = User::query()->whereKey($request->validated('agent_id'))->firstOrFail();
+        $result = $importer->import($request->file('file'), $request->user(), $owner);
+
+        $message = "{$result['updated']} existing lead(s) updated, {$result['created']} new possible lead(s) created.";
+        if ($result['ambiguous'] !== []) {
+            $names = array_slice($result['ambiguous'], 0, 5);
+            $more = count($result['ambiguous']) - count($names);
+            $message .= ' Matched more than one existing lead and were skipped: '.implode(', ', $names).($more > 0 ? " and {$more} more." : '.');
+        }
+        if ($result['skipped'] !== []) {
+            $message .= ' '.count($result['skipped']).' row(s) had no Company Name and were skipped.';
+        }
+
+        return redirect()->route('verification.index', ['status' => 'possible_lead'])->with('toast', ['type' => 'success', 'message' => $message]);
     }
 
     public function show(Request $request, Lead $lead): Response
