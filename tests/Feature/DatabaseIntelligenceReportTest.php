@@ -134,7 +134,7 @@ test('geographic drill-down narrows rows and records to the requested country an
 
     $this->actingAs($user)->get(route('report.index', ['geo_country' => 'PH', 'geo_province' => 'Cebu']))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('databaseReport.geographic_detail.records', 1)
-        ->where('databaseReport.geographic_detail.rows.0.city', 'Cebu City'));
+        ->where('databaseReport.geographic_detail.rows.0.province', 'Cebu'));
 });
 
 test('a state or province name stored in the city column is reclassified as the state/province', function () {
@@ -144,9 +144,18 @@ test('a state or province name stored in the city column is reclassified as the 
     Lead::factory()->for($user, 'agent')->create(['country_code' => 'US', 'country' => 'United States', 'state_province' => 'California', 'city' => 'Los Angeles']);
 
     $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->contains(fn ($row) => $row['province'] === 'Texas' && $row['city'] === 'Unknown')
-            && collect($rows)->contains(fn ($row) => $row['province'] === 'Ontario' && $row['city'] === 'Unknown')
-            && collect($rows)->contains(fn ($row) => $row['province'] === 'California' && $row['city'] === 'Los Angeles')));
+        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->contains(fn ($row) => $row['country'] === 'US' && $row['province'] === 'Texas')
+            && collect($rows)->contains(fn ($row) => $row['country'] === 'CA' && $row['province'] === 'Ontario')
+            && collect($rows)->contains(fn ($row) => $row['country'] === 'US' && $row['province'] === 'California')));
+});
+
+test('a state/province left unknown falls back to the country\'s data-cleaning reference capital', function () {
+    \App\Models\Country::factory()->create(['iso2' => 'US', 'default_timezone' => 'America/New_York']);
+    $user = User::factory()->create();
+    Lead::factory()->for($user, 'agent')->create(['country_code' => 'US', 'country' => 'United States', 'state_province' => null, 'city' => null]);
+
+    $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->contains(fn ($row) => $row['country'] === 'US' && $row['province'] === 'New York' && $row['timezone'] === 'America/New_York')));
 });
 
 test('contribution by agent is visible only to administrators and super administrators', function (string $role, bool $visible) {

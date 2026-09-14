@@ -41,10 +41,14 @@ export type DatabaseReport = Omit<
         filters: {
             geo_country: string;
             geo_province: string;
-            geo_city: string;
         };
         records: number;
-        rows: DatabaseAnalytics['geography']['rows'];
+        rows: Array<{
+            country: string;
+            province: string;
+            timezone: string;
+            records: number;
+        }>;
     };
     contribution: (QualityMetrics & {
         id: number;

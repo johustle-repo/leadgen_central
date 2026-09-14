@@ -203,14 +203,13 @@ export default function Analytics({
             },
         );
     }
-    function drill(country = '', province = '', city = '') {
+    function drill(country = '', province = '') {
         router.get(
             reportIndex.url(),
             {
                 ...appliedQuery,
                 geo_country: country,
                 geo_province: province,
-                geo_city: city,
             },
             { preserveScroll: true },
         );
@@ -710,7 +709,7 @@ export default function Analytics({
                 </Section>
                 <Section
                     title="Geographic analysis"
-                    note="Selected period · click a country, then a state/province, then a city to narrow the location combinations. Historical City values are shown as stored and may contain province names."
+                    note="Selected period · click a country, then a state/province, to narrow the location combinations. When a state/province isn't on file, its country's reference capital is shown instead."
                     collapsible
                     defaultOpen={false}
                 >
@@ -737,38 +736,19 @@ export default function Analytics({
                         {geo.filters.geo_province && (
                             <>
                                 <span>→</span>
-                                <button
-                                    className="text-primary hover:underline"
-                                    onClick={() =>
-                                        drill(
-                                            geo.filters.geo_country,
-                                            geo.filters.geo_province,
-                                        )
-                                    }
-                                >
-                                    {geo.filters.geo_province}
-                                </button>
-                            </>
-                        )}
-                        {geo.filters.geo_city && (
-                            <>
-                                <span>→</span>
-                                <span>{geo.filters.geo_city}</span>
+                                <span>{geo.filters.geo_province}</span>
                             </>
                         )}
                     </div>
                     <p className="text-xs text-muted-foreground">
                         Top 50 combinations · {geo.records.toLocaleString()}{' '}
-                        matching records.{' '}
-                        {data.geography.unverified_city_records.toLocaleString()}{' '}
-                        period records have an unverified city label. Drill-down
-                        filters affect this section only.
+                        matching records. Drill-down filters affect this section
+                        only.
                     </p>
                     <ReportTable
                         headings={[
                             'Country',
-                            'State / province',
-                            'City as stored',
+                            'State/Capital',
                             'Timezone',
                             'Records',
                         ]}
@@ -784,14 +764,6 @@ export default function Analytics({
                                 onClick={() => drill(row.country, row.province)}
                             >
                                 {row.province}
-                            </button>,
-                            <button
-                                className="text-primary hover:underline"
-                                onClick={() =>
-                                    drill(row.country, row.province, row.city)
-                                }
-                            >
-                                {row.city}
                             </button>,
                             row.timezone,
                             row.records,

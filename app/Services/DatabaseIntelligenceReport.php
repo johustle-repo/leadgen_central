@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Country;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\UploadRow;
@@ -98,7 +99,7 @@ class DatabaseIntelligenceReport
             'Top companies by contact records' => [['Company', 'Contact records', 'Unique emails'], ...array_map(fn (array $row): array => [$row['label'], $row['contacts'], $row['emails']], $data['companies'])],
             'Upload quality - selected-period batches' => [['Metric', 'Value'], ['Submitted rows (batch totals)', $quality['submitted_rows']], ['Observed rows', $quality['observed_rows']], ['Processed rows', $quality['processed']], ['Accepted including review', $quality['accepted']], ['Needs review', $quality['needs_review']], ['Duplicates', $quality['duplicates']], ['Rejected', $quality['rejected']], ['Processing errors', $quality['errors']], ['Location issues', $quality['location_issues']], ['Average batch size', $quality['average_batch_size'] ?? 'N/A'], ['Acceptance rate', $rate($quality['accepted_rate'])], ['Duplicate rate', $rate($quality['duplicates_rate'])], ['Rejection rate', $rate($quality['rejected_rate'])], ['Error rate', $rate($quality['errors_rate'])]],
             'Source quality - selected period' => [['Source', 'Records', 'Processed rows', 'Accepted rows', 'Duplicate rate', 'Rejection rate', 'Error rate'], ...array_map(fn (array $row): array => [$row['label'], $row['records'], $row['processed'], $row['accepted'], $rate($row['duplicates_rate']), $rate($row['rejected_rate']), $rate($row['errors_rate'])], $data['source_quality'])],
-            'Geographic analysis - selected period and location filters' => [['Country code or label', 'State / province', 'City as stored', 'Timezone', 'Records'], ...array_map(fn (array $row): array => [$row['country'], $row['province'], $row['city'], $row['timezone'], $row['records']], $data['geographic_detail']['rows'])],
+            'Geographic analysis - selected period and location filters' => [['Country code or label', 'State/Capital', 'Timezone', 'Records'], ...array_map(fn (array $row): array => [$row['country'], $row['province'], $row['timezone'], $row['records']], $data['geographic_detail']['rows'])],
             'Metric definitions' => [['Definition'], ['Period metrics exclude soft-deleted leads. Emails are addresses, not verified people. Repeated company names are not automatically duplicates.'], ['Quality categories overlap. Rates exclude pending rows. Source outcomes use import snapshots; missing snapshots are Unknown. Current lead sources and import outcomes are distinct populations.'], ['Data quality rate is accepted rows without recorded issues divided by processed rows. Location flags may be incomplete. Geography preserves historical labels.']],
         ];
         if ($data['can_compare_agents']) {
@@ -221,24 +222,40 @@ class DatabaseIntelligenceReport
         $misclassifiedRegion = "CASE WHEN NULLIF(TRIM(state_province), '') IS NULL THEN (CASE {$regionCases} END) END";
 
         $projection = (clone $leads)->selectRaw("COALESCE(NULLIF(UPPER(TRIM(country_code)), ''), NULLIF(LOWER(TRIM(country)), ''), 'Unknown') as country,
-            COALESCE({$misclassifiedRegion}, NULLIF(TRIM(state_province), ''), 'Unknown') as province,
-            CASE WHEN ({$misclassifiedRegion}) IS NOT NULL THEN 'Unknown' ELSE COALESCE(NULLIF(TRIM(city), ''), 'Unknown') END as city,
-            COALESCE(NULLIF(TRIM(timezone), ''), 'Unknown') as timezone", [...$bindings, ...$bindings])->toBase();
+            COALESCE({$misclassifiedRegion}, NULLIF(TRIM(state_province), ''), 'Unknown') as province", $bindings)->toBase();
         $query = DB::query()->fromSub($projection, 'locations');
         $selection = [];
-        foreach (['country', 'province', 'city'] as $key) {
+        foreach (['country', 'province'] as $key) {
             $selection['geo_'.$key] = $filters['geo_'.$key] ?? '';
             if ($selection['geo_'.$key] !== '') {
                 $query->where('locations.'.$key, $selection['geo_'.$key]);
             }
         }
         $total = (clone $query)->count();
-        $groups = $query->select('locations.country', 'locations.province', 'locations.city', 'locations.timezone')
-            ->selectRaw('COUNT(*) as records')->groupBy('locations.country', 'locations.province', 'locations.city', 'locations.timezone')
-            ->orderByDesc('records')->orderBy('country')->orderBy('province')->orderBy('city')->orderBy('timezone')->limit(50)->get()
-            ->map(fn (object $row): array => [...(array) $row, 'records' => (int) $row->records])->all();
+        $groups = $query->select('locations.country', 'locations.province')
+            ->selectRaw('COUNT(*) as records')->groupBy('locations.country', 'locations.province')
+            ->orderByDesc('records')->orderBy('country')->orderBy('province')->limit(50)->get();
 
-        return ['filters' => $selection, 'records' => $total, 'rows' => $groups];
+        $references = app(TimezoneReferenceResolver::class)->resolveManyByCountryCode($groups->pluck('country'));
+        $timezonesByReferenceCode = Country::query()
+            ->whereIn('iso2', collect($references)->filter()->pluck('reference_country_code')->unique()->values())
+            ->pluck('default_timezone', 'iso2');
+
+        $rows = $groups->map(function (object $row) use ($references, $timezonesByReferenceCode): array {
+            $country = (string) $row->country;
+            $reference = $references[strtoupper(trim($country))] ?? null;
+            $timezone = $reference !== null ? ($timezonesByReferenceCode[$reference->reference_country_code] ?? 'Unknown') : 'Unknown';
+            $capital = $reference !== null ? $reference->reference_capital : null;
+
+            return [
+                'country' => $country,
+                'province' => $row->province === 'Unknown' ? ($capital ?? 'Unknown') : (string) $row->province,
+                'timezone' => $timezone,
+                'records' => (int) $row->records,
+            ];
+        })->all();
+
+        return ['filters' => $selection, 'records' => $total, 'rows' => $rows];
     }
 
     private function rate(int $value, int $total): ?float
