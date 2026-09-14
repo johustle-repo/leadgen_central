@@ -33,6 +33,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { COUNTRY_CAPITALS } from '@/lib/country-capitals';
 import {
     destroy as destroyAttachment,
     download as downloadAttachment,
@@ -128,13 +129,23 @@ export default function VerificationShow({
 
             return value === null || value === undefined ? '' : String(value);
         };
+        // The country code is the reliable, structured value - convert it to
+        // the country's full name and its capital (used here as the
+        // representative city) rather than whatever free-text country/city
+        // values happen to be stored, falling back to those only when the
+        // code isn't set or isn't recognized.
+        const countryInfo =
+            COUNTRY_CAPITALS[field('country_code').toUpperCase()];
+        const countryName = countryInfo?.name || field('country');
+        const capitalCity =
+            countryInfo?.capital || field('raw_city') || field('city');
         const details = [
             `Name of Contact: ${field('contact_person')}`,
             `email: ${field('email')}`,
             `Company Name: ${field('company_name')}`,
             `Website: ${field('website')}`,
-            `Country: ${field('country')}`,
-            `City/Capital: ${field('raw_city') || field('city')}`,
+            `Country: ${countryName}`,
+            `City/Capital: ${capitalCity}`,
             `Import Trades: ${field('import_trades')}`,
             `Product Requested: ${field('product_requested')}`,
             `LinkedIn: ${field('linkedin_url')}`,

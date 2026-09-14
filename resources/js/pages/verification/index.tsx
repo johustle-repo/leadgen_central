@@ -1,4 +1,4 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, router } from '@inertiajs/react';
 import {
     Download,
     FileText,
@@ -9,6 +9,7 @@ import {
     Upload,
     UserCheck,
 } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
@@ -20,6 +21,13 @@ import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Table,
     TableBody,
     TableCell,
@@ -30,6 +38,7 @@ import {
 import { index, possible as markPossible, show } from '@/routes/verification';
 import possibleLeads from '@/routes/verification/possible-leads';
 
+type Agent = { id: number; name: string };
 type Lead = {
     id: number;
     lead_code: string;
@@ -49,7 +58,7 @@ type Lead = {
     attachments_count: number;
     agent: { name: string } | null;
 };
-type Filters = { status: string; search: string };
+type Filters = { status: string; search: string; agent_id: string };
 type Summary = {
     possible_leads: number;
     qualified_leads: number;
@@ -62,11 +71,13 @@ const statuses = [
     ['not_a_lead', 'Not a lead'],
     ['forwarded', 'Forwarded'],
 ] as const;
+const ALL_AGENTS = '__all__';
 
 export default function VerificationIndex({
     leads,
     filters,
     summary,
+    agents,
 }: {
     leads: {
         data: Lead[];
@@ -77,10 +88,39 @@ export default function VerificationIndex({
     };
     filters: Filters;
     summary: Summary;
+    agents: Agent[];
 }) {
+    const [searchTerm, setSearchTerm] = useState(filters.search || '');
+    const [agentFilter, setAgentFilter] = useState(
+        filters.agent_id || ALL_AGENTS,
+    );
     const exportUrl = possibleLeads.export.url({
         query: { search: filters.search || undefined },
     });
+
+    // Reaches across every lead in the database on its own, ignoring the
+    // status tab and agent filter, rather than searching only within
+    // whichever narrower view happens to be selected.
+    const searchAllLeads = () => {
+        setAgentFilter(ALL_AGENTS);
+        router.get(
+            index.url(),
+            { search: searchTerm },
+            { preserveState: true, replace: true },
+        );
+    };
+
+    const applyAgentFilter = (value: string) => {
+        setAgentFilter(value);
+        router.get(
+            index.url(),
+            {
+                status: filters.status || undefined,
+                agent_id: value === ALL_AGENTS ? undefined : value,
+            },
+            { preserveState: true, replace: true },
+        );
+    };
 
     return (
         <>
@@ -128,34 +168,91 @@ export default function VerificationIndex({
                     ))}
                 </div>
 
-                <FilterBar as="div" icon={SlidersHorizontal} label="Filters">
-                    <Form
-                        {...index.form()}
-                        className="flex flex-col gap-3 sm:col-span-2 lg:col-span-4 lg:flex-row"
-                    >
-                        <div className="relative flex-1">
-                            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <FilterBar
+                    as="div"
+                    icon={SlidersHorizontal}
+                    label="Filters"
+                    hint="Search matches contact, email, company, phone, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of the status tab and agent filter below."
+                >
+                    <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
+                        <label
+                            htmlFor="verification-search"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Search
+                        </label>
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
+                                id="verification-search"
                                 name="search"
-                                defaultValue={filters.search}
+                                value={searchTerm}
+                                onChange={(event) =>
+                                    setSearchTerm(event.target.value)
+                                }
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        searchAllLeads();
+                                    }
+                                }}
                                 placeholder="Search contact, email, company, phone, location, owner, or lead code..."
-                                className="pl-9"
+                                className="pr-24 pl-9"
                             />
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={searchAllLeads}
+                                className="absolute top-1/2 right-1 h-7 -translate-y-1/2"
+                            >
+                                <Search className="size-3.5" />
+                                Search
+                            </Button>
                         </div>
-                        {filters.status && (
-                            <input
-                                type="hidden"
-                                name="status"
-                                value={filters.status}
-                            />
-                        )}
-                        <Button type="submit">Search contacts</Button>
-                        {(filters.search || filters.status) && (
+                    </div>
+                    {agents.length > 0 && (
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="verification-agent"
+                                className="text-xs text-muted-foreground"
+                            >
+                                Agent
+                            </label>
+                            <Select
+                                value={agentFilter}
+                                onValueChange={applyAgentFilter}
+                            >
+                                <SelectTrigger
+                                    id="verification-agent"
+                                    className="w-full"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ALL_AGENTS}>
+                                        All agents
+                                    </SelectItem>
+                                    {agents.map((agent) => (
+                                        <SelectItem
+                                            key={agent.id}
+                                            value={String(agent.id)}
+                                        >
+                                            {agent.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                    {(filters.search ||
+                        filters.status ||
+                        filters.agent_id) && (
+                        <div className="flex items-end">
                             <Button asChild type="button" variant="outline">
                                 <Link href={index()}>Clear</Link>
                             </Button>
-                        )}
-                    </Form>
+                        </div>
+                    )}
                     <div className="sm:col-span-2 lg:col-span-4">
                         <FilterTabs
                             tabs={statuses.map(([value, label]) => ({
@@ -163,7 +260,10 @@ export default function VerificationIndex({
                                 href: index({
                                     query: {
                                         status: value || undefined,
-                                        search: filters.search || undefined,
+                                        agent_id:
+                                            agentFilter === ALL_AGENTS
+                                                ? undefined
+                                                : agentFilter,
                                     },
                                 }),
                                 active: filters.status === value,

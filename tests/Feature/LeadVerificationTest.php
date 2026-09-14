@@ -35,6 +35,39 @@ it('lets administrators search the verification contact workspace', function () 
         ->assertInertia(fn (Assert $page) => $page->where('leads.data.0.id', $matching->id));
 });
 
+it('searches every lead regardless of status, ignoring the default Possible Leads view', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $rawLead = Lead::factory()->create(['status' => 'raw', 'company_name' => 'Raw Prospect Inc', 'contact_person' => 'Searchable Contact']);
+    Lead::factory()->create(['status' => 'possible_lead', 'company_name' => 'Unrelated Possible Lead']);
+
+    // With no search term, the default view is Possible Leads only.
+    $this->actingAs($reviewer)->get(route('verification.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('filters.status', 'possible_lead')
+            ->has('leads.data', 1));
+
+    // Searching finds a raw-status lead too, even though it's outside the
+    // default Possible Leads view - search reaches the whole leads table.
+    $this->actingAs($reviewer)->get(route('verification.index', ['search' => 'Searchable Contact']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.status', '')
+            ->has('leads.data', 1)
+            ->where('leads.data.0.id', $rawLead->id));
+});
+
+it('lets a reviewer filter possible leads down to a single agent', function () {
+    $reviewer = User::factory()->administrator()->create();
+    $agentOne = User::factory()->create(['name' => 'Agent One']);
+    $agentTwo = User::factory()->create(['name' => 'Agent Two']);
+    $ownedByOne = Lead::factory()->for($agentOne, 'agent')->create(['status' => 'possible_lead']);
+    Lead::factory()->for($agentTwo, 'agent')->create(['status' => 'possible_lead']);
+
+    $this->actingAs($reviewer)->get(route('verification.index', ['agent_id' => $agentOne->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('leads.data', 1)
+            ->where('leads.data.0.id', $ownedByOne->id)
+            ->where('filters.agent_id', (string) $agentOne->id));
+});
+
 it('lets a sub-administrator save a contact to the possible leads list', function () {
     $reviewer = User::factory()->subAdministrator()->create();
     $lead = Lead::factory()->create(['status' => 'needs_review']);

@@ -27,6 +27,7 @@ class FilterVerificationRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:150'],
             'status' => ['nullable', Rule::enum(LeadStatus::class)],
+            'agent_id' => ['nullable', 'integer', 'exists:users,id'],
         ];
     }
 }

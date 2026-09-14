@@ -30,14 +30,23 @@ class VerificationController extends Controller
     {
         $filters = $request->validated();
         $search = trim((string) ($filters['search'] ?? ''));
+        $status = $filters['status'] ?? 'possible_lead';
+        $agentId = $filters['agent_id'] ?? null;
         $query = $this->searchQuery($search)
             ->with('agent:id,name')
             ->withCount(['structuredNotes', 'attachments'])
             ->latest();
-        // Possible Leads is the default and primary view of this workspace -
-        // there's no longer a combined "review queue" landing state.
-        $status = $filters['status'] ?? 'possible_lead';
-        $query->where('status', $status);
+        // A search reaches across every lead in the database on its own,
+        // ignoring the status tab and agent filter, rather than searching
+        // only within whichever narrower view happens to be selected.
+        // Possible Leads is the default and primary view otherwise - there's
+        // no longer a combined "review queue" landing state.
+        if ($search === '') {
+            $query->where('status', $status);
+            if ($agentId) {
+                $query->where('agent_id', $agentId);
+            }
+        }
 
         $summary = [
             'possible_leads' => (clone $this->searchQuery($search))->where('status', 'possible_lead')->count(),
@@ -47,8 +56,9 @@ class VerificationController extends Controller
 
         return Inertia::render('verification/index', [
             'leads' => $query->paginate(20)->withQueryString(),
-            'filters' => ['status' => $status, 'search' => $search],
+            'filters' => ['status' => $search === '' ? $status : '', 'search' => $search, 'agent_id' => $search === '' && $agentId ? (string) $agentId : ''],
             'summary' => $summary,
+            'agents' => $request->user()->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [],
         ]);
     }
 
