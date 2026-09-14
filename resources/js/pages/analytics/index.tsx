@@ -72,6 +72,14 @@ function countryName(value: string) {
         ? (regions.of(value) ?? value)
         : formatLabel(value);
 }
+function sharePercent(value: number, total: number): number | null {
+    return total > 0 ? Math.round((1000 * value) / total) / 10 : null;
+}
+const SOURCE_RATE_SERIES = [
+    { key: 'duplicates_rate', label: 'Duplicate rate' },
+    { key: 'rejected_rate', label: 'Rejection rate' },
+    { key: 'errors_rate', label: 'Error rate' },
+] as const;
 function Metric({
     label,
     value,
@@ -677,6 +685,41 @@ export default function Analytics({
                             ],
                         ]}
                     />
+                    <DistributionChart
+                        title="Row outcomes · selected period"
+                        rows={[
+                            {
+                                label: 'Accepted',
+                                value: quality.accepted,
+                                percent: quality.accepted_rate,
+                            },
+                            {
+                                label: 'Duplicates',
+                                value: quality.duplicates,
+                                percent: quality.duplicates_rate,
+                            },
+                            {
+                                label: 'Rejected',
+                                value: quality.rejected,
+                                percent: quality.rejected_rate,
+                            },
+                            {
+                                label: 'Errors',
+                                value: quality.errors,
+                                percent: quality.errors_rate,
+                            },
+                            {
+                                label: 'Pending',
+                                value:
+                                    quality.observed_rows - quality.processed,
+                                percent: sharePercent(
+                                    quality.observed_rows - quality.processed,
+                                    quality.observed_rows,
+                                ),
+                            },
+                        ]}
+                        description="Share of processed rows by outcome; Pending is a share of observed rows instead."
+                    />
                 </Section>
                 <Section
                     title="Source quality analysis"
@@ -706,6 +749,73 @@ export default function Analytics({
                             percent(source.errors_rate),
                         ])}
                     />
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>
+                                Duplicate, rejection and error rate by source
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div
+                                className="h-64 min-w-0"
+                                role="img"
+                                aria-label="Duplicate, rejection and error rate by source, one bar group per source; exact values in the table above"
+                            >
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={data.source_quality.filter(
+                                            (source) => source.processed > 0,
+                                        )}
+                                        barGap={2}
+                                        barCategoryGap="20%"
+                                        accessibilityLayer
+                                    >
+                                        <CartesianGrid
+                                            vertical={false}
+                                            stroke="var(--color-border)"
+                                        />
+                                        <XAxis
+                                            dataKey="label"
+                                            tick={{ fontSize: 11 }}
+                                        />
+                                        <YAxis
+                                            unit="%"
+                                            tick={{ fontSize: 11 }}
+                                        />
+                                        <Tooltip
+                                            content={ChartTooltip}
+                                            cursor={{
+                                                fill: 'var(--color-muted)',
+                                                opacity: 0.4,
+                                            }}
+                                        />
+                                        {SOURCE_RATE_SERIES.map(
+                                            (series, index) => (
+                                                <Bar
+                                                    key={series.key}
+                                                    dataKey={series.key}
+                                                    name={series.label}
+                                                    fill={`var(--color-chart-${index + 1})`}
+                                                    maxBarSize={30}
+                                                    radius={[4, 4, 0, 0]}
+                                                    isAnimationActive={false}
+                                                />
+                                            ),
+                                        )}
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <ChartLegend
+                                items={SOURCE_RATE_SERIES.map(
+                                    (series, index) => ({
+                                        key: series.key,
+                                        label: series.label,
+                                        color: `var(--color-chart-${index + 1})`,
+                                    }),
+                                )}
+                            />
+                        </CardContent>
+                    </Card>
                 </Section>
                 <Section
                     title="Geographic analysis"
@@ -768,6 +878,15 @@ export default function Analytics({
                             row.timezone,
                             row.records,
                         ])}
+                    />
+                    <DistributionChart
+                        title="Top locations by records"
+                        rows={geo.rows.slice(0, 15).map((row) => ({
+                            label: `${row.province} — ${countryName(row.country)}`,
+                            value: row.records,
+                            percent: sharePercent(row.records, geo.records),
+                        }))}
+                        description="Top 15 of the combinations above · share of records matching the current drill-down."
                     />
                 </Section>
                 {data.can_compare_agents && (
