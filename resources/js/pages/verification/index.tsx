@@ -277,7 +277,7 @@ export default function VerificationIndex({
                     {filters.search && ` for “${filters.search}”`}
                 </p>
                 {leads.data.length ? (
-                    <Table>
+                    <Table className="text-xs">
                         <TableHeader>
                             <TableRow className="hover:bg-transparent">
                                 <TableHead>Company</TableHead>
