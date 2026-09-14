@@ -21,8 +21,8 @@ it('lets a sub-administrator classify a lead and records status history', functi
 it('lets administrators search the verification contact workspace', function () {
     $reviewer = User::factory()->subAdministrator()->create();
     $owner = User::factory()->create(['name' => 'North Team Agent']);
-    $matching = Lead::factory()->for($owner, 'agent')->create(['company_name' => 'Atlas Scaffolding', 'contact_person' => 'Maria Santos', 'email' => 'maria@atlas.test']);
-    Lead::factory()->create(['company_name' => 'Unrelated Company', 'contact_person' => 'Other Contact']);
+    $matching = Lead::factory()->for($owner, 'agent')->create(['status' => 'possible_lead', 'company_name' => 'Atlas Scaffolding', 'contact_person' => 'Maria Santos', 'email' => 'maria@atlas.test']);
+    Lead::factory()->create(['status' => 'possible_lead', 'company_name' => 'Unrelated Company', 'contact_person' => 'Other Contact']);
 
     $this->actingAs($reviewer)->get(route('verification.index', ['search' => 'Maria Santos']))
         ->assertInertia(fn (Assert $page) => $page
@@ -209,7 +209,7 @@ it('renders verification records after their owner account is deleted', function
     $lead = Lead::factory()->for($formerAgent, 'agent')->create(['status' => 'needs_review']);
     $formerAgent->delete();
 
-    $this->actingAs($reviewer)->get(route('verification.index'))->assertInertia(fn (Assert $page) => $page
+    $this->actingAs($reviewer)->get(route('verification.index', ['status' => 'needs_review']))->assertInertia(fn (Assert $page) => $page
         ->component('verification/index')
         ->where('leads.data.0.id', $lead->id)
         ->where('leads.data.0.agent', null));

@@ -51,13 +51,11 @@ type Lead = {
 };
 type Filters = { status: string; search: string };
 type Summary = {
-    review_queue: number;
     possible_leads: number;
     qualified_leads: number;
     documents: number;
 };
 const statuses = [
-    ['', 'Review queue'],
     ['needs_review', 'Needs review'],
     ['possible_lead', 'Possible leads'],
     ['qualified_lead', 'Qualified leads'],
@@ -109,10 +107,9 @@ export default function VerificationIndex({
                     </Button>
                 </HeaderActionsPortal>
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-3">
                     {(
                         [
-                            ['Review queue', summary.review_queue, Search],
                             [
                                 'Possible leads',
                                 summary.possible_leads,

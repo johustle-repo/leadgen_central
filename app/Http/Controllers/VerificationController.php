@@ -34,14 +34,12 @@ class VerificationController extends Controller
             ->with('agent:id,name')
             ->withCount(['structuredNotes', 'attachments'])
             ->latest();
-        if ($status = $filters['status'] ?? null) {
-            $query->where('status', $status);
-        } else {
-            $query->whereIn('status', ['raw', 'validated', 'needs_review', 'possible_lead']);
-        }
+        // Possible Leads is the default and primary view of this workspace -
+        // there's no longer a combined "review queue" landing state.
+        $status = $filters['status'] ?? 'possible_lead';
+        $query->where('status', $status);
 
         $summary = [
-            'review_queue' => (clone $this->searchQuery($search))->whereIn('status', ['raw', 'validated', 'needs_review', 'possible_lead'])->count(),
             'possible_leads' => (clone $this->searchQuery($search))->where('status', 'possible_lead')->count(),
             'qualified_leads' => (clone $this->searchQuery($search))->where('status', 'qualified_lead')->count(),
             'documents' => LeadAttachment::query()->whereIn('lead_id', $this->searchQuery($search)->where('status', 'possible_lead')->select('id'))->count(),
@@ -49,7 +47,7 @@ class VerificationController extends Controller
 
         return Inertia::render('verification/index', [
             'leads' => $query->paginate(20)->withQueryString(),
-            'filters' => ['status' => $status ?? '', 'search' => $search],
+            'filters' => ['status' => $status, 'search' => $search],
             'summary' => $summary,
         ]);
     }
