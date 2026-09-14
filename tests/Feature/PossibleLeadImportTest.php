@@ -57,11 +57,16 @@ it('updates an existing lead matched by company name when no email is given', fu
 });
 
 it('creates a fresh possible lead owned by the chosen agent when nothing matches', function () {
+    // Regression test: LeadVerificationService::verify() is called right after
+    // creation to mark the lead Possible Lead. verify() used to reseed only
+    // company_name/website/email/phone from the lead before normalizing, so
+    // contact_person - which normalize() always recomputes, defaulting to
+    // null when absent - got wiped back out immediately after being set.
     $reviewer = User::factory()->administrator()->create();
     $agent = User::factory()->create();
     $file = UploadedFile::fake()->createWithContent(
         'possible-leads.csv',
-        "Company,Email,Product Request\nBrand New Co,new@brandnew.test,Ringlock\n",
+        "Company,Contact,Email,Product Request\nBrand New Co,Ada Lovelace,new@brandnew.test,Ringlock\n",
     );
 
     $this->actingAs($reviewer)->post(route('verification.possible-leads.import.store'), [
@@ -72,6 +77,7 @@ it('creates a fresh possible lead owned by the chosen agent when nothing matches
     $lead = Lead::query()->where('email', 'new@brandnew.test')->firstOrFail();
     expect($lead->status->value)->toBe('possible_lead')
         ->and($lead->agent_id)->toBe($agent->id)
+        ->and($lead->contact_person)->toBe('Ada Lovelace')
         ->and($lead->product_requested)->toBe('Ringlock');
 });
 

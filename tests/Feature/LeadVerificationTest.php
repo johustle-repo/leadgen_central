@@ -3,9 +3,24 @@
 use App\Models\Lead;
 use App\Models\LeadAttachment;
 use App\Models\User;
+use App\Services\LeadVerificationService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+
+it('preserves contact_person when verify() is called without re-passing it', function () {
+    // Regression test: normalize() unconditionally recomputes contact_person
+    // (defaulting to null when absent from the merged data) rather than
+    // leaving it untouched, so verify() must always reseed it from the
+    // lead's current value - a caller that verifies a lead without
+    // explicitly re-passing contact_person must not have it wiped out.
+    $lead = Lead::factory()->create(['status' => 'raw', 'contact_person' => 'Ada Lovelace']);
+    $actor = User::factory()->administrator()->create();
+
+    app(LeadVerificationService::class)->verify($lead, ['status' => 'possible_lead'], $actor);
+
+    expect($lead->refresh()->contact_person)->toBe('Ada Lovelace');
+});
 
 it('lets a sub-administrator classify a lead and records status history', function () {
     $reviewer = User::factory()->subAdministrator()->create();

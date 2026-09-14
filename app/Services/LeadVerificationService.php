@@ -16,7 +16,13 @@ class LeadVerificationService
     {
         return DB::transaction(function () use ($lead, $data, $actor): Lead {
             $oldStatus = $lead->status->value;
-            $updates = $this->normalizer->normalize([...$lead->only(['company_name', 'website', 'email', 'phone']), ...$data]);
+            // normalize() unconditionally recomputes each of these keys (defaulting
+            // to null/empty when absent) rather than leaving them untouched, so
+            // every one it can produce must be seeded from the lead's current
+            // value here - otherwise a caller that verifies a lead without
+            // re-passing, say, contact_person silently wipes it instead of
+            // leaving it as it was.
+            $updates = $this->normalizer->normalize([...$lead->only(['company_name', 'website', 'email', 'phone', 'contact_person']), ...$data]);
             $location = $this->locations->match($data['country_code'] ?? $data['country'] ?? $lead->country_code ?? $lead->country, $data['city'] ?? $lead->city);
             $newStatus = (string) $data['status'];
             $locationAttributes = $location->leadAttributes($data['city'] ?? $lead->raw_city ?? $lead->city, $data['country'] ?? $data['country_code'] ?? $lead->raw_country ?? $lead->country);
