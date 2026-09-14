@@ -93,11 +93,6 @@ export function AppSidebar() {
                               icon: Upload,
                           },
                       ]),
-                {
-                    title: 'Upload History',
-                    href: uploadIndex(),
-                    icon: FileClock,
-                },
                 // Verification is a review step agents don't perform
                 // themselves, so it's hidden for that role.
                 ...(auth.user.role !== 'agent'
@@ -109,6 +104,11 @@ export function AppSidebar() {
                           },
                       ]
                     : []),
+                {
+                    title: 'Upload History',
+                    href: uploadIndex(),
+                    icon: FileClock,
+                },
             ],
         },
     ];
