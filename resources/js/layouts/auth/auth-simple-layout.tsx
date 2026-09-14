@@ -18,9 +18,7 @@ export default function AuthSimpleLayout({
                     href={home()}
                     className="relative flex items-center gap-3"
                 >
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-300 to-indigo-500">
-                        <AppLogoIcon className="size-7 text-slate-950" />
-                    </span>
+                    <AppLogoIcon className="size-11 object-contain" />
                     <span className="text-xl font-semibold">
                         LeadGen <span className="text-cyan-300">Central</span>
                     </span>
@@ -73,9 +71,7 @@ export default function AuthSimpleLayout({
                         href={home()}
                         className="mb-10 flex items-center justify-center gap-3 lg:hidden"
                     >
-                        <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-300 to-indigo-500">
-                            <AppLogoIcon className="size-6 text-slate-950" />
-                        </span>
+                        <AppLogoIcon className="size-10 object-contain" />
                         <span className="text-lg font-semibold">
                             LeadGen Central
                         </span>

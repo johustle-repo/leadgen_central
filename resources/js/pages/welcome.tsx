@@ -45,9 +45,7 @@ export default function Welcome() {
 
                 <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-5 py-6 lg:px-8">
                     <Link href="/" className="flex items-center gap-3">
-                        <span className="flex size-10 items-center justify-center rounded-xl bg-cyan-300">
-                            <AppLogoIcon className="size-6 text-slate-950" />
-                        </span>
+                        <AppLogoIcon className="size-10 object-contain" />
                         <span className="text-lg font-semibold tracking-tight">
                             LeadGen{' '}
                             <span className="text-cyan-300">Central</span>

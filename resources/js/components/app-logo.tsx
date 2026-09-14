@@ -10,9 +10,7 @@ export default function AppLogo() {
 
     return (
         <>
-            <div className="flex aspect-square size-9 items-center justify-center rounded-xl bg-cyan-400 text-slate-950">
-                <AppLogoIcon className="size-5" />
-            </div>
+            <AppLogoIcon className="aspect-square size-9 object-contain" />
             <div className="ml-1.5 grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-bold tracking-tight text-white">
                     {name === 'Laravel' ? 'LeadGen Central' : name}
