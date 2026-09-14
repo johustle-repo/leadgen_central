@@ -153,6 +153,7 @@ export default function VerificationShow({
             `LinkedIn: ${field('linkedin_url')}`,
             `Source of Leads: ${field('data_source')}`,
             `Source Link: ${field('source_url')}`,
+            `Date Uploaded in Reply.io: ${field('lead_date').slice(0, 10)}`,
         ].join('\n');
 
         try {
