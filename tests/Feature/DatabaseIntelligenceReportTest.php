@@ -137,6 +137,18 @@ test('geographic drill-down narrows rows and records to the requested country an
         ->where('databaseReport.geographic_detail.rows.0.city', 'Cebu City'));
 });
 
+test('a state or province name stored in the city column is reclassified as the state/province', function () {
+    $user = User::factory()->create();
+    Lead::factory()->for($user, 'agent')->create(['country_code' => 'US', 'country' => 'United States', 'state_province' => null, 'city' => 'Texas']);
+    Lead::factory()->for($user, 'agent')->create(['country_code' => 'CA', 'country' => 'Canada', 'state_province' => null, 'city' => 'Ontario']);
+    Lead::factory()->for($user, 'agent')->create(['country_code' => 'US', 'country' => 'United States', 'state_province' => 'California', 'city' => 'Los Angeles']);
+
+    $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->contains(fn ($row) => $row['province'] === 'Texas' && $row['city'] === 'Unknown')
+            && collect($rows)->contains(fn ($row) => $row['province'] === 'Ontario' && $row['city'] === 'Unknown')
+            && collect($rows)->contains(fn ($row) => $row['province'] === 'California' && $row['city'] === 'Los Angeles')));
+});
+
 test('contribution by agent is visible only to administrators and super administrators', function (string $role, bool $visible) {
     $user = User::factory()->create(['role' => $role]);
     $agent = User::factory()->create();

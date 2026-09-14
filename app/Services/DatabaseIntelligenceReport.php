@@ -16,6 +16,20 @@ class DatabaseIntelligenceReport
 {
     private const COMPANY = "COALESCE(NULLIF(LOWER(TRIM(normalized_company_name)), ''), NULLIF(LOWER(TRIM(company_name)), ''))";
 
+    /**
+     * Some imported sources only ever supplied state/province-level location
+     * data and that value ended up in the city column with no state_province
+     * on file. Left alone, the Geographic analysis report shows the state as
+     * a "city" next to an "Unknown" state/province, which reads as a bug.
+     * Reclassify those values as the state/province instead.
+     *
+     * @var array<string, list<string>>
+     */
+    private const REGION_NAMES_BY_COUNTRY = [
+        'US' => ['alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware', 'district of columbia', 'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi', 'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey', 'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio', 'oklahoma', 'oregon', 'pennsylvania', 'rhode island', 'south carolina', 'south dakota', 'tennessee', 'texas', 'utah', 'vermont', 'virginia', 'washington', 'west virginia', 'wisconsin', 'wyoming'],
+        'CA' => ['alberta', 'british columbia', 'manitoba', 'new brunswick', 'newfoundland and labrador', 'northwest territories', 'nova scotia', 'nunavut', 'ontario', 'prince edward island', 'quebec', 'saskatchewan', 'yukon'],
+    ];
+
     /** @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
@@ -197,10 +211,19 @@ class DatabaseIntelligenceReport
      */
     private function geography(Builder $leads, array $filters): array
     {
+        $regionCases = '';
+        $bindings = [];
+        foreach (self::REGION_NAMES_BY_COUNTRY as $countryCode => $regionNames) {
+            $placeholders = implode(',', array_fill(0, count($regionNames), '?'));
+            $regionCases .= "WHEN UPPER(TRIM(country_code)) = '{$countryCode}' AND LOWER(TRIM(city)) IN ({$placeholders}) THEN TRIM(city) ";
+            array_push($bindings, ...$regionNames);
+        }
+        $misclassifiedRegion = "CASE WHEN NULLIF(TRIM(state_province), '') IS NULL THEN (CASE {$regionCases} END) END";
+
         $projection = (clone $leads)->selectRaw("COALESCE(NULLIF(UPPER(TRIM(country_code)), ''), NULLIF(LOWER(TRIM(country)), ''), 'Unknown') as country,
-            COALESCE(NULLIF(TRIM(state_province), ''), 'Unknown') as province,
-            COALESCE(NULLIF(TRIM(city), ''), 'Unknown') as city,
-            COALESCE(NULLIF(TRIM(timezone), ''), 'Unknown') as timezone")->toBase();
+            COALESCE({$misclassifiedRegion}, NULLIF(TRIM(state_province), ''), 'Unknown') as province,
+            CASE WHEN ({$misclassifiedRegion}) IS NOT NULL THEN 'Unknown' ELSE COALESCE(NULLIF(TRIM(city), ''), 'Unknown') END as city,
+            COALESCE(NULLIF(TRIM(timezone), ''), 'Unknown') as timezone", [...$bindings, ...$bindings])->toBase();
         $query = DB::query()->fromSub($projection, 'locations');
         $selection = [];
         foreach (['country', 'province', 'city'] as $key) {
