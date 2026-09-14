@@ -636,8 +636,6 @@ export default function Analytics({
                 <Section
                     title="Upload quality analysis"
                     note="Selected-period uploads · submitted rows use batch totals; observed and processed counts use retained import rows. Unstarted uploads may not yet have row outcomes."
-                    collapsible
-                    defaultOpen={false}
                 >
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <Metric
@@ -724,8 +722,6 @@ export default function Analytics({
                 <Section
                     title="Source quality analysis"
                     note="Selected period · Total records uses current lead sources. Import outcomes use saved source snapshots, including updates to existing leads. These are distinct populations; accepted rows are not necessarily new records. Missing snapshots are Unknown; manual records have no import-quality rate."
-                    collapsible
-                    defaultOpen={false}
                 >
                     <ReportTable
                         headings={[
@@ -820,8 +816,6 @@ export default function Analytics({
                 <Section
                     title="Geographic analysis"
                     note="Selected period · click a country, then a state/province, to narrow the location combinations. When a state/province isn't on file, its country's reference capital is shown instead."
-                    collapsible
-                    defaultOpen={false}
                 >
                     <div className="flex flex-wrap items-center gap-2 text-sm">
                         <button
