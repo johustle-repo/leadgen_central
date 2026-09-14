@@ -15,7 +15,7 @@ use Throwable;
 
 class UploadBatchCreator
 {
-    public function __construct(private CsvHeaderMapper $mapper) {}
+    public function __construct(private CsvHeaderMapper $mapper, private CsvDelimiterDetector $delimiters) {}
 
     public function createForMapping(UploadedFile $file, User $owner, string $duplicateHandling): UploadBatch
     {
@@ -56,7 +56,7 @@ class UploadBatchCreator
     private function inspect(UploadedFile $file, string $errorKey, bool $companyMappingRequired): array
     {
         $stream = fopen($file->getRealPath(), 'rb');
-        $headers = $stream ? fgetcsv($stream, escape: '') : false;
+        $headers = $stream ? fgetcsv($stream, separator: $this->delimiters->detect($stream), escape: '') : false;
         if (is_resource($stream)) {
             fclose($stream);
         }

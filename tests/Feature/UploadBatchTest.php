@@ -177,6 +177,33 @@ it('uploads maps and processes valid and invalid CSV rows', function () {
     $this->assertDatabaseHas('upload_rows', ['upload_batch_id' => $batch->id, 'row_number' => 3, 'processing_status' => 'rejected']);
 });
 
+it('detects a tab-delimited CSV instead of reading its header as one unmappable column', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent('tab-leads.csv', "Company\tEmail\tWebsite\nAcme\thello@acme.test\tacme.test\n");
+
+    $upload = $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $upload->assertRedirect(route('uploads.mapping', $batch));
+    expect($batch->headers)->toBe(['Company', 'Email', 'Website']);
+});
+
+it('auto-maps and processes a tab-delimited CSV in a bulk multi-file upload', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $tabFile = UploadedFile::fake()->createWithContent('tab-leads.csv', "Company\tEmail\nAcme\thello@acme.test\n");
+    $commaFile = UploadedFile::fake()->createWithContent('comma-leads.csv', "Company,Email\nOther Co,other@acme.test\n");
+
+    $this->actingAs($agent)->post(route('uploads.store'), ['files' => [$tabFile, $commaFile]])->assertRedirect(route('uploads.index'));
+
+    $batch = UploadBatch::where('original_filename', 'tab-leads.csv')->firstOrFail();
+    expect($batch->column_mapping)->toBe(['Company' => 'company_name', 'Email' => 'email'])
+        ->and($batch->processing_status->value)->toBe('completed')
+        ->and($batch->accepted_rows)->toBe(1);
+    $this->assertDatabaseHas('leads', ['company_name' => 'Acme', 'email' => 'hello@acme.test']);
+});
+
 it('accepts a lead when the CSV is missing some of the default template columns', function () {
     // The recognized standard columns are Date, Company, Website, First Name, Email,
     // Country, City, Import Trades, LinkedIn, Sources of Data, and Source Link - but a

@@ -62,6 +62,12 @@ Configure one cron entry on every scheduler host; the application uses single-se
 * * * * * cd /var/www/leadgen-central/current && php artisan schedule:run >> /dev/null 2>&1
 ```
 
+On Hostinger's hPanel (Advanced → Cron Jobs), use the panel's "PHP" job type instead of a raw crontab line, and always call the PHP binary by its full versioned path rather than the bare `php` — the account's default `php` on the command line can point at an older CLI-only PHP version than the one Composer's lockfile requires, which makes every `artisan` invocation fail immediately with a "Composer detected issues in your platform" error and exit code 255. Confirm the required version with `php artisan --version` requirements in `composer.json`/`composer.lock` and pick the matching binary under `/opt/alt/phpNN/usr/bin/php`. For example:
+
+```text
+/opt/alt/php84/usr/bin/php /home/u942457715/domains/ebnleadgen.online/public_html/artisan schedule:run
+```
+
 The scheduler queues Gmail reply synchronization, processes email sequence steps, re-dispatches any lead upload that lost its queue job, and (on shared hosting) drains the database queue itself — all every minute. A supervised worker satisfies the same purpose on hosts that can run one.
 
 Every scheduled task registers via `Schedule::call()`/`Artisan::call()`, not `Schedule::command()`/`Schedule::exec()`. The latter shell out through Symfony `Process` (`proc_open`), which many shared hosts (including Hostinger) disable outright — the task would silently never run even though `schedule:run` fires correctly every minute, which is why lead uploads could get stuck at "Pending" indefinitely. Running everything in-process via `Artisan::call()` avoids that dependency entirely. Verify the schedule is registered correctly on a fresh deployment with:

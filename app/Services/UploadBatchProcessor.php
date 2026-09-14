@@ -25,6 +25,7 @@ class UploadBatchProcessor
         private LeadNormalizationService $normalizer,
         private LocationMatchingService $locations,
         private DuplicateDetectionService $duplicates,
+        private CsvDelimiterDetector $delimiters,
     ) {}
 
     public function process(UploadBatch $batch): void
@@ -35,12 +36,13 @@ class UploadBatchProcessor
         if ($stream === null) {
             throw new RuntimeException('The uploaded file could not be read.');
         }
-        $headers = fgetcsv($stream, escape: '');
+        $delimiter = $this->delimiters->detect($stream);
+        $headers = fgetcsv($stream, separator: $delimiter, escape: '');
         if (! is_array($headers)) {
             throw new RuntimeException('The CSV file is empty.');
         }
         $rowNumber = 1;
-        while (($values = fgetcsv($stream, escape: '')) !== false) {
+        while (($values = fgetcsv($stream, separator: $delimiter, escape: '')) !== false) {
             $rowNumber++;
             // A row where every cell is blank (a stray blank line, or a run of
             // empty-but-comma-padded cells from an Excel export) carries no
