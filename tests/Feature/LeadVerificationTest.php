@@ -18,6 +18,24 @@ it('lets a sub-administrator classify a lead and records status history', functi
     $this->assertDatabaseHas('lead_status_histories', ['lead_id' => $lead->id, 'old_status' => 'raw', 'new_status' => 'qualified_lead', 'changed_by' => $reviewer->id]);
 });
 
+it('lets a reviewer reassign a lead to a different agent while verifying it', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $originalOwner = User::factory()->create();
+    $newOwner = User::factory()->create();
+    $lead = Lead::factory()->for($originalOwner, 'agent')->create(['status' => 'raw']);
+
+    $this->actingAs($reviewer)->get(route('verification.show', $lead))
+        ->assertInertia(fn (Assert $page) => $page->has('agents', 2));
+
+    $this->actingAs($reviewer)->put(route('verification.update', $lead), [
+        'status' => 'possible_lead',
+        'company_name' => $lead->company_name,
+        'agent_id' => $newOwner->id,
+    ])->assertRedirect();
+
+    expect($lead->refresh()->agent_id)->toBe($newOwner->id);
+});
+
 it('lets administrators search the verification contact workspace', function () {
     $reviewer = User::factory()->subAdministrator()->create();
     $owner = User::factory()->create(['name' => 'North Team Agent']);

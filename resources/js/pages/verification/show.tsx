@@ -117,11 +117,13 @@ export default function VerificationShow({
     previousId,
     nextId,
     reviewers,
+    agents,
 }: {
     lead: Lead;
     previousId: number | null;
     nextId: number | null;
     reviewers: User[];
+    agents: User[];
 }) {
     const copyDetails = async () => {
         const field = (name: string) => {
@@ -237,7 +239,49 @@ export default function VerificationShow({
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                                    <div className="mt-5 grid gap-4 md:grid-cols-3">
+                                        {agents.length > 0 && (
+                                            <div>
+                                                <Label htmlFor="agent_id">
+                                                    Owner
+                                                </Label>
+                                                <Select
+                                                    name="agent_id"
+                                                    defaultValue={String(
+                                                        lead.agent_id ?? '',
+                                                    )}
+                                                >
+                                                    <SelectTrigger
+                                                        id="agent_id"
+                                                        className="mt-2 w-full"
+                                                    >
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {agents.map(
+                                                            (agent) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        agent.id
+                                                                    }
+                                                                    value={String(
+                                                                        agent.id,
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        agent.name
+                                                                    }
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                <InputError
+                                                    className="mt-1"
+                                                    message={errors.agent_id}
+                                                />
+                                            </div>
+                                        )}
                                         <div>
                                             <Label htmlFor="status">
                                                 Classification

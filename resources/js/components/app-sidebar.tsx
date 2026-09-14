@@ -52,6 +52,10 @@ export function AppSidebar() {
         notificationCounts: { unread_email_replies: number };
     }>().props;
     const isSuperAdministrator = auth.user.role === 'super_administrator';
+    // Sub-administrators own possible-lead review specifically, not the raw
+    // lead workspace or bringing new CSVs in - keeping Leads and Upload
+    // Leads off their sidebar keeps it focused on that job.
+    const isSubAdministrator = auth.user.role === 'sub_administrator';
     const navGroups: NavGroup[] = [
         {
             label: 'Overview',
@@ -67,7 +71,9 @@ export function AppSidebar() {
         {
             label: 'Leads',
             items: [
-                { title: 'Leads', href: leadIndex(), icon: Waypoints },
+                ...(isSubAdministrator
+                    ? []
+                    : [{ title: 'Leads', href: leadIndex(), icon: Waypoints }]),
                 // Email Replies is a Super Administrator-only feature; every
                 // other role has it hidden entirely, not just unlinked.
                 ...(isSuperAdministrator
@@ -80,11 +86,15 @@ export function AppSidebar() {
                           },
                       ]
                     : []),
-                {
-                    title: 'Upload Leads',
-                    href: uploadCreate(),
-                    icon: Upload,
-                },
+                ...(isSubAdministrator
+                    ? []
+                    : [
+                          {
+                              title: 'Upload Leads',
+                              href: uploadCreate(),
+                              icon: Upload,
+                          },
+                      ]),
                 {
                     title: 'Upload History',
                     href: uploadIndex(),

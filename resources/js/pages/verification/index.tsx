@@ -54,8 +54,6 @@ type Lead = {
     product_requested: string | null;
     status: string;
     validation_status: string;
-    structured_notes_count: number;
-    attachments_count: number;
     agent: { name: string } | null;
 };
 type Filters = { status: string; search: string; agent_id: string };
@@ -287,7 +285,6 @@ export default function VerificationIndex({
                                 <TableHead>Product requested</TableHead>
                                 <TableHead>Owner</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Activity</TableHead>
                                 <TableHead>
                                     <span className="sr-only">Actions</span>
                                 </TableHead>
@@ -330,10 +327,6 @@ export default function VerificationIndex({
                                     </TableCell>
                                     <TableCell>
                                         <StatusBadge value={lead.status} />
-                                    </TableCell>
-                                    <TableCell className="text-xs text-muted-foreground">
-                                        {lead.structured_notes_count} notes ·{' '}
-                                        {lead.attachments_count} files
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex justify-end gap-2">

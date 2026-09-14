@@ -34,7 +34,6 @@ class VerificationController extends Controller
         $agentId = $filters['agent_id'] ?? null;
         $query = $this->searchQuery($search)
             ->with('agent:id,name')
-            ->withCount(['structuredNotes', 'attachments'])
             ->latest();
         // A search reaches across every lead in the database on its own,
         // ignoring the status tab and agent filter, rather than searching
@@ -119,7 +118,7 @@ class VerificationController extends Controller
         Gate::authorize('view', $lead);
         $lead->load(['agent:id,name', 'uploadBatch:id,batch_code', 'structuredNotes.user:id,name', 'statusHistory.changer:id,name', 'forwardings.forwarder:id,name', 'attachments.uploader:id,name']);
 
-        return Inertia::render('verification/show', ['lead' => $lead, 'previousId' => Lead::query()->where('id', '<', $lead->id)->max('id'), 'nextId' => Lead::query()->where('id', '>', $lead->id)->min('id'), 'reviewers' => User::query()->whereIn('role', [UserRole::SuperAdministrator, UserRole::Administrator, UserRole::SubAdministrator])->where('status', 'active')->get(['id', 'name'])]);
+        return Inertia::render('verification/show', ['lead' => $lead, 'previousId' => Lead::query()->where('id', '<', $lead->id)->max('id'), 'nextId' => Lead::query()->where('id', '>', $lead->id)->min('id'), 'reviewers' => User::query()->whereIn('role', [UserRole::SuperAdministrator, UserRole::Administrator, UserRole::SubAdministrator])->where('status', 'active')->get(['id', 'name']), 'agents' => User::query()->where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name'])]);
     }
 
     public function update(VerifyLeadRequest $request, Lead $lead, LeadVerificationService $service): RedirectResponse
