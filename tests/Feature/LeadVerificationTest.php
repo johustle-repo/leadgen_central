@@ -114,6 +114,17 @@ it('lets a reviewer filter possible leads down to a single agent', function () {
             ->where('filters.agent_id', (string) $agentOne->id));
 });
 
+it('only lists agents, not admin-tier accounts, in the Lead Review agent filter', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $agent = User::factory()->create(['name' => 'Field Agent']);
+    User::factory()->administrator()->create(['name' => 'An Administrator']);
+
+    $this->actingAs($reviewer)->get(route('verification.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('agents', 1)
+            ->where('agents.0.id', $agent->id));
+});
+
 it('lets a sub-administrator save a contact to the possible leads list', function () {
     $reviewer = User::factory()->subAdministrator()->create();
     $lead = Lead::factory()->create(['status' => 'needs_review']);

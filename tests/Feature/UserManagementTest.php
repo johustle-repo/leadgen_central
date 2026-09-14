@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\EmailReply;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\User;
@@ -49,22 +48,33 @@ it('excludes super administrators from the user list', function () {
     $response = $this->actingAs($administrator)->get(route('users.index'));
 
     $response->assertInertia(fn (Assert $page) => $page
-        ->where('users.data', fn ($data) => collect($data)->pluck('name')->doesntContain('Hidden Super Admin')
-            && collect($data)->pluck('name')->contains('Visible Agent')));
+        ->where('administrators.data', fn ($data) => collect($data)->pluck('name')->doesntContain('Hidden Super Admin'))
+        ->where('agents.data', fn ($data) => collect($data)->pluck('name')->contains('Visible Agent')));
 });
 
-it('shows each users total leads and replies', function () {
+it('lists administrators and agents as two separate collections', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create(['created_at' => now()->addMinute()]);
-    $leads = Lead::factory(3)->for($agent, 'agent')->create();
-    EmailReply::factory(2)->for($agent, 'agent')->for($leads->first())->create();
+    Lead::factory(3)->for($agent, 'agent')->create();
 
     $response = $this->actingAs($administrator)->get(route('users.index'));
 
     $response->assertInertia(fn (Assert $page) => $page
-        ->where('users.data.0.id', $agent->id)
-        ->where('users.data.0.leads_count', 3)
-        ->where('users.data.0.email_replies_count', 2));
+        ->where('agents.data.0.id', $agent->id)
+        ->where('agents.data.0.leads_count', 3)
+        ->where('administrators.data', fn ($data) => collect($data)->pluck('id')->contains($administrator->id)));
+});
+
+it('shows each users gmail connection status instead of a reply count', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create();
+    $connection = \App\Models\GmailConnection::factory()->for($agent)->create(['status' => 'error', 'last_error' => 'Token revoked']);
+
+    $response = $this->actingAs($administrator)->get(route('users.index'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('agents.data.0.gmail_status', 'error')
+        ->where('agents.data.0.gmail_error', 'Token revoked'));
 });
 
 it('lets a super administrator clear an agents leads and completed upload history', function () {
@@ -143,10 +153,6 @@ it('forbids agents from deleting users', function () {
 it('allows administrators to switch each users email sequence', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create();
-
-    $this->actingAs($administrator)->get(route('users.index'))
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('users.data.0.email_sequence_enabled', true));
 
     $response = $this->actingAs($administrator)->patch(route('users.email-sequence.toggle', $agent), [
         'is_active' => false,

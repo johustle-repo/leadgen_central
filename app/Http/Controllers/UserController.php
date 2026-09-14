@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
 use App\Services\AgentRecordsCleaner;
 use App\UserRole;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -22,35 +23,71 @@ class UserController extends Controller
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', User::class);
+        $search = $request->string('search')->trim()->toString();
+        $status = $request->string('status')->toString();
+        $role = $request->string('role')->toString();
+
+        // Administrators and agents are shown as two separate lists rather
+        // than one flat table, so the "Role" filter narrows to whichever
+        // list(s) it applies to instead of just filtering rows within one
+        // combined table.
+        $administrators = null;
+        if ($role === '' || in_array($role, [UserRole::Administrator->value, UserRole::SubAdministrator->value], true)) {
+            $adminQuery = $this->baseUserQuery($search, $status)
+                ->whereIn('role', [UserRole::Administrator, UserRole::SubAdministrator]);
+            if ($role !== '') {
+                $adminQuery->where('role', $role);
+            }
+            $administrators = $adminQuery->latest()->paginate(15, pageName: 'admins_page')->withQueryString();
+            $administrators->through(fn (User $user): array => $this->mapUser($request, $user));
+        }
+
+        $agents = null;
+        if ($role === '' || $role === UserRole::Agent->value) {
+            $agents = $this->baseUserQuery($search, $status)
+                ->where('role', UserRole::Agent)
+                ->latest()
+                ->paginate(15, pageName: 'agents_page')
+                ->withQueryString();
+            $agents->through(fn (User $user): array => $this->mapUser($request, $user));
+        }
+
+        return Inertia::render('users/index', ['administrators' => $administrators, 'agents' => $agents, 'filters' => $request->only(['search', 'role', 'status'])]);
+    }
+
+    /** @return Builder<User> */
+    private function baseUserQuery(string $search, string $status): Builder
+    {
         $query = User::query()
             ->select(['id', 'name', 'email', 'role', 'team', 'status', 'created_at'])
             ->where('role', '!=', UserRole::SuperAdministrator)
-            ->with(['emailSequences:id,user_id,is_active'])
-            ->withCount(['leads', 'emailReplies', 'uploadBatches']);
-        if ($search = $request->string('search')->trim()->toString()) {
-            $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
+            ->with('latestGmailConnection')
+            ->withCount(['leads', 'uploadBatches']);
+        if ($search !== '') {
+            $query->where(fn (Builder $q) => $q->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
         }
-        foreach (['role', 'status'] as $filter) {
-            if ($value = $request->string($filter)->toString()) {
-                $query->where($filter, $value);
-            }
+        if ($status !== '') {
+            $query->where('status', $status);
         }
 
-        $users = $query->latest()->paginate(15)->withQueryString();
-        $users->through(fn (User $user): array => [
+        return $query;
+    }
+
+    /** @return array<string, mixed> */
+    private function mapUser(Request $request, User $user): array
+    {
+        $connection = $user->latestGmailConnection;
+
+        return [
             ...$user->only(['id', 'name', 'email', 'role', 'team', 'status', 'created_at']),
             'leads_count' => $user->leads_count,
-            'email_replies_count' => $user->email_replies_count,
             'upload_batches_count' => $user->upload_batches_count,
-            'email_sequence_enabled' => $user->emailSequences->isEmpty()
-                ? true
-                : $user->emailSequences->first()->is_active,
+            'gmail_status' => $connection?->status,
+            'gmail_error' => $connection?->last_error,
             'can_delete' => $request->user()->can('delete', $user),
             'can_impersonate' => $request->user()->can('impersonate', $user),
             'can_clear_records' => $request->user()->can('clearRecords', $user),
-        ]);
-
-        return Inertia::render('users/index', ['users' => $users, 'filters' => $request->only(['search', 'role', 'status'])]);
+        ];
     }
 
     /**

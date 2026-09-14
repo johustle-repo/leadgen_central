@@ -3,7 +3,6 @@ import { usePage, usePoll } from '@inertiajs/react';
 import {
     CalendarClock,
     ChartNoAxesCombined,
-    ClipboardList,
     FileClock,
     LayoutGrid,
     MailSearch,
@@ -32,7 +31,6 @@ import {
     scanner as attendanceScanner,
     summary as attendanceSummary,
 } from '@/routes/attendance';
-import { index as auditLogIndex } from '@/routes/audit-logs';
 import { index as emailReplyIndex } from '@/routes/email-replies';
 import { index as leadIndex } from '@/routes/leads';
 import { index as reportIndex } from '@/routes/report';
@@ -116,14 +114,7 @@ export function AppSidebar() {
     if (isAdministratorRole(auth.user.role)) {
         navGroups.push({
             label: 'Administration',
-            items: [
-                { title: 'Users', href: userIndex(), icon: Users },
-                {
-                    title: 'Audit Logs',
-                    href: auditLogIndex(),
-                    icon: ClipboardList,
-                },
-            ],
+            items: [{ title: 'Users', href: userIndex(), icon: Users }],
         });
     }
 

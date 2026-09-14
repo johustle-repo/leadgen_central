@@ -57,7 +57,7 @@ class VerificationController extends Controller
             'leads' => $query->paginate(20)->withQueryString(),
             'filters' => ['status' => $search === '' ? $status : '', 'search' => $search, 'agent_id' => $search === '' && $agentId ? (string) $agentId : ''],
             'summary' => $summary,
-            'agents' => $request->user()->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [],
+            'agents' => $request->user()->canViewAllLeads() ? User::query()->where('role', UserRole::Agent)->orderBy('name')->get(['id', 'name']) : [],
         ]);
     }
 
