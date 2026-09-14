@@ -246,7 +246,9 @@ export default function VerificationShow({
                                             <div
                                                 key={name}
                                                 className={
-                                                    name === 'address'
+                                                    name === 'address' ||
+                                                    name ===
+                                                        'product_requested'
                                                         ? 'md:col-span-2'
                                                         : ''
                                                 }
