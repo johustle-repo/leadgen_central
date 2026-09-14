@@ -18,6 +18,19 @@ it('lets a sub-administrator classify a lead and records status history', functi
     $this->assertDatabaseHas('lead_status_histories', ['lead_id' => $lead->id, 'old_status' => 'raw', 'new_status' => 'qualified_lead', 'changed_by' => $reviewer->id]);
 });
 
+it('lets a reviewer record the date a possible lead replied in Reply.io', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $lead = Lead::factory()->create(['status' => 'possible_lead', 'replied_at' => null]);
+
+    $this->actingAs($reviewer)->put(route('verification.update', $lead), [
+        'status' => 'possible_lead',
+        'company_name' => $lead->company_name,
+        'replied_at' => '2026-09-14',
+    ])->assertRedirect();
+
+    expect($lead->refresh()->replied_at?->toDateString())->toBe('2026-09-14');
+});
+
 it('lets a reviewer reassign a lead to a different agent while verifying it', function () {
     $reviewer = User::factory()->subAdministrator()->create();
     $originalOwner = User::factory()->create();

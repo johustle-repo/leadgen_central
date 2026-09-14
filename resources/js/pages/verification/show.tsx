@@ -275,7 +275,7 @@ export default function VerificationShow({
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="mt-5 grid gap-4 md:grid-cols-3">
+                                    <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                                         {agents.length > 0 && (
                                             <div>
                                                 <Label htmlFor="agent_id">
@@ -350,6 +350,24 @@ export default function VerificationShow({
                                                     </SelectItem>
                                                 </SelectContent>
                                             </Select>
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="replied_at">
+                                                Date Replied (Reply.io)
+                                            </Label>
+                                            <Input
+                                                id="replied_at"
+                                                name="replied_at"
+                                                type="date"
+                                                defaultValue={String(
+                                                    lead.replied_at ?? '',
+                                                ).slice(0, 10)}
+                                                className="mt-2"
+                                            />
+                                            <InputError
+                                                className="mt-1"
+                                                message={errors.replied_at}
+                                            />
                                         </div>
                                         <div>
                                             <Label htmlFor="remarks">
