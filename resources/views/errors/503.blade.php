@@ -1,74 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="refresh" content="30">
     <title>Maintenance — LeadGen Central</title>
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-        }
-        body {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            background: #07111f;
-            color: #e2e8f0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
-        .card {
-            max-width: 26rem;
-            text-align: center;
-        }
-        img {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 20px;
-        }
-        h1 {
-            font-size: 1.375rem;
-            font-weight: 600;
-            margin: 0 0 10px;
-            color: #ffffff;
-        }
-        p {
-            font-size: 0.9375rem;
-            line-height: 1.6;
-            color: #94a3b8;
-            margin: 0;
-        }
-        .retry {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 24px;
-            font-size: 0.8125rem;
-            color: #67e8f9;
-        }
-        .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 999px;
-            background: #67e8f9;
-            animation: pulse 1.4s ease-in-out infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 1; }
-        }
-    </style>
+    @vite(['resources/css/app.css'])
 </head>
-<body>
-    <div class="card">
-        <img src="/logo.png" alt="LeadGen Central">
-        <h1>We'll be right back</h1>
-        <p>LeadGen Central is undergoing brief scheduled maintenance. This usually only takes a few minutes — this page will refresh automatically.</p>
-        <div class="retry">
-            <span class="dot"></span>
-            Checking again shortly&hellip;
+<body class="bg-[#07111f] font-sans text-white antialiased">
+    <div class="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-10">
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,.16),transparent_35%),radial-gradient(circle_at_85%_85%,rgba(99,102,241,.16),transparent_32%)]"></div>
+        <div class="pointer-events-none absolute inset-0 [background-image:linear-gradient(rgba(148,163,184,.10)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,.10)_1px,transparent_1px)] [background-size:52px_52px] opacity-25"></div>
+
+        <div class="relative w-full max-w-md">
+            <div class="rounded-3xl border border-white/10 bg-white/[.045] p-8 text-center shadow-2xl shadow-black/40 sm:p-10">
+                <div class="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                    <img src="/logo.png" alt="LeadGen Central" class="size-11 object-contain">
+                </div>
+
+                <div class="mb-5 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/8 px-3 py-1.5 text-xs font-medium text-cyan-200">
+                    <span class="relative flex size-1.5">
+                        <span class="absolute inline-flex size-full animate-ping rounded-full bg-cyan-300 opacity-75"></span>
+                        <span class="relative inline-flex size-1.5 rounded-full bg-cyan-300"></span>
+                    </span>
+                    Scheduled maintenance
+                </div>
+
+                <h1 class="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                    We&rsquo;ll be right back
+                </h1>
+                <p class="mt-3 text-sm leading-6 text-slate-400">
+                    LeadGen Central is undergoing brief maintenance. This
+                    usually only takes a few minutes &mdash; this page checks
+                    again automatically, no need to refresh.
+                </p>
+            </div>
+
+            <p class="mt-6 text-center text-xs tracking-wide text-slate-500 uppercase">
+                LeadGen Central &middot; Lead Operations
+            </p>
         </div>
     </div>
 </body>
