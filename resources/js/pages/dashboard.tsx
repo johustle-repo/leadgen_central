@@ -17,6 +17,7 @@ import {
     percent,
     summarize,
 } from '@/components/database-charts';
+import { HeaderActionsPortal } from '@/components/header-actions';
 import { Section } from '@/components/report-section';
 import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
@@ -132,6 +133,83 @@ export default function Dashboard({
     return (
         <>
             <Head title="Database dashboard" />
+            <HeaderActionsPortal>
+                <form
+                    onSubmit={applyPeriod}
+                    className="flex flex-wrap items-center gap-2"
+                    aria-busy={processing}
+                >
+                    <Select
+                        value={selectedPeriod}
+                        onValueChange={setSelectedPeriod}
+                    >
+                        <SelectTrigger
+                            id="dashboard-period"
+                            size="sm"
+                            className="w-36"
+                            aria-label="Reporting period"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {Object.entries(PERIODS).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {isCustom && (
+                        <>
+                            <Input
+                                key={`from-${filters.date_from}`}
+                                id="date-from"
+                                name="date_from"
+                                type="date"
+                                aria-label="From date"
+                                defaultValue={filters.date_from}
+                                required={isCustom}
+                                className="h-8 w-36"
+                            />
+                            <Input
+                                key={`to-${filters.date_to}`}
+                                id="date-to"
+                                name="date_to"
+                                type="date"
+                                aria-label="To date"
+                                defaultValue={filters.date_to}
+                                required={isCustom}
+                                className="h-8 w-36"
+                            />
+                        </>
+                    )}
+                    <Select
+                        value={granularity}
+                        onValueChange={(value) =>
+                            setGranularity(value as typeof granularity)
+                        }
+                    >
+                        <SelectTrigger
+                            id="growth-interval"
+                            size="sm"
+                            className="w-28"
+                            aria-label="Growth interval"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {['day', 'week', 'month'].map((value) => (
+                                <SelectItem key={value} value={value}>
+                                    {formatLabel(value)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button type="submit" size="sm" disabled={processing}>
+                        {processing ? 'Updating…' : 'Apply'}
+                    </Button>
+                </form>
+            </HeaderActionsPortal>
             <div className="flex min-w-0 flex-1 flex-col gap-8 p-4 md:p-6">
                 <header className="flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -147,126 +225,22 @@ export default function Dashboard({
                                 ? 'Your records only'
                                 : 'All-owner database scope'}
                         </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Showing {selectedLabel} · {data.timezone}.
+                            Comparisons use the preceding equal-length period:{' '}
+                            {previousLabel}. Custom ranges support up to ten
+                            years.
+                        </p>
+                        {Object.keys(errors).length > 0 && (
+                            <p
+                                role="alert"
+                                className="mt-2 text-sm text-destructive"
+                            >
+                                {Object.values(errors).join(' ')}
+                            </p>
+                        )}
                     </div>
                 </header>
-
-                <form
-                    onSubmit={applyPeriod}
-                    className="rounded-xl border bg-card p-4"
-                    aria-busy={processing}
-                >
-                    <div className="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                        <div className="space-y-1.5">
-                            <label
-                                htmlFor="dashboard-period"
-                                className="text-xs font-medium"
-                            >
-                                Reporting period
-                            </label>
-                            <Select
-                                value={selectedPeriod}
-                                onValueChange={setSelectedPeriod}
-                            >
-                                <SelectTrigger
-                                    id="dashboard-period"
-                                    className="w-full"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Object.entries(PERIODS).map(
-                                        ([value, label]) => (
-                                            <SelectItem
-                                                key={value}
-                                                value={value}
-                                            >
-                                                {label}
-                                            </SelectItem>
-                                        ),
-                                    )}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-1.5">
-                            <label
-                                htmlFor="date-from"
-                                className="text-xs font-medium"
-                            >
-                                From
-                            </label>
-                            <Input
-                                key={`from-${filters.date_from}`}
-                                id="date-from"
-                                name="date_from"
-                                type="date"
-                                defaultValue={filters.date_from}
-                                disabled={!isCustom}
-                                required={isCustom}
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label
-                                htmlFor="date-to"
-                                className="text-xs font-medium"
-                            >
-                                To
-                            </label>
-                            <Input
-                                key={`to-${filters.date_to}`}
-                                id="date-to"
-                                name="date_to"
-                                type="date"
-                                defaultValue={filters.date_to}
-                                disabled={!isCustom}
-                                required={isCustom}
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label
-                                htmlFor="growth-interval"
-                                className="text-xs font-medium"
-                            >
-                                Growth interval
-                            </label>
-                            <Select
-                                value={granularity}
-                                onValueChange={(value) =>
-                                    setGranularity(value as typeof granularity)
-                                }
-                            >
-                                <SelectTrigger
-                                    id="growth-interval"
-                                    className="w-full"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {['day', 'week', 'month'].map((value) => (
-                                        <SelectItem key={value} value={value}>
-                                            {formatLabel(value)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Updating…' : 'Apply period'}
-                        </Button>
-                    </div>
-                    {Object.keys(errors).length > 0 && (
-                        <div
-                            role="alert"
-                            className="mt-3 text-sm text-destructive"
-                        >
-                            {Object.values(errors).join(' ')}
-                        </div>
-                    )}
-                    <p className="mt-3 text-xs text-muted-foreground">
-                        Showing {selectedLabel} · {data.timezone}. Comparisons
-                        use the preceding equal-length period: {previousLabel}.
-                        Custom ranges support up to ten years.
-                    </p>
-                </form>
 
                 <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-4">
                     <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
