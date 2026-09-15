@@ -150,6 +150,68 @@ const formatApStyleDate = (value: string) => {
     return `${AP_STYLE_MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 };
 
+/**
+ * Owns its own Select state, keyed by lead id at the call site: Inertia
+ * re-renders this same page component in place (rather than remounting it)
+ * when navigating to a different lead via Next/Previous, so a plain
+ * useState here would keep showing the previous lead's country and, if
+ * saved without being touched, silently wipe the new lead's country and
+ * country_code.
+ */
+function CountryField({
+    lead,
+    errors,
+}: {
+    lead: Lead;
+    errors: Record<string, string | undefined>;
+}) {
+    const initialCountryCode = String(lead.country_code ?? '').toUpperCase();
+    const [countryCode, setCountryCode] = useState(
+        COUNTRY_CAPITALS[initialCountryCode]
+            ? initialCountryCode
+            : SELECT_COUNTRY,
+    );
+
+    return (
+        <div>
+            <Label htmlFor="country">Country</Label>
+            <input
+                type="hidden"
+                name="country"
+                value={
+                    countryCode === SELECT_COUNTRY
+                        ? ''
+                        : COUNTRY_CAPITALS[countryCode].name
+                }
+            />
+            <input
+                type="hidden"
+                name="country_code"
+                value={countryCode === SELECT_COUNTRY ? '' : countryCode}
+            />
+            <Select value={countryCode} onValueChange={setCountryCode}>
+                <SelectTrigger id="country" className="mt-2 w-full">
+                    <SelectValue placeholder="Select a country" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value={SELECT_COUNTRY}>
+                        Select a country
+                    </SelectItem>
+                    {COUNTRY_OPTIONS.map(({ code, name }) => (
+                        <SelectItem key={code} value={code}>
+                            {name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">
+                Country code is set automatically from this selection.
+            </p>
+            <InputError className="mt-1" message={errors.country} />
+        </div>
+    );
+}
+
 export default function VerificationShow({
     lead,
     previousId,
@@ -163,12 +225,6 @@ export default function VerificationShow({
     reviewers: User[];
     agents: User[];
 }) {
-    const initialCountryCode = String(lead.country_code ?? '').toUpperCase();
-    const [countryCode, setCountryCode] = useState(
-        COUNTRY_CAPITALS[initialCountryCode]
-            ? initialCountryCode
-            : SELECT_COUNTRY,
-    );
 
     const copyDetails = async () => {
         const field = (name: string) => {
@@ -240,7 +296,7 @@ export default function VerificationShow({
                     )}
                 </HeaderActionsPortal>
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-                    <Form {...update.form(lead.id)}>
+                    <Form key={lead.id} {...update.form(lead.id)}>
                         {({ errors, processing }) => (
                             <Card>
                                 <CardHeader className="flex-row items-center justify-between">
@@ -279,70 +335,10 @@ export default function VerificationShow({
                                                 </div>
                                             ),
                                         )}
-                                        <div>
-                                            <Label htmlFor="country">
-                                                Country
-                                            </Label>
-                                            <input
-                                                type="hidden"
-                                                name="country"
-                                                value={
-                                                    countryCode ===
-                                                    SELECT_COUNTRY
-                                                        ? ''
-                                                        : COUNTRY_CAPITALS[
-                                                              countryCode
-                                                          ].name
-                                                }
-                                            />
-                                            <input
-                                                type="hidden"
-                                                name="country_code"
-                                                value={
-                                                    countryCode ===
-                                                    SELECT_COUNTRY
-                                                        ? ''
-                                                        : countryCode
-                                                }
-                                            />
-                                            <Select
-                                                value={countryCode}
-                                                onValueChange={setCountryCode}
-                                            >
-                                                <SelectTrigger
-                                                    id="country"
-                                                    className="mt-2 w-full"
-                                                >
-                                                    <SelectValue placeholder="Select a country" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem
-                                                        value={SELECT_COUNTRY}
-                                                    >
-                                                        Select a country
-                                                    </SelectItem>
-                                                    {COUNTRY_OPTIONS.map(
-                                                        ({ code, name }) => (
-                                                            <SelectItem
-                                                                key={code}
-                                                                value={code}
-                                                            >
-                                                                {name}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                Country code is set
-                                                automatically from this
-                                                selection.
-                                            </p>
-                                            <InputError
-                                                className="mt-1"
-                                                message={errors.country}
-                                            />
-                                        </div>
+                                        <CountryField
+                                            lead={lead}
+                                            errors={errors}
+                                        />
                                         {fieldsAfterCountry.map(
                                             ([name, label]) => (
                                                 <div key={name}>
