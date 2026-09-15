@@ -182,7 +182,7 @@ export default function VerificationIndex({
                     icon={SlidersHorizontal}
                     label="Filters"
                     gridClassName="grid-cols-1"
-                    hint="Search matches contact, email, company, phone, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of the status tab and agent filter below."
+                    hint="Search matches contact, email, company, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of the status tab and agent filter below."
                 >
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -207,7 +207,7 @@ export default function VerificationIndex({
                                             searchAllLeads();
                                         }
                                     }}
-                                    placeholder="Search contact, email, company, phone, location, owner, or lead code..."
+                                    placeholder="Search contact, email, company, location, owner, or lead code..."
                                     className="pr-24 pl-9"
                                 />
                                 <Button

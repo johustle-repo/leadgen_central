@@ -268,7 +268,7 @@ export default function LeadsIndex({
                     icon={SlidersHorizontal}
                     label="Filters"
                     gridClassName="sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]"
-                    hint="Search matches company, contact, email, phone, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of every other filter below."
+                    hint="Search matches company, contact, email, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of every other filter below."
                 >
                     <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
                         <label
