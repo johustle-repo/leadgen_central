@@ -396,15 +396,7 @@ export default function LeadForm({
                                                     isCreating);
 
                                             return (
-                                                <div
-                                                    key={field.name}
-                                                    className={
-                                                        field.name ===
-                                                        'source_url'
-                                                            ? 'md:col-span-2'
-                                                            : ''
-                                                    }
-                                                >
+                                                <div key={field.name}>
                                                     {field.name !==
                                                         'company_name' && (
                                                         <Label
