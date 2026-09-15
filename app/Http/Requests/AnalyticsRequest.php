@@ -25,8 +25,6 @@ class AnalyticsRequest extends DashboardRequest
         return [
             ...parent::rules(),
             'period' => ['nullable', Rule::in(['today', 'week', 'last_week', 'month', 'last_month', '30_days', 'quarter', 'custom', '7_days', '90_days'])],
-            'geo_country' => ['nullable', 'string', 'max:255'],
-            'geo_province' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

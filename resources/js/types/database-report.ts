@@ -38,15 +38,9 @@ export type DatabaseReport = Omit<
     industry_coverage: number | null;
     show_industries: boolean;
     geographic_detail: {
-        filters: {
-            geo_country: string;
-            geo_province: string;
-        };
         records: number;
         rows: Array<{
             country: string;
-            province: string;
-            timezone: string;
             records: number;
         }>;
     };

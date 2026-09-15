@@ -181,7 +181,6 @@ export default function Analytics({
         period,
         ...filters,
         granularity: data.growth.granularity,
-        ...data.geographic_detail.filters,
     };
     const qualitySeries = [
         'duplicates',
@@ -209,17 +208,6 @@ export default function Analytics({
                 onStart: () => setProcessing(true),
                 onFinish: () => setProcessing(false),
             },
-        );
-    }
-    function drill(country = '', province = '') {
-        router.get(
-            reportIndex.url(),
-            {
-                ...appliedQuery,
-                geo_country: country,
-                geo_province: province,
-            },
-            { preserveScroll: true },
         );
     }
     const geo = data.geographic_detail;
@@ -815,72 +803,27 @@ export default function Analytics({
                 </Section>
                 <Section
                     title="Geographic analysis"
-                    note="Selected period · click a country, then a state/province, to narrow the location combinations. When a state/province isn't on file, its country's reference capital is shown instead."
+                    note="Selected period · total leads by country."
                 >
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <button
-                            className="text-primary hover:underline"
-                            onClick={() => drill()}
-                        >
-                            All locations
-                        </button>
-                        {geo.filters.geo_country && (
-                            <>
-                                <span>→</span>
-                                <button
-                                    className="text-primary hover:underline"
-                                    onClick={() =>
-                                        drill(geo.filters.geo_country)
-                                    }
-                                >
-                                    {countryName(geo.filters.geo_country)}
-                                </button>
-                            </>
-                        )}
-                        {geo.filters.geo_province && (
-                            <>
-                                <span>→</span>
-                                <span>{geo.filters.geo_province}</span>
-                            </>
-                        )}
-                    </div>
                     <p className="text-xs text-muted-foreground">
-                        Top 50 combinations · {geo.records.toLocaleString()}{' '}
-                        matching records. Drill-down filters affect this section
-                        only.
+                        Top 50 countries · {geo.records.toLocaleString()}{' '}
+                        matching records.
                     </p>
                     <ReportTable
-                        headings={[
-                            'Country',
-                            'State/Capital',
-                            'Timezone',
-                            'Records',
-                        ]}
+                        headings={['Country', 'Records']}
                         rows={geo.rows.map((row) => [
-                            <button
-                                className="text-primary hover:underline"
-                                onClick={() => drill(row.country)}
-                            >
-                                {countryName(row.country)}
-                            </button>,
-                            <button
-                                className="text-primary hover:underline"
-                                onClick={() => drill(row.country, row.province)}
-                            >
-                                {row.province}
-                            </button>,
-                            row.timezone,
+                            countryName(row.country),
                             row.records,
                         ])}
                     />
                     <DistributionChart
-                        title="Top locations by records"
+                        title="Top countries by records"
                         rows={geo.rows.slice(0, 15).map((row) => ({
-                            label: `${row.province} — ${countryName(row.country)}`,
+                            label: countryName(row.country),
                             value: row.records,
                             percent: sharePercent(row.records, geo.records),
                         }))}
-                        description="Top 15 of the combinations above · share of records matching the current drill-down."
+                        description="Top 15 countries above · share of matching records."
                     />
                 </Section>
                 {data.can_compare_agents && (

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Country;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\UploadRow;
@@ -18,27 +17,13 @@ class DatabaseIntelligenceReport
     private const COMPANY = "COALESCE(NULLIF(LOWER(TRIM(normalized_company_name)), ''), NULLIF(LOWER(TRIM(company_name)), ''))";
 
     /**
-     * Some imported sources only ever supplied state/province-level location
-     * data and that value ended up in the city column with no state_province
-     * on file. Left alone, the Geographic analysis report shows the state as
-     * a "city" next to an "Unknown" state/province, which reads as a bug.
-     * Reclassify those values as the state/province instead.
-     *
-     * @var array<string, list<string>>
-     */
-    private const REGION_NAMES_BY_COUNTRY = [
-        'US' => ['alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware', 'district of columbia', 'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi', 'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey', 'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio', 'oklahoma', 'oregon', 'pennsylvania', 'rhode island', 'south carolina', 'south dakota', 'tennessee', 'texas', 'utah', 'vermont', 'virginia', 'washington', 'west virginia', 'wisconsin', 'wyoming'],
-        'CA' => ['alberta', 'british columbia', 'manitoba', 'new brunswick', 'newfoundland and labrador', 'northwest territories', 'nova scotia', 'nunavut', 'ontario', 'prince edward island', 'quebec', 'saskatchewan', 'yukon'],
-    ];
-
-    /**
      * Some imported sources spell a country name differently than the
      * canonical name on file (e.g. "United States" vs. our "United States
      * of America", or "Republic of Ireland" vs. our "Ireland"). With no
-     * country_code and no exact name match, the Geographic analysis report
-     * can't resolve a timezone and shows "Unknown" for a country we can
-     * plainly identify. Map the common variants to their ISO2 code so the
-     * same timezone/capital lookup used for a matched country still applies.
+     * country_code and no exact name match, that record would count as a
+     * separate "country" in the Geographic analysis totals instead of
+     * folding into the country it actually belongs to. Map the common
+     * variants to their ISO2 code so it groups correctly.
      *
      * @var array<string, string>
      */
@@ -107,7 +92,7 @@ class DatabaseIntelligenceReport
         $knownIndustry = (clone $leads)->whereNotNull('industry')->whereRaw("LOWER(TRIM(industry)) NOT IN ('', 'unknown', 'n/a')")->count();
         $data['industry_coverage'] = $this->rate($knownIndustry, $data['overview']['records']);
         $data['show_industries'] = $knownIndustry > 0 && $data['industry_coverage'] >= 20;
-        $data['geographic_detail'] = $this->geography($leads, $filters);
+        $data['geographic_detail'] = $this->geography($leads);
         $data['contribution'] = $user->isAdministrator() ? $this->contribution($leads, $batches, $rows) : [];
 
         return $data;
@@ -129,7 +114,7 @@ class DatabaseIntelligenceReport
             'Top companies by contact records' => [['Company', 'Contact records', 'Unique emails'], ...array_map(fn (array $row): array => [$row['label'], $row['contacts'], $row['emails']], $data['companies'])],
             'Upload quality - selected-period batches' => [['Metric', 'Value'], ['Submitted rows (batch totals)', $quality['submitted_rows']], ['Observed rows', $quality['observed_rows']], ['Processed rows', $quality['processed']], ['Accepted including review', $quality['accepted']], ['Needs review', $quality['needs_review']], ['Duplicates', $quality['duplicates']], ['Rejected', $quality['rejected']], ['Processing errors', $quality['errors']], ['Location issues', $quality['location_issues']], ['Average batch size', $quality['average_batch_size'] ?? 'N/A'], ['Acceptance rate', $rate($quality['accepted_rate'])], ['Duplicate rate', $rate($quality['duplicates_rate'])], ['Rejection rate', $rate($quality['rejected_rate'])], ['Error rate', $rate($quality['errors_rate'])]],
             'Source quality - selected period' => [['Source', 'Records', 'Processed rows', 'Accepted rows', 'Duplicate rate', 'Rejection rate', 'Error rate'], ...array_map(fn (array $row): array => [$row['label'], $row['records'], $row['processed'], $row['accepted'], $rate($row['duplicates_rate']), $rate($row['rejected_rate']), $rate($row['errors_rate'])], $data['source_quality'])],
-            'Geographic analysis - selected period and location filters' => [['Country code or label', 'State/Capital', 'Timezone', 'Records'], ...array_map(fn (array $row): array => [$row['country'], $row['province'], $row['timezone'], $row['records']], $data['geographic_detail']['rows'])],
+            'Geographic analysis - selected period' => [['Country code or label', 'Records'], ...array_map(fn (array $row): array => [$row['country'], $row['records']], $data['geographic_detail']['rows'])],
             'Metric definitions' => [['Definition'], ['Period metrics exclude soft-deleted leads. Emails are addresses, not verified people. Repeated company names are not automatically duplicates.'], ['Quality categories overlap. Rates exclude pending rows. Source outcomes use import snapshots; missing snapshots are Unknown. Current lead sources and import outcomes are distinct populations.'], ['Data quality rate is accepted rows without recorded issues divided by processed rows. Location flags may be incomplete. Geography preserves historical labels.']],
         ];
         if ($data['can_compare_agents']) {
@@ -237,26 +222,10 @@ class DatabaseIntelligenceReport
     }
 
     /** @param Builder<Lead> $leads
-     * @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
-    private function geography(Builder $leads, array $filters): array
+    private function geography(Builder $leads): array
     {
-        $regionCases = '';
-        $bindings = [];
-        foreach (self::REGION_NAMES_BY_COUNTRY as $countryCode => $regionNames) {
-            $placeholders = implode(',', array_fill(0, count($regionNames), '?'));
-            $regionCases .= "WHEN UPPER(TRIM(country_code)) = '{$countryCode}' AND LOWER(TRIM(city)) IN ({$placeholders}) THEN TRIM(city) ";
-            array_push($bindings, ...$regionNames);
-        }
-        $misclassifiedRegion = "CASE WHEN NULLIF(TRIM(state_province), '') IS NULL THEN (CASE {$regionCases} END) END";
-
-        // Some imported sources never filled in country_code, only the full
-        // country name (e.g. "United States"). Left alone, that name fails
-        // to match the code-keyed timezone reference table below and the
-        // row shows "Unknown" for a country we can plainly identify. Match
-        // it against the known countries by name first, then against common
-        // spelling variants, to recover the ISO2 code.
         $aliasCase = '';
         $aliasBindings = [];
         foreach (self::COUNTRY_NAME_ALIASES as $alias => $iso2) {
@@ -268,41 +237,16 @@ class DatabaseIntelligenceReport
             ->leftJoin('countries', function ($join) {
                 $join->on('countries.normalized_name', '=', DB::raw('LOWER(TRIM(leads.country))'));
             })
-            ->selectRaw("COALESCE(NULLIF(UPPER(TRIM(leads.country_code)), ''), countries.iso2, CASE LOWER(TRIM(leads.country)) {$aliasCase} END, NULLIF(LOWER(TRIM(leads.country)), ''), 'Unknown') as country,
-            COALESCE({$misclassifiedRegion}, NULLIF(TRIM(leads.state_province), ''), 'Unknown') as province", [...$aliasBindings, ...$bindings])->toBase();
+            ->selectRaw("COALESCE(NULLIF(UPPER(TRIM(leads.country_code)), ''), countries.iso2, CASE LOWER(TRIM(leads.country)) {$aliasCase} END, NULLIF(LOWER(TRIM(leads.country)), ''), 'Unknown') as country", $aliasBindings)
+            ->toBase();
+
         $query = DB::query()->fromSub($projection, 'locations');
-        $selection = [];
-        foreach (['country', 'province'] as $key) {
-            $selection['geo_'.$key] = $filters['geo_'.$key] ?? '';
-            if ($selection['geo_'.$key] !== '') {
-                $query->where('locations.'.$key, $selection['geo_'.$key]);
-            }
-        }
         $total = (clone $query)->count();
-        $groups = $query->select('locations.country', 'locations.province')
-            ->selectRaw('COUNT(*) as records')->groupBy('locations.country', 'locations.province')
-            ->orderByDesc('records')->orderBy('country')->orderBy('province')->limit(50)->get();
+        $rows = $query->select('locations.country')->selectRaw('COUNT(*) as records')
+            ->groupBy('locations.country')->orderByDesc('records')->orderBy('country')->limit(50)->get()
+            ->map(fn (object $row): array => ['country' => (string) $row->country, 'records' => (int) $row->records])->all();
 
-        $references = app(TimezoneReferenceResolver::class)->resolveManyByCountryCode($groups->pluck('country'));
-        $timezonesByReferenceCode = Country::query()
-            ->whereIn('iso2', collect($references)->filter()->pluck('reference_country_code')->unique()->values())
-            ->pluck('default_timezone', 'iso2');
-
-        $rows = $groups->map(function (object $row) use ($references, $timezonesByReferenceCode): array {
-            $country = (string) $row->country;
-            $reference = $references[strtoupper(trim($country))] ?? null;
-            $timezone = $reference !== null ? ($timezonesByReferenceCode[$reference->reference_country_code] ?? 'Unknown') : 'Unknown';
-            $capital = $reference !== null ? $reference->reference_capital : null;
-
-            return [
-                'country' => $country,
-                'province' => $row->province === 'Unknown' ? ($capital ?? 'Unknown') : (string) $row->province,
-                'timezone' => $timezone,
-                'records' => (int) $row->records,
-            ];
-        })->all();
-
-        return ['filters' => $selection, 'records' => $total, 'rows' => $rows];
+        return ['records' => $total, 'rows' => $rows];
     }
 
     private function rate(int $value, int $total): ?float

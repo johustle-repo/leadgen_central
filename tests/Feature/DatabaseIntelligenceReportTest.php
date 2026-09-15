@@ -117,7 +117,7 @@ test('industries panel is hidden below twenty percent coverage and shown once pa
         ->where('databaseReport.show_industries', true));
 });
 
-test('geographic drill-down narrows rows and records to the requested country and province', function () {
+test('geographic analysis groups leads by country and totals records', function () {
     $user = User::factory()->create();
     Lead::factory()->for($user, 'agent')->create(['country_code' => 'PH', 'country' => 'Philippines', 'state_province' => 'Metro Manila', 'city' => 'Manila']);
     Lead::factory()->for($user, 'agent')->create(['country_code' => 'PH', 'country' => 'Philippines', 'state_province' => 'Cebu', 'city' => 'Cebu City']);
@@ -125,49 +125,20 @@ test('geographic drill-down narrows rows and records to the requested country an
 
     $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('databaseReport.geographic_detail.records', 3)
-        ->has('databaseReport.geographic_detail.rows', 3));
-
-    $this->actingAs($user)->get(route('report.index', ['geo_country' => 'PH']))->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('databaseReport.geographic_detail.filters.geo_country', 'PH')
-        ->where('databaseReport.geographic_detail.records', 2)
-        ->has('databaseReport.geographic_detail.rows', 2));
-
-    $this->actingAs($user)->get(route('report.index', ['geo_country' => 'PH', 'geo_province' => 'Cebu']))->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('databaseReport.geographic_detail.records', 1)
-        ->where('databaseReport.geographic_detail.rows.0.province', 'Cebu'));
+        ->has('databaseReport.geographic_detail.rows', 2)
+        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->firstWhere('country', 'PH')['records'] === 2
+            && collect($rows)->firstWhere('country', 'US')['records'] === 1));
 });
 
-test('a state or province name stored in the city column is reclassified as the state/province', function () {
+test('a country name that does not exactly match the canonical spelling still folds into the right country total', function () {
     $user = User::factory()->create();
-    Lead::factory()->for($user, 'agent')->create(['country_code' => 'US', 'country' => 'United States', 'state_province' => null, 'city' => 'Texas']);
-    Lead::factory()->for($user, 'agent')->create(['country_code' => 'CA', 'country' => 'Canada', 'state_province' => null, 'city' => 'Ontario']);
-    Lead::factory()->for($user, 'agent')->create(['country_code' => 'US', 'country' => 'United States', 'state_province' => 'California', 'city' => 'Los Angeles']);
+    Lead::factory()->for($user, 'agent')->create(['country_code' => 'US', 'country' => 'United States']);
+    Lead::factory()->for($user, 'agent')->create(['country_code' => null, 'country' => 'United States']);
+    Lead::factory()->for($user, 'agent')->create(['country_code' => null, 'country' => 'Republic of Ireland']);
 
     $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->contains(fn ($row) => $row['country'] === 'US' && $row['province'] === 'Texas')
-            && collect($rows)->contains(fn ($row) => $row['country'] === 'CA' && $row['province'] === 'Ontario')
-            && collect($rows)->contains(fn ($row) => $row['country'] === 'US' && $row['province'] === 'California')));
-});
-
-test('a country name that does not exactly match the canonical name still resolves a timezone', function () {
-    \App\Models\Country::factory()->create(['iso2' => 'US', 'default_timezone' => 'America/New_York']);
-    \App\Models\Country::factory()->create(['iso2' => 'FR', 'default_timezone' => 'Europe/Paris']);
-    $user = User::factory()->create();
-    Lead::factory()->for($user, 'agent')->create(['country_code' => null, 'country' => 'United States', 'state_province' => 'Texas', 'city' => null]);
-    Lead::factory()->for($user, 'agent')->create(['country_code' => null, 'country' => 'Republic of Ireland', 'state_province' => null, 'city' => null]);
-
-    $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->contains(fn ($row) => $row['country'] === 'US' && $row['province'] === 'Texas' && $row['timezone'] === 'America/New_York')
-            && collect($rows)->contains(fn ($row) => $row['country'] === 'IE' && $row['timezone'] === 'Europe/Paris')));
-});
-
-test('a state/province left unknown falls back to the country\'s data-cleaning reference capital', function () {
-    \App\Models\Country::factory()->create(['iso2' => 'US', 'default_timezone' => 'America/New_York']);
-    $user = User::factory()->create();
-    Lead::factory()->for($user, 'agent')->create(['country_code' => 'US', 'country' => 'United States', 'state_province' => null, 'city' => null]);
-
-    $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->contains(fn ($row) => $row['country'] === 'US' && $row['province'] === 'New York' && $row['timezone'] === 'America/New_York')));
+        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->firstWhere('country', 'US')['records'] === 2
+            && collect($rows)->firstWhere('country', 'IE')['records'] === 1));
 });
 
 test('contribution by agent is visible only to administrators and super administrators', function (string $role, bool $visible) {
