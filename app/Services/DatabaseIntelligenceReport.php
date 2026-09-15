@@ -31,6 +31,36 @@ class DatabaseIntelligenceReport
         'CA' => ['alberta', 'british columbia', 'manitoba', 'new brunswick', 'newfoundland and labrador', 'northwest territories', 'nova scotia', 'nunavut', 'ontario', 'prince edward island', 'quebec', 'saskatchewan', 'yukon'],
     ];
 
+    /**
+     * Some imported sources spell a country name differently than the
+     * canonical name on file (e.g. "United States" vs. our "United States
+     * of America", or "Republic of Ireland" vs. our "Ireland"). With no
+     * country_code and no exact name match, the Geographic analysis report
+     * can't resolve a timezone and shows "Unknown" for a country we can
+     * plainly identify. Map the common variants to their ISO2 code so the
+     * same timezone/capital lookup used for a matched country still applies.
+     *
+     * @var array<string, string>
+     */
+    private const COUNTRY_NAME_ALIASES = [
+        'united states' => 'US',
+        'usa' => 'US',
+        'u.s.a.' => 'US',
+        'u.s.' => 'US',
+        'america' => 'US',
+        'uk' => 'GB',
+        'u.k.' => 'GB',
+        'great britain' => 'GB',
+        'england' => 'GB',
+        'republic of ireland' => 'IE',
+        'south korea' => 'KR',
+        'north korea' => 'KP',
+        'vietnam' => 'VN',
+        'ivory coast' => 'CI',
+        'czech republic' => 'CZ',
+        'russia' => 'RU',
+    ];
+
     /** @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
@@ -221,8 +251,25 @@ class DatabaseIntelligenceReport
         }
         $misclassifiedRegion = "CASE WHEN NULLIF(TRIM(state_province), '') IS NULL THEN (CASE {$regionCases} END) END";
 
-        $projection = (clone $leads)->selectRaw("COALESCE(NULLIF(UPPER(TRIM(country_code)), ''), NULLIF(LOWER(TRIM(country)), ''), 'Unknown') as country,
-            COALESCE({$misclassifiedRegion}, NULLIF(TRIM(state_province), ''), 'Unknown') as province", $bindings)->toBase();
+        // Some imported sources never filled in country_code, only the full
+        // country name (e.g. "United States"). Left alone, that name fails
+        // to match the code-keyed timezone reference table below and the
+        // row shows "Unknown" for a country we can plainly identify. Match
+        // it against the known countries by name first, then against common
+        // spelling variants, to recover the ISO2 code.
+        $aliasCase = '';
+        $aliasBindings = [];
+        foreach (self::COUNTRY_NAME_ALIASES as $alias => $iso2) {
+            $aliasCase .= 'WHEN ? THEN ? ';
+            array_push($aliasBindings, $alias, $iso2);
+        }
+
+        $projection = (clone $leads)
+            ->leftJoin('countries', function ($join) {
+                $join->on('countries.normalized_name', '=', DB::raw('LOWER(TRIM(leads.country))'));
+            })
+            ->selectRaw("COALESCE(NULLIF(UPPER(TRIM(leads.country_code)), ''), countries.iso2, CASE LOWER(TRIM(leads.country)) {$aliasCase} END, NULLIF(LOWER(TRIM(leads.country)), ''), 'Unknown') as country,
+            COALESCE({$misclassifiedRegion}, NULLIF(TRIM(leads.state_province), ''), 'Unknown') as province", [...$aliasBindings, ...$bindings])->toBase();
         $query = DB::query()->fromSub($projection, 'locations');
         $selection = [];
         foreach (['country', 'province'] as $key) {

@@ -149,6 +149,18 @@ test('a state or province name stored in the city column is reclassified as the 
             && collect($rows)->contains(fn ($row) => $row['country'] === 'US' && $row['province'] === 'California')));
 });
 
+test('a country name that does not exactly match the canonical name still resolves a timezone', function () {
+    \App\Models\Country::factory()->create(['iso2' => 'US', 'default_timezone' => 'America/New_York']);
+    \App\Models\Country::factory()->create(['iso2' => 'FR', 'default_timezone' => 'Europe/Paris']);
+    $user = User::factory()->create();
+    Lead::factory()->for($user, 'agent')->create(['country_code' => null, 'country' => 'United States', 'state_province' => 'Texas', 'city' => null]);
+    Lead::factory()->for($user, 'agent')->create(['country_code' => null, 'country' => 'Republic of Ireland', 'state_province' => null, 'city' => null]);
+
+    $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('databaseReport.geographic_detail.rows', fn ($rows) => collect($rows)->contains(fn ($row) => $row['country'] === 'US' && $row['province'] === 'Texas' && $row['timezone'] === 'America/New_York')
+            && collect($rows)->contains(fn ($row) => $row['country'] === 'IE' && $row['timezone'] === 'Europe/Paris')));
+});
+
 test('a state/province left unknown falls back to the country\'s data-cleaning reference capital', function () {
     \App\Models\Country::factory()->create(['iso2' => 'US', 'default_timezone' => 'America/New_York']);
     $user = User::factory()->create();
