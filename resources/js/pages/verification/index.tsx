@@ -13,7 +13,6 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
-import { FilterTabs } from '@/components/filter-tabs';
 import { HeaderActionsPortal } from '@/components/header-actions';
 import { Pagination } from '@/components/pagination';
 import { StatTile } from '@/components/stat-tile';
@@ -120,6 +119,18 @@ export default function VerificationIndex({
         );
     };
 
+    const applyStatusFilter = (value: string) => {
+        router.get(
+            index.url(),
+            {
+                status: value,
+                agent_id:
+                    agentFilter === ALL_AGENTS ? undefined : agentFilter,
+            },
+            { preserveState: true, replace: true },
+        );
+    };
+
     return (
         <>
             <Head title="Lead Review" />
@@ -210,6 +221,32 @@ export default function VerificationIndex({
                                 </Button>
                             </div>
                         </div>
+                        <div className="flex flex-col gap-1.5 lg:w-56">
+                            <label
+                                htmlFor="verification-status"
+                                className="text-xs text-muted-foreground"
+                            >
+                                Lead category
+                            </label>
+                            <Select
+                                value={filters.status || 'possible_lead'}
+                                onValueChange={applyStatusFilter}
+                            >
+                                <SelectTrigger
+                                    id="verification-status"
+                                    className="w-full"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {statuses.map(([value, label]) => (
+                                        <SelectItem key={value} value={value}>
+                                            {label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         {agents.length > 0 && (
                             <div className="flex flex-col gap-1.5 lg:w-56">
                                 <label
@@ -251,23 +288,6 @@ export default function VerificationIndex({
                                 <Link href={index()}>Clear</Link>
                             </Button>
                         )}
-                    </div>
-                    <div>
-                        <FilterTabs
-                            tabs={statuses.map(([value, label]) => ({
-                                label,
-                                href: index({
-                                    query: {
-                                        status: value || undefined,
-                                        agent_id:
-                                            agentFilter === ALL_AGENTS
-                                                ? undefined
-                                                : agentFilter,
-                                    },
-                                }),
-                                active: filters.status === value,
-                            }))}
-                        />
                     </div>
                 </FilterBar>
 

@@ -27,6 +27,7 @@ class SystemSettingController extends Controller
                 'active' => app()->isDownForMaintenance(),
                 'can_manage' => $request->user()->isSuperAdministrator(),
             ],
+            'isSuperAdministrator' => $request->user()->isSuperAdministrator(),
         ]);
     }
 

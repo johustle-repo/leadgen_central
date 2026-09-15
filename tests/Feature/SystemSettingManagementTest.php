@@ -90,3 +90,40 @@ it('forbids agents from toggling maintenance mode', function () {
         ->post(route('system-settings.maintenance.enable'))
         ->assertForbidden();
 });
+
+it('lets a super administrator reach system settings and disable maintenance mode while the site is actually down', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+
+    Artisan::call('down');
+
+    try {
+        $this->actingAs($superAdministrator)
+            ->get(route('system-settings.edit'))
+            ->assertOk();
+
+        $this->actingAs($superAdministrator)
+            ->delete(route('system-settings.maintenance.disable'))
+            ->assertRedirect()
+            ->assertSessionHas('toast.message', 'Maintenance mode disabled.');
+    } finally {
+        Artisan::call('up');
+    }
+
+    expect(app()->isDownForMaintenance())->toBeFalse();
+});
+
+it('hides upload limits from a super administrator on the system settings page', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+
+    $this->actingAs($superAdministrator)->get(route('system-settings.edit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('isSuperAdministrator', true));
+});
+
+it('shows upload limits to a regular administrator on the system settings page', function () {
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)->get(route('system-settings.edit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('isSuperAdministrator', false));
+});
