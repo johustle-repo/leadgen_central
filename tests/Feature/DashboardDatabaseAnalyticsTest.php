@@ -6,6 +6,7 @@ use App\Models\UploadRow;
 use App\Models\User;
 use App\Services\DashboardReport;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -196,6 +197,7 @@ test('dashboard query count does not grow with lead or agent count', function ()
     $initialCount = count(DB::getQueryLog());
     DB::disableQueryLog();
     Lead::factory()->count(12)->create();
+    Cache::flush();
     DB::flushQueryLog();
     DB::enableQueryLog();
 

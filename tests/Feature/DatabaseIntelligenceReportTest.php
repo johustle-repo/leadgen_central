@@ -6,6 +6,7 @@ use App\Models\UploadRow;
 use App\Models\User;
 use App\Services\DatabaseIntelligenceReport;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -191,6 +192,7 @@ test('database report query count does not grow with lead or upload row volume',
     UploadBatch::factory()->for($agent)->count(15)->create()->each(
         fn (UploadBatch $extraBatch) => UploadRow::factory()->for($extraBatch)->create(['processing_status' => 'accepted']),
     );
+    Cache::flush();
     DB::flushQueryLog();
     DB::enableQueryLog();
 

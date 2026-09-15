@@ -12,6 +12,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DashboardReport
@@ -23,10 +24,30 @@ class DashboardReport
     private const COUNTRY = "COALESCE(NULLIF(UPPER(TRIM(country_code)), ''), NULLIF(LOWER(TRIM(country)), ''))";
 
     /**
+     * This report runs dozens of full-table aggregate queries (one per
+     * distribution/breakdown) and was the main contributor to slow
+     * Dashboard/Report page loads. The underlying leads rarely change
+     * second-to-second, so a short cache turns repeat visits - by far the
+     * common case - into an instant response instead of redoing the same
+     * ~1s of aggregation every time.
+     *
      * @param  array{period?: string|null, date_from?: string|null, date_to?: string|null, granularity?: string|null}  $filters
      * @return array<string, mixed>
      */
     public function for(User $user, array $filters): array
+    {
+        ksort($filters);
+        $scope = $user->canViewAllLeads() ? "role:{$user->role->value}" : "agent:{$user->id}";
+        $cacheKey = 'dashboard-report:'.$scope.':'.md5(serialize($filters));
+
+        return Cache::remember($cacheKey, now()->addMinute(), fn (): array => $this->build($user, $filters));
+    }
+
+    /**
+     * @param  array{period?: string|null, date_from?: string|null, date_to?: string|null, granularity?: string|null}  $filters
+     * @return array<string, mixed>
+     */
+    private function build(User $user, array $filters): array
     {
         [$from, $until, $period] = $this->period($filters);
         $previousFrom = $from->subDays((int) $from->diffInDays($until));
@@ -103,10 +124,15 @@ class DashboardReport
                 'companies' => $companies->map(fn (object $row): array => ['label' => $row->company, 'contacts' => (int) $row->contacts, 'emails' => (int) $row->emails])->all(),
                 'contribution' => $contribution, 'can_compare_agents' => $user->isAdministrator(),
             ],
+            // Cast to plain arrays: Eloquent models round-trip through the
+            // cache below, and an Eloquent Collection can come back as
+            // __PHP_Incomplete_Class on unserialize. Inertia would flatten
+            // these to arrays anyway when it JSON-encodes the response, so
+            // this changes nothing about what the page receives.
             'recentBatches' => (clone $batches)->with(['user' => fn (Relation $query) => $query->getQuery()->withoutGlobalScope(SoftDeletingScope::class)->select('id', 'name')])->latest()->limit(5)
-                ->get(['id', 'user_id', 'batch_code', 'original_filename', 'processing_status', 'created_at', 'total_rows']),
+                ->get(['id', 'user_id', 'batch_code', 'original_filename', 'processing_status', 'created_at', 'total_rows'])->toArray(),
             'recentLeads' => (clone $leads)->with(['agent' => fn (Relation $query) => $query->getQuery()->withoutGlobalScope(SoftDeletingScope::class)->select('id', 'name')])->latest()->limit(5)
-                ->get(['id', 'lead_code', 'agent_id', 'company_name', 'status', 'created_at']),
+                ->get(['id', 'lead_code', 'agent_id', 'company_name', 'status', 'created_at'])->toArray(),
         ];
     }
 

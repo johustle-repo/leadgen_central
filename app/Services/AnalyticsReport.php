@@ -10,16 +10,37 @@ use App\Models\User;
 use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
 class AnalyticsReport
 {
     /**
+     * This is the slowest page in the app to build - dozens of full-table
+     * aggregate queries across leads, replies, and batches, on top of the
+     * (separately cached) DatabaseIntelligenceReport it embeds. The leads
+     * behind it don't change second-to-second, so a short cache turns the
+     * common case - revisiting or refreshing the report - into an instant
+     * response instead of repeating ~2s of aggregation every time.
+     *
      * @param  array{period?: string, date_from?: string, date_to?: string}  $filters
      * @return array<string, mixed>
      */
     public function for(User $user, array $filters): array
+    {
+        ksort($filters);
+        $scope = $user->canViewAllLeads() ? "role:{$user->role->value}" : "agent:{$user->id}";
+        $cacheKey = 'analytics-report:'.$scope.':'.md5(serialize($filters));
+
+        return Cache::remember($cacheKey, now()->addMinute(), fn (): array => $this->build($user, $filters));
+    }
+
+    /**
+     * @param  array{period?: string, date_from?: string, date_to?: string}  $filters
+     * @return array<string, mixed>
+     */
+    private function build(User $user, array $filters): array
     {
         [$from, $to, $period] = $this->dateRange($filters);
         $days = $from->diffInDays($to) + 1;

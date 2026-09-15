@@ -10,6 +10,7 @@ use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DatabaseIntelligenceReport
@@ -50,6 +51,18 @@ class DatabaseIntelligenceReport
      * @return array<string, mixed>
      */
     public function for(User $user, array $filters): array
+    {
+        ksort($filters);
+        $scope = $user->canViewAllLeads() ? "role:{$user->role->value}" : "agent:{$user->id}";
+        $cacheKey = 'report-intelligence:'.$scope.':'.md5(serialize($filters));
+
+        return Cache::remember($cacheKey, now()->addMinute(), fn (): array => $this->build($user, $filters));
+    }
+
+    /** @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    private function build(User $user, array $filters): array
     {
         $dashboard = app(DashboardReport::class)->for($user, $filters);
         $data = $dashboard['databaseAnalytics'];
@@ -180,8 +193,12 @@ class DatabaseIntelligenceReport
             default => 'DATE(event_at)',
         };
         $counts = $this->rowMetrics(DB::query()->fromSub($events, 'events'))->selectRaw("{$bucket} as bucket")->groupBy('bucket')->get()->keyBy('bucket');
-        $start = match ($granularity) { 'week' => $from->startOfWeek(), 'month' => $from->startOfMonth(), default => $from };
-        $step = match ($granularity) { 'week' => 'addWeek', 'month' => 'addMonth', default => 'addDay' };
+        $start = match ($granularity) {
+            'week' => $from->startOfWeek(), 'month' => $from->startOfMonth(), default => $from
+        };
+        $step = match ($granularity) {
+            'week' => 'addWeek', 'month' => 'addMonth', default => 'addDay'
+        };
         $points = [];
         for ($date = $start; $date->lt($until); $date = $date->{$step}()) {
             $points[] = ['date' => $date->toDateString(), ...$this->metrics($counts->get($date->toDateString()))];
@@ -191,7 +208,7 @@ class DatabaseIntelligenceReport
     }
 
     /** @param Builder<Lead> $leads
-     * @param Builder<UploadBatch> $batches
+     * @param  Builder<UploadBatch>  $batches
      * @return array<int, array<string, mixed>>
      */
     private function contribution(Builder $leads, Builder $batches, QueryBuilder $rows): array
