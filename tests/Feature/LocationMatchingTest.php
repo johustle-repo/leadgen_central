@@ -18,6 +18,24 @@ it('matches exact and aliased locations and assigns an IANA timezone', function 
         ->and($alias->matchType)->toBe('alias')->and($alias->country?->id)->toBe($country->id)->and($alias->city?->id)->toBe($city->id);
 });
 
+it('falls back to the static timezone reference when the countries table has no matching row', function () {
+    // The countries table is only populated by a manual, one-off dataset
+    // import that's easy to skip on a fresh environment - country_code
+    // and timezone auto-set must still work for a caller (e.g. the Add
+    // Possible Lead country dropdown) that supplies an exact ISO2 code.
+    expect(Country::count())->toBe(0);
+
+    $result = app(LocationMatchingService::class)->match('PH', null);
+    $attributes = $result->leadAttributes(null, 'PH');
+
+    expect($result->country?->iso2)->toBe('PH')
+        ->and($result->country?->id)->toBeNull()
+        ->and($attributes['country'])->toBe('Philippines')
+        ->and($attributes['country_code'])->toBe('PH')
+        ->and($attributes['timezone'])->toBe('Asia/Manila')
+        ->and($attributes['canonical_country_id'])->toBeNull();
+});
+
 it('uses the country default timezone when the submitted location is not a canonical city', function () {
     Country::factory()->create(['name' => 'United States', 'normalized_name' => 'united states', 'iso2' => 'US', 'default_timezone' => 'America/New_York']);
 
