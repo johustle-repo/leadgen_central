@@ -51,14 +51,16 @@ function SimpleField({
     label,
     type,
     errors,
+    className,
 }: {
     name: string;
     label: string;
     type: string;
     errors: Record<string, string | undefined>;
+    className?: string;
 }) {
     return (
-        <div>
+        <div className={className}>
             <Label htmlFor={name}>{label}</Label>
             <Input
                 id={name}
@@ -393,6 +395,7 @@ export default function PossibleLeadCreate({
                                             label="Product requested"
                                             type="text"
                                             errors={errors}
+                                            className="md:col-span-2"
                                         />
                                         <div className="md:col-span-2">
                                             <Label htmlFor="notes">
