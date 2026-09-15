@@ -42,6 +42,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import { create, destroy, edit, impersonate, index } from '@/routes/users';
 import { clear as clearRecords } from '@/routes/users/records';
 
@@ -92,9 +93,9 @@ function UserActions({ user }: { user: User }) {
                     <DialogContent>
                         <DialogTitle>Log in as {user.name}?</DialogTitle>
                         <DialogDescription>
-                            You&apos;ll see the app exactly as they do. A
-                            banner lets you return to your own account at any
-                            time. This is recorded in the audit log.
+                            You&apos;ll see the app exactly as they do. A banner
+                            lets you return to your own account at any time.
+                            This is recorded in the audit log.
                         </DialogDescription>
                         <DialogFooter>
                             <DialogClose asChild>
@@ -131,13 +132,12 @@ function UserActions({ user }: { user: User }) {
                             Clear {user.name}&apos;s records?
                         </DialogTitle>
                         <DialogDescription>
-                            This deletes all{' '}
-                            {user.leads_count.toLocaleString()} lead(s) and{' '}
-                            {user.upload_batches_count.toLocaleString()}{' '}
-                            upload record(s) (including the raw files) owned
-                            by {user.name}. The upload history cannot be
-                            recovered afterward. Their user account is not
-                            affected.
+                            This deletes all {user.leads_count.toLocaleString()}{' '}
+                            lead(s) and{' '}
+                            {user.upload_batches_count.toLocaleString()} upload
+                            record(s) (including the raw files) owned by{' '}
+                            {user.name}. The upload history cannot be recovered
+                            afterward. Their user account is not affected.
                         </DialogDescription>
                         <DialogFooter>
                             <DialogClose asChild>
@@ -155,10 +155,9 @@ function UserActions({ user }: { user: User }) {
                                         return;
                                     }
 
-                                    router.delete(
-                                        clearRecords.url(user.id),
-                                        { preserveScroll: true },
-                                    );
+                                    router.delete(clearRecords.url(user.id), {
+                                        preserveScroll: true,
+                                    });
                                 }}
                             >
                                 Clear records
@@ -223,22 +222,31 @@ function UsersSection({
                     <Table>
                         <TableHeader>
                             <TableRow className="hover:bg-transparent">
-                                <TableHead>User</TableHead>
-                                <TableHead>Role</TableHead>
-                                <TableHead>Team</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead align="right">
+                                <TableHead className="py-4">User</TableHead>
+                                <TableHead className="py-4">Role</TableHead>
+                                <TableHead className="py-4">Team</TableHead>
+                                <TableHead className="py-4">Status</TableHead>
+                                <TableHead align="right" className="py-4">
                                     Total leads
                                 </TableHead>
-                                <TableHead align="right">Errors</TableHead>
-                                <TableHead>Created</TableHead>
-                                <TableHead align="right">Actions</TableHead>
+                                <TableHead align="right" className="py-4">
+                                    Errors
+                                </TableHead>
+                                <TableHead
+                                    align="center"
+                                    className="py-4 pl-8"
+                                >
+                                    Created
+                                </TableHead>
+                                <TableHead align="right" className="py-4">
+                                    Actions
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {users.data.map((user) => (
                                 <TableRow key={user.id}>
-                                    <TableCell>
+                                    <TableCell className="py-4">
                                         <Link
                                             href={edit(user.id)}
                                             className="font-medium hover:underline"
@@ -249,7 +257,7 @@ function UsersSection({
                                             {user.email}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="capitalize">
+                                    <TableCell className="py-4 capitalize">
                                         <span className="inline-flex items-center gap-1.5">
                                             {user.role ===
                                                 'super_administrator' && (
@@ -258,32 +266,38 @@ function UsersSection({
                                             {user.role.replaceAll('_', ' ')}
                                         </span>
                                     </TableCell>
-                                    <TableCell>{user.team || '—'}</TableCell>
-                                    <TableCell>
+                                    <TableCell className="py-4">
+                                        {user.team || '—'}
+                                    </TableCell>
+                                    <TableCell className="py-4">
                                         <StatusBadge value={user.status} />
                                     </TableCell>
                                     <TableCell
                                         align="right"
-                                        className="font-medium"
+                                        className="py-4 font-medium"
                                     >
                                         {user.leads_count.toLocaleString()}
                                     </TableCell>
                                     <TableCell
                                         align="right"
-                                        className={
+                                        className={cn(
+                                            'py-4',
                                             user.errors_count > 0
                                                 ? 'font-medium text-destructive'
-                                                : 'text-muted-foreground'
-                                        }
+                                                : 'text-muted-foreground',
+                                        )}
                                     >
                                         {user.errors_count.toLocaleString()}
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell
+                                        align="center"
+                                        className="py-4 pl-8"
+                                    >
                                         {new Date(
                                             user.created_at,
                                         ).toLocaleDateString()}
                                     </TableCell>
-                                    <TableCell align="right">
+                                    <TableCell align="right" className="py-4">
                                         <UserActions user={user} />
                                     </TableCell>
                                 </TableRow>
