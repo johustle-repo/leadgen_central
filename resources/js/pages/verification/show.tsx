@@ -12,6 +12,7 @@ import {
     Trash2,
     Upload,
 } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { HeaderActionsPortal } from '@/components/header-actions';
 import InputError from '@/components/input-error';
@@ -90,15 +91,18 @@ type Lead = Record<string, string | number | null | object[]> & {
     attachments: Attachment[];
     upload_batch: { batch_code: string } | null;
 };
-const editableFields = [
+const SELECT_COUNTRY = '__select__';
+const COUNTRY_OPTIONS = Object.entries(COUNTRY_CAPITALS)
+    .map(([code, { name }]) => ({ code, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+const fieldsBeforeCountry = [
     ['company_name', 'Company Name'],
     ['website', 'Website'],
     ['website_domain', 'Domain'],
-    ['industry', 'Industry'],
-    ['address', 'Address'],
     ['city', 'City'],
-    ['country', 'Country'],
-    ['country_code', 'Country Code'],
+] as const;
+const fieldsAfterCountry = [
     ['timezone', 'Timezone'],
     ['contact_person', 'Contact Person'],
     ['position', 'Position'],
@@ -158,6 +162,13 @@ export default function VerificationShow({
     reviewers: User[];
     agents: User[];
 }) {
+    const initialCountryCode = String(lead.country_code ?? '').toUpperCase();
+    const [countryCode, setCountryCode] = useState(
+        COUNTRY_CAPITALS[initialCountryCode]
+            ? initialCountryCode
+            : SELECT_COUNTRY,
+    );
+
     const copyDetails = async () => {
         const field = (name: string) => {
             const value = lead[name];
@@ -242,38 +253,124 @@ export default function VerificationShow({
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid gap-4 md:grid-cols-2">
-                                        {editableFields.map(([name, label]) => (
-                                            <div
-                                                key={name}
-                                                className={
-                                                    name === 'address' ||
-                                                    name ===
-                                                        'product_requested'
-                                                        ? 'md:col-span-2'
-                                                        : ''
+                                        {fieldsBeforeCountry.map(
+                                            ([name, label]) => (
+                                                <div key={name}>
+                                                    <Label htmlFor={name}>
+                                                        {label}
+                                                    </Label>
+                                                    <Input
+                                                        id={name}
+                                                        name={name}
+                                                        defaultValue={String(
+                                                            lead[name] ?? '',
+                                                        )}
+                                                        readOnly={
+                                                            name ===
+                                                            'website_domain'
+                                                        }
+                                                        className="mt-2"
+                                                    />
+                                                    <InputError
+                                                        className="mt-1"
+                                                        message={errors[name]}
+                                                    />
+                                                </div>
+                                            ),
+                                        )}
+                                        <div>
+                                            <Label htmlFor="country">
+                                                Country
+                                            </Label>
+                                            <input
+                                                type="hidden"
+                                                name="country"
+                                                value={
+                                                    countryCode ===
+                                                    SELECT_COUNTRY
+                                                        ? ''
+                                                        : COUNTRY_CAPITALS[
+                                                              countryCode
+                                                          ].name
                                                 }
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name="country_code"
+                                                value={
+                                                    countryCode ===
+                                                    SELECT_COUNTRY
+                                                        ? ''
+                                                        : countryCode
+                                                }
+                                            />
+                                            <Select
+                                                value={countryCode}
+                                                onValueChange={setCountryCode}
                                             >
-                                                <Label htmlFor={name}>
-                                                    {label}
-                                                </Label>
-                                                <Input
-                                                    id={name}
-                                                    name={name}
-                                                    defaultValue={String(
-                                                        lead[name] ?? '',
+                                                <SelectTrigger
+                                                    id="country"
+                                                    className="mt-2 w-full"
+                                                >
+                                                    <SelectValue placeholder="Select a country" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem
+                                                        value={SELECT_COUNTRY}
+                                                    >
+                                                        Select a country
+                                                    </SelectItem>
+                                                    {COUNTRY_OPTIONS.map(
+                                                        ({ code, name }) => (
+                                                            <SelectItem
+                                                                key={code}
+                                                                value={code}
+                                                            >
+                                                                {name}
+                                                            </SelectItem>
+                                                        ),
                                                     )}
-                                                    readOnly={
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                Country code is set
+                                                automatically from this
+                                                selection.
+                                            </p>
+                                            <InputError
+                                                className="mt-1"
+                                                message={errors.country}
+                                            />
+                                        </div>
+                                        {fieldsAfterCountry.map(
+                                            ([name, label]) => (
+                                                <div
+                                                    key={name}
+                                                    className={
                                                         name ===
-                                                        'website_domain'
+                                                        'product_requested'
+                                                            ? 'md:col-span-2'
+                                                            : ''
                                                     }
-                                                    className="mt-2"
-                                                />
-                                                <InputError
-                                                    className="mt-1"
-                                                    message={errors[name]}
-                                                />
-                                            </div>
-                                        ))}
+                                                >
+                                                    <Label htmlFor={name}>
+                                                        {label}
+                                                    </Label>
+                                                    <Input
+                                                        id={name}
+                                                        name={name}
+                                                        defaultValue={String(
+                                                            lead[name] ?? '',
+                                                        )}
+                                                        className="mt-2"
+                                                    />
+                                                    <InputError
+                                                        className="mt-1"
+                                                        message={errors[name]}
+                                                    />
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                     <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                                         {agents.length > 0 && (
@@ -294,22 +391,16 @@ export default function VerificationShow({
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {agents.map(
-                                                            (agent) => (
-                                                                <SelectItem
-                                                                    key={
-                                                                        agent.id
-                                                                    }
-                                                                    value={String(
-                                                                        agent.id,
-                                                                    )}
-                                                                >
-                                                                    {
-                                                                        agent.name
-                                                                    }
-                                                                </SelectItem>
-                                                            ),
-                                                        )}
+                                                        {agents.map((agent) => (
+                                                            <SelectItem
+                                                                key={agent.id}
+                                                                value={String(
+                                                                    agent.id,
+                                                                )}
+                                                            >
+                                                                {agent.name}
+                                                            </SelectItem>
+                                                        ))}
                                                     </SelectContent>
                                                 </Select>
                                                 <InputError
