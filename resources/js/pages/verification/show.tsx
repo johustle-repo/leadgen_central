@@ -25,6 +25,15 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -35,6 +44,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { COUNTRY_CAPITALS } from '@/lib/country-capitals';
+import { destroy as destroyLead } from '@/routes/leads';
 import {
     destroy as destroyAttachment,
     download as downloadAttachment,
@@ -218,14 +228,15 @@ export default function VerificationShow({
     nextId,
     reviewers,
     agents,
+    canDelete,
 }: {
     lead: Lead;
     previousId: number | null;
     nextId: number | null;
     reviewers: User[];
     agents: User[];
+    canDelete: boolean;
 }) {
-
     const copyDetails = async () => {
         const field = (name: string) => {
             const value = lead[name];
@@ -293,6 +304,48 @@ export default function VerificationShow({
                                 <ArrowRight />
                             </Link>
                         </Button>
+                    )}
+                    {canDelete && (
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                >
+                                    <Trash2 />
+                                    Delete
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogTitle>
+                                    Delete {lead.company_name}?
+                                </DialogTitle>
+                                <DialogDescription>
+                                    This removes the lead from active lists. It
+                                    can be restored by an administrator if
+                                    needed.
+                                </DialogDescription>
+                                <DialogFooter>
+                                    <DialogClose asChild>
+                                        <Button variant="secondary">
+                                            Cancel
+                                        </Button>
+                                    </DialogClose>
+                                    <Form {...destroyLead.form(lead.id)}>
+                                        {({ processing }) => (
+                                            <Button
+                                                type="submit"
+                                                variant="destructive"
+                                                disabled={processing}
+                                            >
+                                                Delete lead
+                                            </Button>
+                                        )}
+                                    </Form>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     )}
                 </HeaderActionsPortal>
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">

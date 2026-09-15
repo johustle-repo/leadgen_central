@@ -6,6 +6,7 @@ import {
     Search,
     SlidersHorizontal,
     Sparkles,
+    Trash2,
     Upload,
     UserCheck,
 } from 'lucide-react';
@@ -18,6 +19,15 @@ import { Pagination } from '@/components/pagination';
 import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -34,6 +44,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { destroy } from '@/routes/leads';
 import { index, possible as markPossible, show } from '@/routes/verification';
 import possibleLeads from '@/routes/verification/possible-leads';
 
@@ -75,6 +86,7 @@ export default function VerificationIndex({
     filters,
     summary,
     agents,
+    canDelete,
 }: {
     leads: {
         data: Lead[];
@@ -86,6 +98,7 @@ export default function VerificationIndex({
     filters: Filters;
     summary: Summary;
     agents: Agent[];
+    canDelete: boolean;
 }) {
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
     const [agentFilter, setAgentFilter] = useState(
@@ -124,8 +137,7 @@ export default function VerificationIndex({
             index.url(),
             {
                 status: value,
-                agent_id:
-                    agentFilter === ALL_AGENTS ? undefined : agentFilter,
+                agent_id: agentFilter === ALL_AGENTS ? undefined : agentFilter,
             },
             { preserveState: true, replace: true },
         );
@@ -385,6 +397,59 @@ export default function VerificationIndex({
                                                     Review
                                                 </Link>
                                             </Button>
+                                            {canDelete && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="destructive"
+                                                        >
+                                                            <Trash2 />
+                                                            Delete
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogTitle>
+                                                            Delete{' '}
+                                                            {lead.company_name}?
+                                                        </DialogTitle>
+                                                        <DialogDescription>
+                                                            This removes the
+                                                            lead from active
+                                                            lists. It can be
+                                                            restored by an
+                                                            administrator if
+                                                            needed.
+                                                        </DialogDescription>
+                                                        <DialogFooter>
+                                                            <DialogClose
+                                                                asChild
+                                                            >
+                                                                <Button variant="secondary">
+                                                                    Cancel
+                                                                </Button>
+                                                            </DialogClose>
+                                                            <Button
+                                                                type="button"
+                                                                variant="destructive"
+                                                                onClick={() =>
+                                                                    router.delete(
+                                                                        destroy.url(
+                                                                            lead.id,
+                                                                        ),
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                Delete lead
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
                                         </div>
                                     </TableCell>
                                 </TableRow>

@@ -470,6 +470,27 @@ it('allows an administrator to bulk delete selected leads and records an audit e
     ]);
 });
 
+it('lets an administrator delete a single lead and records an audit event', function () {
+    $administrator = User::factory()->administrator()->create();
+    $lead = Lead::factory()->create();
+
+    $response = $this->actingAs($administrator)
+        ->from(route('verification.index'))
+        ->delete(route('leads.destroy', $lead));
+
+    $response->assertRedirect(route('verification.index'))->assertSessionHas('toast', [
+        'type' => 'success',
+        'message' => 'Lead deleted successfully.',
+    ]);
+    $this->assertSoftDeleted($lead);
+    $this->assertDatabaseHas('audit_logs', [
+        'user_id' => $administrator->id,
+        'action' => 'lead.bulk_deleted',
+        'auditable_type' => 'lead',
+        'auditable_id' => $lead->id,
+    ]);
+});
+
 it('prevents non-administrators from deleting leads', function (string $role) {
     $user = $role === 'agent'
         ? User::factory()->create()

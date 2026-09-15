@@ -372,13 +372,18 @@ class LeadController extends Controller
 
     /**
      * Remove the specified resource from storage.
+     *
+     * Redirects back rather than to a fixed route so this works the same
+     * whether it's triggered from the Leads list or the Lead Review queue.
      */
-    public function destroy(Lead $lead): RedirectResponse
+    public function destroy(Request $request, Lead $lead, LeadBulkDeletion $deletion): RedirectResponse
     {
         Gate::authorize('delete', $lead);
-        $lead->delete();
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 401);
+        $deletion->delete([$lead->id], $actor, $request->ip(), $request->userAgent());
 
-        return redirect()->route('leads.index')->with('toast', ['type' => 'success', 'message' => 'Lead archived.']);
+        return back()->with('toast', ['type' => 'success', 'message' => 'Lead deleted successfully.']);
     }
 
     public function bulkDestroy(BulkDeleteLeadsRequest $request, LeadBulkDeletion $deletion): RedirectResponse

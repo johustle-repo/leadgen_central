@@ -44,6 +44,23 @@ it('lets a reviewer set and update the secondary email through the verify form',
     expect($lead->refresh()->secondary_email)->toBe('second@example.com');
 });
 
+it('exposes canDelete on the Lead Review queue and a single lead only to administrators', function (string $role, bool $expected) {
+    $user = User::factory()->create(['role' => $role]);
+    $lead = Lead::factory()->create();
+
+    $this->actingAs($user)->get(route('verification.index'))->assertInertia(fn (Assert $page) => $page
+        ->where('canDelete', $expected));
+
+    if ($user->canViewAllLeads()) {
+        $this->actingAs($user)->get(route('verification.show', $lead))->assertInertia(fn (Assert $page) => $page
+            ->where('canDelete', $expected));
+    }
+})->with([
+    'sub-administrator' => ['sub_administrator', false],
+    'administrator' => ['administrator', true],
+    'super administrator' => ['super_administrator', true],
+]);
+
 it('lets a sub-administrator classify a lead and records status history', function () {
     $reviewer = User::factory()->subAdministrator()->create();
     $lead = Lead::factory()->create(['status' => 'raw']);
