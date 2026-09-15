@@ -170,6 +170,7 @@ const fields = [
         type: 'email',
         requiredOnCreate: true,
     },
+    { name: 'secondary_email', label: 'Secondary Email', type: 'email' },
     { name: 'country_code', label: 'Country', maxLength: 2 },
     { name: 'city', label: 'City' },
     { name: 'import_trades', label: 'Import Trades' },

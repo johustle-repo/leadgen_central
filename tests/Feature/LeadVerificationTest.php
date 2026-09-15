@@ -22,6 +22,28 @@ it('preserves contact_person when verify() is called without re-passing it', fun
     expect($lead->refresh()->contact_person)->toBe('Ada Lovelace');
 });
 
+it('preserves secondary_email when verify() is called without re-passing it', function () {
+    $lead = Lead::factory()->create(['status' => 'raw', 'secondary_email' => 'second@example.com']);
+    $actor = User::factory()->administrator()->create();
+
+    app(LeadVerificationService::class)->verify($lead, ['status' => 'possible_lead'], $actor);
+
+    expect($lead->refresh()->secondary_email)->toBe('second@example.com');
+});
+
+it('lets a reviewer set and update the secondary email through the verify form', function () {
+    $lead = Lead::factory()->create(['status' => 'raw', 'company_name' => 'Acme']);
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)->put(route('verification.update', $lead), [
+        'company_name' => 'Acme',
+        'status' => 'possible_lead',
+        'secondary_email' => 'Second@Example.com',
+    ])->assertRedirect();
+
+    expect($lead->refresh()->secondary_email)->toBe('second@example.com');
+});
+
 it('lets a sub-administrator classify a lead and records status history', function () {
     $reviewer = User::factory()->subAdministrator()->create();
     $lead = Lead::factory()->create(['status' => 'raw']);
@@ -153,6 +175,7 @@ it('lets administrators add a possible lead and assign it to an active agent', f
         'company_name' => 'Atlas Scaffolding',
         'contact_person' => 'MARIA SANTOS',
         'email' => 'maria@atlas.test',
+        'secondary_email' => 'Ops@Atlas.test',
         'country_code' => 'us',
         'city' => 'Texas',
         'data_source' => 'Manual',
@@ -165,6 +188,7 @@ it('lets administrators add a possible lead and assign it to an active agent', f
         ->and($lead->agent_id)->toBe($owner->id)
         ->and($lead->contact_person)->toBe('Maria Santos')
         ->and($lead->country_code)->toBe('US')
+        ->and($lead->secondary_email)->toBe('ops@atlas.test')
         ->and($lead->created_by)->toBe($reviewer->id);
     $this->assertDatabaseHas('lead_status_histories', ['lead_id' => $lead->id, 'old_status' => 'raw', 'new_status' => 'possible_lead', 'changed_by' => $reviewer->id]);
 });

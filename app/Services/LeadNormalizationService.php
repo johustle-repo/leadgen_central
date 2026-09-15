@@ -24,6 +24,7 @@ class LeadNormalizationService
             'website_domain' => $this->domains->domain($website),
             'contact_person' => filled($data['contact_person'] ?? null) ? Str::squish((string) $data['contact_person']) : null,
             'email' => filled($data['email'] ?? null) ? Str::lower(trim((string) $data['email'])) : null,
+            'secondary_email' => filled($data['secondary_email'] ?? null) ? Str::lower(trim((string) $data['secondary_email'])) : null,
             'phone' => filled($data['phone'] ?? null) ? preg_replace('/[^0-9+]/', '', (string) $data['phone']) : null,
         ];
     }

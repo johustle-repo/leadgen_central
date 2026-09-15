@@ -77,7 +77,7 @@ class VerificationController extends Controller
         $owner = User::query()->whereKey($data['agent_id'])->firstOrFail();
         $lead = $creator->create($data, $owner, $request->user());
         $verification->verify($lead, [
-            ...$lead->only(['company_name', 'website', 'city', 'country', 'country_code', 'timezone', 'contact_person', 'position', 'email', 'phone', 'industry']),
+            ...$lead->only(['company_name', 'website', 'city', 'country', 'country_code', 'timezone', 'contact_person', 'position', 'email', 'secondary_email', 'phone', 'industry']),
             'status' => 'possible_lead',
             'remarks' => 'Added directly to Possible Leads by '.$request->user()->name.'.',
         ], $request->user());
@@ -139,7 +139,7 @@ class VerificationController extends Controller
     public function markPossible(MarkPossibleLeadRequest $request, Lead $lead, LeadVerificationService $service): RedirectResponse
     {
         $service->verify($lead, [
-            ...$lead->only(['company_name', 'website', 'city', 'country', 'country_code', 'timezone', 'contact_person', 'position', 'email', 'phone', 'industry']),
+            ...$lead->only(['company_name', 'website', 'city', 'country', 'country_code', 'timezone', 'contact_person', 'position', 'email', 'secondary_email', 'phone', 'industry']),
             'status' => 'possible_lead',
             'remarks' => $request->validated('remarks') ?? 'Marked as a possible lead from the verification queue.',
         ], $request->user());

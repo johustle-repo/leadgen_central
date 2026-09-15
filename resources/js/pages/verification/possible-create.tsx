@@ -259,6 +259,12 @@ export default function PossibleLeadCreate({
                                             errors={errors}
                                         />
                                         <SimpleField
+                                            name="secondary_email"
+                                            label="Secondary Email"
+                                            type="email"
+                                            errors={errors}
+                                        />
+                                        <SimpleField
                                             name="phone"
                                             label="Phone"
                                             type="text"

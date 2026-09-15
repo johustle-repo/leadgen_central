@@ -22,7 +22,7 @@ class LeadVerificationService
             // value here - otherwise a caller that verifies a lead without
             // re-passing, say, contact_person silently wipes it instead of
             // leaving it as it was.
-            $updates = $this->normalizer->normalize([...$lead->only(['company_name', 'website', 'email', 'phone', 'contact_person']), ...$data]);
+            $updates = $this->normalizer->normalize([...$lead->only(['company_name', 'website', 'email', 'secondary_email', 'phone', 'contact_person']), ...$data]);
             $location = $this->locations->match($data['country_code'] ?? $data['country'] ?? $lead->country_code ?? $lead->country, $data['city'] ?? $lead->city);
             $newStatus = (string) $data['status'];
             $locationAttributes = $location->leadAttributes($data['city'] ?? $lead->raw_city ?? $lead->city, $data['country'] ?? $data['country_code'] ?? $lead->raw_country ?? $lead->country);

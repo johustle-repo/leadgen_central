@@ -107,6 +107,7 @@ const fieldsAfterCountry = [
     ['contact_person', 'Contact Person'],
     ['position', 'Position'],
     ['email', 'Email'],
+    ['secondary_email', 'Secondary Email'],
     ['phone', 'Phone'],
     ['product_requested', 'Product Requested'],
 ] as const;
@@ -344,15 +345,7 @@ export default function VerificationShow({
                                         </div>
                                         {fieldsAfterCountry.map(
                                             ([name, label]) => (
-                                                <div
-                                                    key={name}
-                                                    className={
-                                                        name ===
-                                                        'product_requested'
-                                                            ? 'md:col-span-2'
-                                                            : ''
-                                                    }
-                                                >
+                                                <div key={name}>
                                                     <Label htmlFor={name}>
                                                         {label}
                                                     </Label>
