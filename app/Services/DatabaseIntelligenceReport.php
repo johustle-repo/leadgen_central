@@ -56,7 +56,7 @@ class DatabaseIntelligenceReport
         $scope = $user->canViewAllLeads() ? "role:{$user->role->value}" : "agent:{$user->id}";
         $cacheKey = 'report-intelligence:'.$scope.':'.md5(serialize($filters));
 
-        return Cache::remember($cacheKey, now()->addMinute(), fn (): array => $this->build($user, $filters));
+        return Cache::remember($cacheKey, now()->addMinutes(5), fn (): array => $this->build($user, $filters));
     }
 
     /** @param array<string, mixed> $filters
