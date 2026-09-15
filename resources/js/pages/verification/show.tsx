@@ -480,7 +480,7 @@ export default function VerificationShow({
                                             value="save_next"
                                             disabled={processing}
                                         >
-                                            Save &amp; Next
+                                            Next
                                         </Button>
                                     </div>
                                 </CardContent>
