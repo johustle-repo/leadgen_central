@@ -31,7 +31,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
     return (
         <div className="flex flex-col gap-6 bg-muted/40 p-4 md:p-6">
-            <header className="flex items-center gap-4 rounded-xl bg-primary px-5 py-4 text-primary-foreground shadow-xs">
+            <header className="accent-banner flex items-center gap-4 rounded-xl px-5 py-4 shadow-xs">
                 <Avatar className="size-12 shrink-0 overflow-hidden rounded-full ring-2 ring-primary-foreground/40">
                     <AvatarImage
                         src={auth.user.avatar ?? undefined}

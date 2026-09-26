@@ -214,7 +214,7 @@ export default function Dashboard({
                 </form>
             </HeaderActionsPortal>
             <div className="flex min-w-0 flex-1 flex-col gap-4 bg-muted/40 p-4 md:p-6">
-                <header className="flex flex-wrap items-end justify-between gap-3 rounded-lg bg-primary px-5 py-4 text-primary-foreground shadow-xs">
+                <header className="accent-banner flex flex-wrap items-end justify-between gap-3 rounded-lg px-5 py-4 shadow-xs">
                     <div className="min-w-0">
                         <h1 className="text-xl font-semibold tracking-tight">
                             Database intelligence
