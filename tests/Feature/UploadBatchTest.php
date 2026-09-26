@@ -888,3 +888,28 @@ it('still rejects a file whose named columns repeat', function () {
     $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file])
         ->assertSessionHasErrors(['file' => 'dupes.csv contains duplicate column headers.']);
 });
+
+it('summarizes upload history and filters it by status tab and filename search', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create();
+    UploadBatch::factory()->for($agent)->create(['original_filename' => 'march-tendata.csv', 'processing_status' => 'completed', 'total_rows' => 100, 'accepted_rows' => 80, 'duplicate_rows' => 10, 'rejected_rows' => 6, 'error_rows' => 4]);
+    UploadBatch::factory()->for($agent)->create(['original_filename' => 'april-lusha.csv', 'processing_status' => 'processing', 'total_rows' => 50]);
+    UploadBatch::factory()->for($agent)->create(['original_filename' => 'broken.csv', 'processing_status' => 'failed', 'total_rows' => 0]);
+
+    $this->actingAs($administrator)->get(route('uploads.index'))->assertInertia(fn (Assert $page) => $page
+        ->where('summary', ['uploads' => 3, 'rows' => 150, 'accepted' => 80, 'duplicates' => 10, 'rejected' => 6, 'errors' => 4])
+        ->where('statusCounts', ['all' => 3, 'in_progress' => 1, 'completed' => 1, 'failed' => 1])
+        ->has('batches.data', 3));
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['status' => 'in_progress']))->assertInertia(fn (Assert $page) => $page
+        ->where('filters.status', 'in_progress')
+        ->where('summary.uploads', 3)
+        ->has('batches.data', 1)
+        ->where('batches.data.0.original_filename', 'april-lusha.csv'));
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['search' => 'tendata', 'status' => 'bogus']))->assertInertia(fn (Assert $page) => $page
+        ->where('filters.status', 'all')
+        ->where('summary.uploads', 1)
+        ->has('batches.data', 1)
+        ->where('batches.data.0.original_filename', 'march-tendata.csv'));
+});

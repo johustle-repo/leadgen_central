@@ -17,6 +17,7 @@ use App\Services\UploadBatchDeletion;
 use App\Services\UploadBatchReanalyzer;
 use App\UploadBatchStatus;
 use App\UploadRowStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -27,6 +28,14 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UploadBatchController extends Controller
 {
+    /** Upload History status tabs and the batch statuses each one covers. */
+    private const STATUS_TABS = [
+        'all' => ['pending', 'processing', 'completed', 'failed'],
+        'in_progress' => ['pending', 'processing'],
+        'completed' => ['completed'],
+        'failed' => ['failed'],
+    ];
+
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', UploadBatch::class);
@@ -48,6 +57,20 @@ class UploadBatchController extends Controller
         } elseif ($agentId = $request->string('agent_id')->toString()) {
             $query->where('upload_batches.user_id', $agentId);
         }
+        $search = $request->string('search')->trim()->limit(100, '')->toString();
+        if ($search !== '') {
+            $query->where(fn (Builder $builder) => $builder->where('upload_batches.original_filename', 'like', "%{$search}%")
+                ->orWhere('upload_batches.batch_code', 'like', "%{$search}%"));
+        }
+        // Summary figures describe everything matching the owner, agent and
+        // search filters; the status tab only narrows the list below them.
+        $summary = (clone $query)->toBase()->reorder()->selectRaw('COUNT(*) as uploads, COALESCE(SUM(total_rows), 0) as rows_total, COALESCE(SUM(accepted_rows), 0) as accepted, COALESCE(SUM(duplicate_rows), 0) as duplicates, COALESCE(SUM(rejected_rows), 0) as rejected, COALESCE(SUM(error_rows), 0) as errors')->first();
+        $statusCounts = (clone $query)->toBase()->reorder()->selectRaw('processing_status, COUNT(*) as aggregate')->groupBy('processing_status')->pluck('aggregate', 'processing_status');
+        $status = $request->string('status')->toString();
+        $status = array_key_exists($status, self::STATUS_TABS) ? $status : 'all';
+        if ($status !== 'all') {
+            $query->whereIn('upload_batches.processing_status', self::STATUS_TABS[$status]);
+        }
         if ($column === 'agent') {
             $query->leftJoin('users as sort_agents', 'sort_agents.id', '=', 'upload_batches.user_id')
                 ->orderBy('sort_agents.name', $direction);
@@ -66,7 +89,16 @@ class UploadBatchController extends Controller
         return Inertia::render('uploads/index', [
             'batches' => $query->paginate($perPage)->withQueryString(),
             'sort' => $sort,
-            'filters' => ['agent_id' => $request->string('agent_id')->toString(), 'per_page' => (string) $perPage],
+            'filters' => ['agent_id' => $request->string('agent_id')->toString(), 'per_page' => (string) $perPage, 'status' => $status, 'search' => $search],
+            'summary' => [
+                'uploads' => (int) $summary->uploads,
+                'rows' => (int) $summary->rows_total,
+                'accepted' => (int) $summary->accepted,
+                'duplicates' => (int) $summary->duplicates,
+                'rejected' => (int) $summary->rejected,
+                'errors' => (int) $summary->errors,
+            ],
+            'statusCounts' => collect(self::STATUS_TABS)->map(fn (array $statuses): int => collect($statuses)->sum(fn (string $value): int => (int) ($statusCounts[$value] ?? 0)))->all(),
             'deletableTotal' => $deletableTotal,
             'agents' => $request->user()->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [],
         ]);

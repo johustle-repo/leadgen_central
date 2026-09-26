@@ -1,6 +1,20 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
-import { RotateCcw, SlidersHorizontal, Trash2, Upload } from 'lucide-react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    Copy,
+    FileStack,
+    Rows3,
+    RotateCcw,
+    Search,
+    SlidersHorizontal,
+    Trash2,
+    Upload,
+    XCircle,
+} from 'lucide-react';
 import { useState } from 'react';
+import { KpiCard } from '@/components/bi-visuals';
+import { percent } from '@/components/database-charts';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
 import { HeaderActionsPortal } from '@/components/header-actions';
@@ -17,6 +31,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -58,7 +73,24 @@ type Batch = {
     user: { name: string } | null;
 };
 type Agent = { id: number; name: string };
+type Summary = {
+    uploads: number;
+    rows: number;
+    accepted: number;
+    duplicates: number;
+    rejected: number;
+    errors: number;
+};
+type StatusTab = 'all' | 'in_progress' | 'completed' | 'failed';
 const ALL_AGENTS = '__all__';
+const STATUS_TABS: Array<[StatusTab, string]> = [
+    ['all', 'All'],
+    ['in_progress', 'In progress'],
+    ['completed', 'Completed'],
+    ['failed', 'Failed'],
+];
+const share = (value: number, total: number) =>
+    total > 0 ? Math.round((1000 * value) / total) / 10 : null;
 
 const formatUploadedDate = (value: string) =>
     new Intl.DateTimeFormat('en-US', {
@@ -74,16 +106,26 @@ export default function UploadIndex({
     filters,
     deletableTotal,
     agents,
+    summary,
+    statusCounts,
 }: {
     batches: {
         data: Batch[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     sort: string;
-    filters: { agent_id: string; per_page: string };
+    filters: {
+        agent_id: string;
+        per_page: string;
+        status: StatusTab;
+        search: string;
+    };
     deletableTotal: number;
     agents: Agent[];
+    summary: Summary;
+    statusCounts: Record<StatusTab, number>;
 }) {
+    const [searchTerm, setSearchTerm] = useState(filters.search);
     const { auth } = usePage<{ auth: Auth }>().props;
     usePoll(5000, { only: ['batches'] });
     const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
@@ -130,6 +172,8 @@ export default function UploadIndex({
             sort: string;
             agent_id: string;
             per_page: string;
+            status: StatusTab;
+            search: string;
         }>,
     ) => {
         router.get(
@@ -138,6 +182,8 @@ export default function UploadIndex({
                 sort,
                 agent_id: filters.agent_id || undefined,
                 per_page: filters.per_page,
+                status: filters.status === 'all' ? undefined : filters.status,
+                search: filters.search || undefined,
                 ...changes,
             },
             { preserveState: true, replace: true },
@@ -208,12 +254,99 @@ export default function UploadIndex({
                         </Link>
                     </Button>
                 </HeaderActionsPortal>
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
+                    <KpiCard
+                        label="Uploads"
+                        value={summary.uploads}
+                        icon={FileStack}
+                    />
+                    <KpiCard
+                        label="Rows uploaded"
+                        value={summary.rows}
+                        icon={Rows3}
+                    />
+                    <KpiCard
+                        label="Accepted"
+                        value={summary.accepted}
+                        footnote={`${percent(share(summary.accepted, summary.rows))} of rows`}
+                        icon={CheckCircle2}
+                    />
+                    <KpiCard
+                        label="Duplicates"
+                        value={summary.duplicates}
+                        footnote={`${percent(share(summary.duplicates, summary.rows))} of rows`}
+                        icon={Copy}
+                    />
+                    <KpiCard
+                        label="Rejected"
+                        value={summary.rejected}
+                        footnote={`${percent(share(summary.rejected, summary.rows))} of rows`}
+                        icon={XCircle}
+                    />
+                    <KpiCard
+                        label="Errors"
+                        value={summary.errors}
+                        footnote={`${percent(share(summary.errors, summary.rows))} of rows`}
+                        icon={AlertTriangle}
+                    />
+                </div>
+                <nav
+                    aria-label="Upload status"
+                    className="flex gap-1 overflow-x-auto border-b"
+                >
+                    {STATUS_TABS.map(([value, label]) => (
+                        <button
+                            key={value}
+                            type="button"
+                            aria-current={
+                                filters.status === value ? 'page' : undefined
+                            }
+                            onClick={() =>
+                                updateQuery({
+                                    status: value === 'all' ? undefined : value,
+                                })
+                            }
+                            className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm whitespace-nowrap ${filters.status === value ? 'border-primary font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        >
+                            {label}
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+                                {(statusCounts[value] ?? 0).toLocaleString()}
+                            </span>
+                        </button>
+                    ))}
+                </nav>
                 <FilterBar
                     as="div"
                     icon={SlidersHorizontal}
                     label="Filters"
-                    gridClassName="sm:grid-cols-3"
+                    gridClassName="sm:grid-cols-2 lg:grid-cols-5"
                 >
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                        <label
+                            htmlFor="uploads-search"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Search
+                        </label>
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                id="uploads-search"
+                                value={searchTerm}
+                                onChange={(event) =>
+                                    setSearchTerm(event.target.value)
+                                }
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        updateQuery({ search: searchTerm });
+                                    }
+                                }}
+                                placeholder="Filename or batch code — press Enter"
+                                className="pl-9"
+                            />
+                        </div>
+                    </div>
                     <div className="flex flex-col gap-1.5">
                         <label
                             htmlFor="uploads-per-page"
@@ -378,7 +511,9 @@ export default function UploadIndex({
                                 <TableHead>Owner</TableHead>
                                 <TableHead>Date uploaded</TableHead>
                                 <TableHead align="right">Rows</TableHead>
+                                <TableHead>Acceptance</TableHead>
                                 <TableHead align="right">Accepted</TableHead>
+                                <TableHead align="right">Duplicates</TableHead>
                                 <TableHead align="right">Rejected</TableHead>
                                 <TableHead align="right">Errors</TableHead>
                                 <TableHead>Status</TableHead>
@@ -419,45 +554,91 @@ export default function UploadIndex({
                                         >
                                             {batch.original_filename}
                                         </Link>
-                                        <div className="text-xs text-muted-foreground">
+                                        <div className="text-xs whitespace-nowrap text-muted-foreground">
                                             {batch.batch_code}
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="whitespace-nowrap">
                                         {batch.user?.name ?? 'Former user'}
                                     </TableCell>
                                     <TableCell className="whitespace-nowrap">
                                         {formatUploadedDate(batch.created_at)}
                                     </TableCell>
                                     <TableCell align="right">
-                                        {batch.total_rows}
+                                        {batch.total_rows.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell>
+                                        {batch.total_rows > 0 &&
+                                        batch.processing_status ===
+                                            'completed' ? (
+                                            <div className="flex min-w-28 items-center gap-2">
+                                                <div
+                                                    className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+                                                    aria-hidden="true"
+                                                >
+                                                    <div
+                                                        className="h-full rounded-full bg-success"
+                                                        style={{
+                                                            width: `${Math.min(100, share(batch.accepted_rows, batch.total_rows) ?? 0)}%`,
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="w-11 text-right text-xs tabular-nums">
+                                                    {percent(
+                                                        share(
+                                                            batch.accepted_rows,
+                                                            batch.total_rows,
+                                                        ),
+                                                    )}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">
+                                                —
+                                            </span>
+                                        )}
                                     </TableCell>
                                     <TableCell
                                         align="right"
                                         className="text-success"
                                     >
-                                        {batch.accepted_rows}
+                                        {batch.accepted_rows.toLocaleString()}
                                     </TableCell>
                                     <TableCell
                                         align="right"
-                                        className="text-destructive"
+                                        className={
+                                            batch.duplicate_rows > 0
+                                                ? 'text-warning'
+                                                : 'text-muted-foreground'
+                                        }
                                     >
-                                        0
+                                        {batch.duplicate_rows.toLocaleString()}
                                     </TableCell>
                                     <TableCell
                                         align="right"
-                                        className="text-destructive"
+                                        className={
+                                            batch.rejected_rows > 0
+                                                ? 'text-destructive'
+                                                : 'text-muted-foreground'
+                                        }
                                     >
-                                        {batch.rejected_rows +
-                                            batch.error_rows +
-                                            batch.duplicate_rows}
+                                        {batch.rejected_rows.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        className={
+                                            batch.error_rows > 0
+                                                ? 'text-destructive'
+                                                : 'text-muted-foreground'
+                                        }
+                                    >
+                                        {batch.error_rows.toLocaleString()}
                                     </TableCell>
                                     <TableCell>
                                         <StatusBadge
                                             value={batch.processing_status}
                                         />
-                                        {batch.processing_status ===
-                                            'failed' &&
+                                        {batch.processing_status === 'failed' &&
                                             batch.failure_message && (
                                                 <p
                                                     className="mt-1 max-w-48 truncate text-xs text-destructive"
@@ -521,11 +702,12 @@ export default function UploadIndex({
                                                         <DialogTrigger asChild>
                                                             <Button
                                                                 type="button"
-                                                                size="sm"
-                                                                variant="destructive"
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="size-8 text-muted-foreground hover:text-destructive"
+                                                                aria-label={`Delete ${batch.original_filename}`}
                                                             >
                                                                 <Trash2 />
-                                                                Delete
                                                             </Button>
                                                         </DialogTrigger>
                                                         <DialogContent>
@@ -583,8 +765,16 @@ export default function UploadIndex({
                     <div className="rounded-xl border bg-card">
                         <EmptyState
                             icon={Upload}
-                            title="No upload batches yet"
-                            description="Upload a CSV to see its processing results here."
+                            title={
+                                filters.search || filters.status !== 'all'
+                                    ? 'No uploads match these filters'
+                                    : 'No upload batches yet'
+                            }
+                            description={
+                                filters.search || filters.status !== 'all'
+                                    ? 'Try another status tab or a different search.'
+                                    : 'Upload a CSV to see its processing results here.'
+                            }
                         />
                     </div>
                 )}
