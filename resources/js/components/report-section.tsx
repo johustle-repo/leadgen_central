@@ -33,9 +33,7 @@ export function Section({
                     <h2 className="text-lg font-semibold tracking-tight">
                         {title}
                     </h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        {note}
-                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">{note}</p>
                 </div>
                 {children}
             </section>
@@ -52,9 +50,7 @@ export function Section({
                     <h2 className="text-lg font-semibold tracking-tight">
                         {title}
                     </h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        {note}
-                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">{note}</p>
                 </div>
                 <ChevronDown className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </CollapsibleTrigger>

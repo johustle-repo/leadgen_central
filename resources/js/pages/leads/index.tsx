@@ -399,18 +399,14 @@ export default function LeadsIndex({
                                     Date added
                                 </SelectItem>
                                 {agents.length > 0 && (
-                                    <SelectItem value="agent">
-                                        Agent
-                                    </SelectItem>
+                                    <SelectItem value="agent">Agent</SelectItem>
                                 )}
                                 <SelectItem value="company_name">
                                     Company
                                 </SelectItem>
                                 <SelectItem value="status">Status</SelectItem>
                                 <SelectItem value="source">Source</SelectItem>
-                                <SelectItem value="country">
-                                    Country
-                                </SelectItem>
+                                <SelectItem value="country">Country</SelectItem>
                                 <SelectItem value="city">City</SelectItem>
                             </SelectContent>
                         </Select>
@@ -437,9 +433,7 @@ export default function LeadsIndex({
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="desc">
-                                    Descending
-                                </SelectItem>
+                                <SelectItem value="desc">Descending</SelectItem>
                                 <SelectItem value="asc">Ascending</SelectItem>
                             </SelectContent>
                         </Select>

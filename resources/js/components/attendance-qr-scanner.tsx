@@ -416,10 +416,7 @@ export function AttendanceQrScanner({
                                     name="code"
                                     value={form.data.code}
                                     onChange={(event) =>
-                                        form.setData(
-                                            'code',
-                                            event.target.value,
-                                        )
+                                        form.setData('code', event.target.value)
                                     }
                                     placeholder="attendance:..."
                                     aria-invalid={
@@ -459,8 +456,8 @@ export function AttendanceQrScanner({
                         <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
                             Attendance is recorded the instant a QR code is
                             detected by the camera or an uploaded image -
-                            there&apos;s no separate confirm step. Pick Time
-                            In or Time Out first.
+                            there&apos;s no separate confirm step. Pick Time In
+                            or Time Out first.
                         </div>
                     </div>
                 </CardContent>
@@ -481,8 +478,8 @@ export function AttendanceQrScanner({
                             <CardContent>
                                 <ol className="list-decimal space-y-2 pl-4 text-sm text-muted-foreground">
                                     <li>
-                                        Choose Time In or Time Out, then use
-                                        the live camera scanner.
+                                        Choose Time In or Time Out, then use the
+                                        live camera scanner.
                                     </li>
                                     <li>
                                         If camera access fails, upload a QR
@@ -528,9 +525,7 @@ export function AttendanceQrScanner({
                                                 </p>
                                                 {checkIn.employee_code && (
                                                     <p className="text-xs text-muted-foreground">
-                                                        {
-                                                            checkIn.employee_code
-                                                        }
+                                                        {checkIn.employee_code}
                                                     </p>
                                                 )}
                                                 <div className="mt-1">

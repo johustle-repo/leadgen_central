@@ -114,9 +114,7 @@ export default function AttendanceIndex({
         filters.entry_type || ALL_ENTRY_TYPES,
     );
     const [importErrorsDismissed, setImportErrorsDismissed] = useState(false);
-    const [activeTab, setActiveTab] = useState<'monitor' | 'record'>(
-        'monitor',
-    );
+    const [activeTab, setActiveTab] = useState<'monitor' | 'record'>('monitor');
 
     function applyFilters(overrides: Record<string, string>) {
         router.get(
@@ -136,18 +134,20 @@ export default function AttendanceIndex({
     function filterRecords(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         applyFilters(
-            Object.fromEntries(
-                new FormData(event.currentTarget),
-            ) as Record<string, string>,
+            Object.fromEntries(new FormData(event.currentTarget)) as Record<
+                string,
+                string
+            >,
         );
     }
 
     function filterMonitor(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         applyFilters(
-            Object.fromEntries(
-                new FormData(event.currentTarget),
-            ) as Record<string, string>,
+            Object.fromEntries(new FormData(event.currentTarget)) as Record<
+                string,
+                string
+            >,
         );
     }
 
@@ -221,9 +221,7 @@ export default function AttendanceIndex({
     const manualEntryError = Object.values(manualForm.errors)[0];
 
     const importErrors =
-        !importErrorsDismissed && flash.importErrors
-            ? flash.importErrors
-            : [];
+        !importErrorsDismissed && flash.importErrors ? flash.importErrors : [];
 
     const selectedCalendarDay = calendarWeek.find(
         (day) => day.date === monitorDate,
@@ -237,8 +235,8 @@ export default function AttendanceIndex({
                     <div>
                         <h1 className="text-xl font-semibold">Attendance</h1>
                         <p className="text-sm text-muted-foreground">
-                            One row per date per user, with a calendar view
-                            for marking rest days and holidays.
+                            One row per date per user, with a calendar view for
+                            marking rest days and holidays.
                         </p>
                     </div>
                     <Button asChild>
@@ -279,9 +277,9 @@ export default function AttendanceIndex({
                     <CardHeader>
                         <CardTitle>Attendance table</CardTitle>
                         <CardDescription>
-                            One row per date per user with separate Time In
-                            and Time Out values, plus a late check based on
-                            office hours.
+                            One row per date per user with separate Time In and
+                            Time Out values, plus a late check based on office
+                            hours.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-6">
@@ -334,13 +332,10 @@ export default function AttendanceIndex({
                         <div className="rounded-xl border p-4">
                             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                                 <div>
-                                    <p className="font-medium">
-                                        Calendar week
-                                    </p>
+                                    <p className="font-medium">Calendar week</p>
                                     <p className="text-xs text-muted-foreground">
-                                        Week starts on Sunday. Select any
-                                        date, then mark it as a holiday or
-                                        rest day.
+                                        Week starts on Sunday. Select any date,
+                                        then mark it as a holiday or rest day.
                                     </p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
@@ -464,22 +459,17 @@ export default function AttendanceIndex({
                             <div>
                                 <p className="mb-3 text-sm text-muted-foreground">
                                     Super admin accounts can adjust existing
-                                    Time In and Time Out records, add a
-                                    missing Time Out, and switch to the
-                                    Record Attendance tab for new manual
-                                    entries.
+                                    Time In and Time Out records, add a missing
+                                    Time Out, and switch to the Record
+                                    Attendance tab for new manual entries.
                                 </p>
                                 {dailyMonitor.length ? (
                                     <Table>
                                         <TableHeader>
                                             <TableRow className="hover:bg-transparent">
                                                 <TableHead>Staff</TableHead>
-                                                <TableHead>
-                                                    Time In
-                                                </TableHead>
-                                                <TableHead>
-                                                    Time Out
-                                                </TableHead>
+                                                <TableHead>Time In</TableHead>
+                                                <TableHead>Time Out</TableHead>
                                                 <TableHead>
                                                     Total Hours
                                                 </TableHead>
@@ -570,8 +560,8 @@ export default function AttendanceIndex({
                                     <p className="mb-4 text-sm text-muted-foreground">
                                         Manually add a Time In or Time Out
                                         record for an active agent. Time Out
-                                        entries still require an existing
-                                        Time In on the same date.
+                                        entries still require an existing Time
+                                        In on the same date.
                                     </p>
                                     <form
                                         onSubmit={submitManualEntry}
@@ -582,9 +572,7 @@ export default function AttendanceIndex({
                                                 Agent
                                             </Label>
                                             <Select
-                                                value={
-                                                    manualForm.data.user_id
-                                                }
+                                                value={manualForm.data.user_id}
                                                 onValueChange={(value) =>
                                                     manualForm.setData(
                                                         'user_id',
@@ -658,14 +646,11 @@ export default function AttendanceIndex({
                                                     id="manual-date"
                                                     type="date"
                                                     className="mt-2"
-                                                    value={
-                                                        manualForm.data.date
-                                                    }
+                                                    value={manualForm.data.date}
                                                     onChange={(event) =>
                                                         manualForm.setData(
                                                             'date',
-                                                            event.target
-                                                                .value,
+                                                            event.target.value,
                                                         )
                                                     }
                                                 />
@@ -695,20 +680,18 @@ export default function AttendanceIndex({
                                             <p className="mb-1 font-medium text-foreground">
                                                 Quick reminders
                                             </p>
-                                            Only active agents are listed
-                                            here. A Time In must happen
-                                            before a Time Out on the same
-                                            date, and each date only allows
-                                            one Time In and one Time Out per
-                                            agent.
+                                            Only active agents are listed here.
+                                            A Time In must happen before a Time
+                                            Out on the same date, and each date
+                                            only allows one Time In and one Time
+                                            Out per agent.
                                         </div>
                                         <div className="flex gap-2">
                                             <Button
                                                 type="submit"
                                                 disabled={
                                                     manualForm.processing ||
-                                                    !manualForm.data
-                                                        .user_id ||
+                                                    !manualForm.data.user_id ||
                                                     !manualForm.data.time
                                                 }
                                             >
@@ -732,10 +715,10 @@ export default function AttendanceIndex({
                                         Import attendance history
                                     </p>
                                     <p className="mb-4 text-sm text-muted-foreground">
-                                        Upload one or more JSON exports from
-                                        a previous system. Rows are matched
-                                        to staff by email or name;
-                                        re-importing the same file is safe.
+                                        Upload one or more JSON exports from a
+                                        previous system. Rows are matched to
+                                        staff by email or name; re-importing the
+                                        same file is safe.
                                     </p>
                                     <form
                                         onSubmit={submitImport}
@@ -755,13 +738,9 @@ export default function AttendanceIndex({
                                                 )
                                             }
                                         />
-                                        {importForm.data.files.length >
-                                            0 && (
+                                        {importForm.data.files.length > 0 && (
                                             <p className="text-xs text-muted-foreground">
-                                                {
-                                                    importForm.data.files
-                                                        .length
-                                                }{' '}
+                                                {importForm.data.files.length}{' '}
                                                 file
                                                 {importForm.data.files
                                                     .length === 1
@@ -774,17 +753,15 @@ export default function AttendanceIndex({
                                             </p>
                                         )}
                                         <InputError
-                                            message={
-                                                importForm.errors.files
-                                            }
+                                            message={importForm.errors.files}
                                         />
                                         <Button
                                             type="submit"
                                             variant="outline"
                                             disabled={
                                                 importForm.processing ||
-                                                importForm.data.files
-                                                    .length === 0
+                                                importForm.data.files.length ===
+                                                    0
                                             }
                                         >
                                             <FileJson />
@@ -823,10 +800,7 @@ export default function AttendanceIndex({
                                                 {user.name}
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                                {user.role.replaceAll(
-                                                    '_',
-                                                    ' ',
-                                                )}
+                                                {user.role.replaceAll('_', ' ')}
                                             </p>
                                         </div>
                                         <Button

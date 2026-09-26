@@ -225,10 +225,10 @@ export default function EmailRepliesIndex({
                     <CardHeader>
                         <CardTitle>Agent Gmail accounts</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            Every agent is listed here. They can connect
-                            their own Gmail from their profile settings, or
-                            you can connect it for them below. Trigger a
-                            re-sync if a mailbox looks stale.
+                            Every agent is listed here. They can connect their
+                            own Gmail from their profile settings, or you can
+                            connect it for them below. Trigger a re-sync if a
+                            mailbox looks stale.
                         </p>
                     </CardHeader>
                     <CardContent className="p-0">

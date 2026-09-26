@@ -409,8 +409,8 @@ export default function AttendanceSummary({
                                                                                 restDay
                                                                                     ? 'Rest Day'
                                                                                     : holiday
-                                                                                        ? 'Holiday'
-                                                                                        : null;
+                                                                                      ? 'Holiday'
+                                                                                      : null;
 
                                                                             return (
                                                                                 <TableRow

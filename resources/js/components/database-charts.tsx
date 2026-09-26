@@ -37,7 +37,7 @@ export function ChartTooltip({ active, label, payload }: TooltipContentProps) {
                             className="size-2 shrink-0 rounded-[2px]"
                             style={{ backgroundColor: entry.color }}
                         />
-                        <span className="font-semibold tabular-nums text-foreground">
+                        <span className="font-semibold text-foreground tabular-nums">
                             {typeof entry.value === 'number'
                                 ? entry.value.toLocaleString()
                                 : entry.value}

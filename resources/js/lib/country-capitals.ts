@@ -4,7 +4,10 @@
  * contexts (like the Lead Review "Copy details" clipboard export) that need
  * a representative city when the lead's own city isn't the point.
  */
-export const COUNTRY_CAPITALS: Record<string, { name: string; capital: string }> = {
+export const COUNTRY_CAPITALS: Record<
+    string,
+    { name: string; capital: string }
+> = {
     AD: { name: 'Andorra', capital: 'Andorra la Vella' },
     AE: { name: 'United Arab Emirates', capital: 'Abu Dhabi' },
     AF: { name: 'Afghanistan', capital: 'Kabul' },

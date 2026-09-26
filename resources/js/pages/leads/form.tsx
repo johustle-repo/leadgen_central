@@ -252,9 +252,10 @@ export default function LeadForm({
 
         autosaveTimer.current = setTimeout(() => {
             writeDraft(
-                Object.fromEntries(
-                    new FormData(formEl),
-                ) as Record<string, string>,
+                Object.fromEntries(new FormData(formEl)) as Record<
+                    string,
+                    string
+                >,
             );
         }, 400);
     };
@@ -519,8 +520,8 @@ export default function LeadForm({
                         <CardHeader>
                             <CardTitle>Change history</CardTitle>
                             <CardDescription>
-                                Field edits recorded for this lead, most
-                                recent first.
+                                Field edits recorded for this lead, most recent
+                                first.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="divide-y">
@@ -535,8 +536,7 @@ export default function LeadForm({
                                             {entry.description}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {entry.user?.name ??
-                                                'Deleted user'}{' '}
+                                            {entry.user?.name ?? 'Deleted user'}{' '}
                                             ·{' '}
                                             {new Date(
                                                 entry.created_at,

@@ -397,7 +397,8 @@ function truncateMiddle(
     let right = text.length - left;
 
     while (left > 0 && right > 0) {
-        const candidate = text.slice(0, left) + ellipsis + text.slice(text.length - right);
+        const candidate =
+            text.slice(0, left) + ellipsis + text.slice(text.length - right);
 
         if (ctx.measureText(candidate).width <= maxWidth) {
             return candidate;

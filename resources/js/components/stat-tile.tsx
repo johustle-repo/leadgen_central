@@ -30,7 +30,9 @@ export function StatTile({
         <Card
             className={`relative flex h-full flex-col overflow-hidden py-0 transition-colors ${href ? 'cursor-pointer hover:border-ring' : ''}`}
         >
-            <div className={`absolute inset-x-0 top-0 h-1 bg-current ${tone}`} />
+            <div
+                className={`absolute inset-x-0 top-0 h-1 bg-current ${tone}`}
+            />
             <CardContent className="flex flex-1 items-center justify-between gap-4 px-5 pt-6 pb-5">
                 <div className="min-w-0">
                     <p className="text-sm text-muted-foreground">{label}</p>
@@ -64,7 +66,7 @@ export function StatTile({
     return (
         <Link
             href={href}
-            className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="block h-full rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
             {card}
         </Link>

@@ -19,9 +19,8 @@ export type EditingAttendanceCell = {
  */
 export function useAttendanceEntryEditor() {
     const editForm = useForm<{ recorded_at: string }>({ recorded_at: '' });
-    const [editingCell, setEditingCell] = useState<EditingAttendanceCell | null>(
-        null,
-    );
+    const [editingCell, setEditingCell] =
+        useState<EditingAttendanceCell | null>(null);
 
     function openEditor(
         userId: number,

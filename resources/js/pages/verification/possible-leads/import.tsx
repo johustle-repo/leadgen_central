@@ -52,15 +52,14 @@ export default function PossibleLeadsImport({ agents }: { agents: Agent[] }) {
                                     </CardTitle>
                                     <CardDescription>
                                         Each row is matched against existing
-                                        leads by email, then by company name.
-                                        A match is updated with the file's
-                                        data and marked Possible Lead. A row
-                                        with no match is created fresh as a
-                                        Possible Lead, owned by the agent you
-                                        pick below. A company matching more
-                                        than one existing lead is skipped and
-                                        reported so you can resolve it
-                                        manually.
+                                        leads by email, then by company name. A
+                                        match is updated with the file's data
+                                        and marked Possible Lead. A row with no
+                                        match is created fresh as a Possible
+                                        Lead, owned by the agent you pick below.
+                                        A company matching more than one
+                                        existing lead is skipped and reported so
+                                        you can resolve it manually.
                                     </CardDescription>
                                 </div>
                             </div>
@@ -98,9 +97,8 @@ export default function PossibleLeadsImport({ agents }: { agents: Agent[] }) {
                                     message={form.errors.agent_id}
                                 />
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    Only applies to rows with no existing
-                                    match. A matched lead keeps its current
-                                    owner.
+                                    Only applies to rows with no existing match.
+                                    A matched lead keeps its current owner.
                                 </p>
                             </div>
                             <div>
