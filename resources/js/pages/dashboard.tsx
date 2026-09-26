@@ -38,19 +38,9 @@ import type { Auth } from '@/types';
 import type { DatabaseAnalytics, Overview } from '@/types/database-analytics';
 
 type Props = {
-    stats: Record<string, number>;
     period: string;
     filters: { date_from: string; date_to: string };
     databaseAnalytics: DatabaseAnalytics;
-    recentBatches: Array<{
-        id: number;
-        batch_code: string;
-        original_filename: string;
-        processing_status: string;
-        total_rows: number;
-        created_at: string;
-        user: { name: string } | null;
-    }>;
     recentLeads: Array<{
         id: number;
         lead_code: string;
@@ -220,16 +210,10 @@ export default function Dashboard({
                             Database intelligence
                         </h1>
                         <p className="mt-2 text-sm text-muted-foreground">
-                            Size, composition, quality and growth ·{' '}
+                            {selectedLabel} · compared with {previousLabel} ·{' '}
                             {auth.user.role === 'agent'
                                 ? 'Your records only'
-                                : 'All-owner database scope'}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Showing {selectedLabel} · {data.timezone}.
-                            Comparisons use the preceding equal-length period:{' '}
-                            {previousLabel}. Custom ranges support up to ten
-                            years.
+                                : 'All records'}
                         </p>
                         {Object.keys(errors).length > 0 && (
                             <p
@@ -251,7 +235,7 @@ export default function Dashboard({
 
                 <Section
                     title="Database overview"
-                    note={`Records created ${selectedLabel}. Current values and classifications; soft-deleted leads excluded.`}
+                    note="Records created in the selected period."
                 >
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         {(
@@ -287,7 +271,7 @@ export default function Dashboard({
 
                 <Section
                     title="Data quality"
-                    note={`Uploads created ${selectedLabel} · full breakdown and trends are on Reports.`}
+                    note="Uploads in the selected period · full breakdown on Reports."
                 >
                     <div className="grid gap-4 sm:grid-cols-3">
                         <StatTile
@@ -316,115 +300,22 @@ export default function Dashboard({
 
                 <Section
                     title="Database growth"
-                    note={`Additions during ${selectedLabel}, grouped by ${data.growth.granularity}. This is not a cumulative sales funnel.`}
+                    note={`Records added per ${data.growth.granularity}.`}
                 >
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="mb-6 grid gap-4 sm:grid-cols-3">
-                                {(
-                                    ['records', 'companies', 'emails'] as const
-                                ).map((key) => (
-                                    <div key={key}>
-                                        <p className="text-xs text-muted-foreground">
-                                            {key === 'records'
-                                                ? 'Records added'
-                                                : `First-seen ${key}`}
-                                        </p>
-                                        <p className="text-2xl font-semibold tabular-nums">
-                                            {data.growth.totals[
-                                                key
-                                            ].toLocaleString()}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {changeLabel(
-                                                data.growth.totals[
-                                                    `${key}_change`
-                                                ],
-                                            )}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
                             <GrowthChart growth={data.growth} />
-                            <p className="mt-4 text-xs text-muted-foreground">
-                                First-seen companies and emails use their
-                                earliest surviving record within your authorized
-                                scope. Existing companies with new contacts do
-                                not count as newly added companies. Partial
-                                weeks/months include only selected dates.
-                                Historical deletions, ownership changes and
-                                edits cannot be reconstructed as a historical
-                                database snapshot.
-                            </p>
-                        </CardContent>
-                    </Card>
-                </Section>
-
-                <Section
-                    title="Companies and contacts"
-                    note={`Top 15 companies by contact records created ${selectedLabel}. Shared company names do not imply duplicate contacts.`}
-                >
-                    <Card>
-                        <CardContent className="overflow-x-auto pt-6">
-                            <table className="w-full text-left text-sm">
-                                <thead>
-                                    <tr>
-                                        <th className="p-3">Company group</th>
-                                        <th className="p-3 text-right">
-                                            Contact records
-                                        </th>
-                                        <th className="p-3 text-right">
-                                            Unique emails
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {data.companies.map((row) => (
-                                        <tr key={row.label}>
-                                            <td className="p-3 uppercase">
-                                                {row.label}
-                                            </td>
-                                            <td className="p-3 text-right tabular-nums">
-                                                {row.contacts.toLocaleString()}
-                                            </td>
-                                            <td className="p-3 text-right tabular-nums">
-                                                {row.emails.toLocaleString()}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {data.companies.length === 0 && (
-                                        <tr>
-                                            <td
-                                                colSpan={3}
-                                                className="p-6 text-center text-muted-foreground"
-                                            >
-                                                No named companies in this
-                                                period.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                            <p className="mt-4 text-xs text-muted-foreground">
-                                Company groups use normalized names, not a
-                                verified company identifier. Same-name
-                                businesses may be grouped together. A reliable
-                                unique-person count requires a stable contact
-                                identity beyond an email address.
-                            </p>
                         </CardContent>
                     </Card>
                 </Section>
 
                 <Section
                     title="Recent database activity"
-                    note={`Latest records and uploads created ${selectedLabel}.`}
+                    note="Latest records in the selected period."
                 >
                     <Card>
                         <CardHeader className="flex-row items-center justify-between">
-                            <CardTitle>
-                                Recent records · selected period
-                            </CardTitle>
+                            <CardTitle>Recent records</CardTitle>
                             <Link
                                 href={leadsIndex()}
                                 className="text-xs text-primary hover:underline"
