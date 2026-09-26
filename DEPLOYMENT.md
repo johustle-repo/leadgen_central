@@ -80,6 +80,8 @@ If a batch is still stuck "Pending" after deploying this fix, confirm the cron e
 
 ## Every release
 
+On the current Hostinger server, releases are automated: push to `main` and CI deploys. The frontend is built locally and `public/build` is committed, so never run `npm ci`/`npm run build` there. See [Deploying a release](README.md#deploying-a-release). The generic sequence below applies to hosts that build on the server:
+
 ```bash
 php artisan down --retry=60
 git pull --ff-only
