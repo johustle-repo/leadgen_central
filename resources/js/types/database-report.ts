@@ -18,6 +18,24 @@ export type QualityMetrics = {
     location_issues_rate: number | null;
     clean_rate: number | null;
 };
+export type DemographicMetrics = {
+    records: number;
+    possible: number;
+    qualified: number;
+    forwarded: number;
+};
+export type DemographicRow = DemographicMetrics & {
+    region: string;
+    country: string;
+    city: string;
+    agent_id: number | null;
+};
+export type Demographics = {
+    rows: DemographicRow[];
+    agents: Record<string, string>;
+    regions: string[];
+    truncated: boolean;
+};
 export type DatabaseReport = Omit<
     DatabaseAnalytics,
     'contribution' | 'quality'
@@ -44,6 +62,7 @@ export type DatabaseReport = Omit<
             records: number;
         }>;
     };
+    demographics: Demographics;
     contribution: (QualityMetrics & {
         id: number;
         name: string;

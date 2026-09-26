@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\LeadStatus;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\UploadRow;
 use App\Models\User;
+use App\Support\CountryRegions;
 use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -46,6 +48,12 @@ class DatabaseIntelligenceReport
         'czech republic' => 'CZ',
         'russia' => 'RU',
     ];
+
+    /**
+     * Upper bound on region/country/city/agent combinations sent to the
+     * interactive demographics visuals, keeping the page payload bounded.
+     */
+    private const DEMOGRAPHIC_ROW_LIMIT = 5000;
 
     /** @param array<string, mixed> $filters
      * @return array<string, mixed>
@@ -106,6 +114,7 @@ class DatabaseIntelligenceReport
         $data['industry_coverage'] = $this->rate($knownIndustry, $data['overview']['records']);
         $data['show_industries'] = $knownIndustry > 0 && $data['industry_coverage'] >= 20;
         $data['geographic_detail'] = $this->geography($leads);
+        $data['demographics'] = $this->demographics($leads);
         $data['contribution'] = $user->isAdministrator() ? $this->contribution($leads, $batches, $rows) : [];
 
         return $data;
@@ -132,6 +141,33 @@ class DatabaseIntelligenceReport
         ];
         if ($data['can_compare_agents']) {
             $sections['Database contribution by agent - selected period'] = [['Agent', 'Records', 'Companies', 'Uploads', 'Avg batch', 'Duplicate rate', 'Rejection rate', 'Error rate', 'Quality rate'], ...array_map(fn (array $row): array => [$row['name'], $row['records'], $row['companies'], $row['uploads'], $row['average_batch_size'] ?? 'N/A', $rate($row['duplicates_rate']), $rate($row['rejected_rate']), $rate($row['errors_rate']), $rate($row['clean_rate'])], $data['contribution'])];
+        }
+
+        $demographics = $data['demographics'];
+        $countryName = fn (string $code): string => CountryRegions::COUNTRIES[$code]['name'] ?? $code;
+        $agentName = fn (?int $id): string => $id === null ? 'Unassigned' : ($demographics['agents'][$id] ?? 'Deleted user');
+        $breakdown = function (string $heading, callable $labelOf, ?int $limit = null) use ($demographics, $rate): array {
+            $totals = [];
+            foreach ($demographics['rows'] as $row) {
+                $label = $labelOf($row);
+                $totals[$label] ??= ['records' => 0, 'possible' => 0, 'qualified' => 0, 'forwarded' => 0];
+                foreach (array_keys($totals[$label]) as $metric) {
+                    $totals[$label][$metric] += $row[$metric];
+                }
+            }
+            uasort($totals, fn (array $a, array $b): int => $b['records'] <=> $a['records']);
+            $totals = array_slice($totals, 0, $limit, true);
+
+            return [[$heading, 'Leads', 'Possible leads', 'Qualified leads', 'Forwarded', 'Possible lead rate'], ...array_map(
+                fn (string|int $label, array $total): array => [(string) $label, $total['records'], $total['possible'], $total['qualified'], $total['forwarded'], $rate($this->rate($total['possible'], $total['records']))],
+                array_keys($totals), $totals,
+            )];
+        };
+        $sections['Leads by region - selected period'] = $breakdown('Region', fn (array $row): string => $row['region']);
+        $sections['Leads by country - selected period'] = $breakdown('Country', fn (array $row): string => $countryName($row['country']));
+        $sections['Leads by city or capital - selected period (top 50)'] = $breakdown('City', fn (array $row): string => $row['city'].', '.$countryName($row['country']), 50);
+        if ($data['can_compare_agents']) {
+            $sections['Leads by agent - selected period'] = $breakdown('Agent', fn (array $row): string => $agentName($row['agent_id']));
         }
 
         return $sections;
@@ -243,19 +279,7 @@ class DatabaseIntelligenceReport
      */
     private function geography(Builder $leads): array
     {
-        $aliasCase = '';
-        $aliasBindings = [];
-        foreach (self::COUNTRY_NAME_ALIASES as $alias => $iso2) {
-            $aliasCase .= 'WHEN ? THEN ? ';
-            array_push($aliasBindings, $alias, $iso2);
-        }
-
-        $projection = (clone $leads)
-            ->leftJoin('countries', function ($join) {
-                $join->on('countries.normalized_name', '=', DB::raw('LOWER(TRIM(leads.country))'));
-            })
-            ->selectRaw("COALESCE(NULLIF(UPPER(TRIM(leads.country_code)), ''), countries.iso2, CASE LOWER(TRIM(leads.country)) {$aliasCase} END, NULLIF(LOWER(TRIM(leads.country)), ''), 'Unknown') as country", $aliasBindings)
-            ->toBase();
+        $projection = $this->withResolvedCountry($leads)->toBase();
 
         $query = DB::query()->fromSub($projection, 'locations');
         $total = (clone $query)->count();
@@ -264,6 +288,74 @@ class DatabaseIntelligenceReport
             ->map(fn (object $row): array => ['country' => (string) $row->country, 'records' => (int) $row->records])->all();
 
         return ['records' => $total, 'rows' => $rows];
+    }
+
+    /**
+     * Select each lead's country as an ISO2 code where one can be resolved
+     * (stored code, canonical countries table, or a known alias), otherwise
+     * its lowercased name, otherwise 'Unknown'.
+     *
+     * @param  Builder<Lead>  $leads
+     * @return Builder<Lead>
+     */
+    private function withResolvedCountry(Builder $leads): Builder
+    {
+        $aliasCase = '';
+        $aliasBindings = [];
+        foreach (self::COUNTRY_NAME_ALIASES as $alias => $iso2) {
+            $aliasCase .= 'WHEN ? THEN ? ';
+            array_push($aliasBindings, $alias, $iso2);
+        }
+
+        return (clone $leads)
+            ->leftJoin('countries', function ($join) {
+                $join->on('countries.normalized_name', '=', DB::raw('LOWER(TRIM(leads.country))'));
+            })
+            ->selectRaw("COALESCE(NULLIF(UPPER(TRIM(leads.country_code)), ''), countries.iso2, CASE LOWER(TRIM(leads.country)) {$aliasCase} END, NULLIF(LOWER(TRIM(leads.country)), ''), 'Unknown') as country", $aliasBindings);
+    }
+
+    /**
+     * Lead counts per region, country, city and owning agent, with possible,
+     * qualified and forwarded leads counted by current status. The page
+     * aggregates these combinations client-side so every visual can
+     * cross-filter the others without another request.
+     *
+     * @param  Builder<Lead>  $leads
+     * @return array{rows: list<array{region: string, country: string, city: string, agent_id: int|null, records: int, possible: int, qualified: int, forwarded: int}>, agents: array<int, string>, regions: list<string>, truncated: bool}
+     */
+    private function demographics(Builder $leads): array
+    {
+        $projection = $this->withResolvedCountry($leads)
+            ->selectRaw("COALESCE(NULLIF(TRIM(leads.city), ''), 'Unknown') as city, leads.agent_id, leads.status")
+            ->toBase();
+        $combinations = DB::query()->fromSub($projection, 'demographics')
+            ->selectRaw('country, LOWER(city) as city_key, MIN(city) as city, agent_id, COUNT(*) as records')
+            ->selectRaw('COUNT(CASE WHEN status = ? THEN 1 END) as possible', [LeadStatus::PossibleLead->value])
+            ->selectRaw('COUNT(CASE WHEN status = ? THEN 1 END) as qualified', [LeadStatus::QualifiedLead->value])
+            ->selectRaw('COUNT(CASE WHEN status = ? THEN 1 END) as forwarded', [LeadStatus::Forwarded->value])
+            ->groupBy('country', 'city_key', 'agent_id')
+            ->orderByDesc('records')->orderBy('country')->orderBy('city_key')
+            ->limit(self::DEMOGRAPHIC_ROW_LIMIT + 1)->get();
+        $truncated = $combinations->count() > self::DEMOGRAPHIC_ROW_LIMIT;
+
+        $rows = [];
+        foreach ($combinations->take(self::DEMOGRAPHIC_ROW_LIMIT) as $combination) {
+            $country = (string) $combination->country;
+            if (preg_match('/^[A-Z]{2}$/', $country) !== 1) {
+                $country = CountryRegions::codeForName($country) ?? $country;
+            }
+            $agentId = $combination->agent_id === null ? null : (int) $combination->agent_id;
+            $key = implode('|', [$country, $combination->city_key, $agentId]);
+            $rows[$key] ??= ['region' => CountryRegions::regionFor($country), 'country' => $country, 'city' => (string) $combination->city, 'agent_id' => $agentId, 'records' => 0, 'possible' => 0, 'qualified' => 0, 'forwarded' => 0];
+            foreach (['records', 'possible', 'qualified', 'forwarded'] as $metric) {
+                $rows[$key][$metric] += (int) $combination->{$metric};
+            }
+        }
+
+        $agentIds = array_values(array_unique(array_filter(array_column($rows, 'agent_id'), fn (?int $id): bool => $id !== null)));
+        $agents = $agentIds === [] ? [] : User::withTrashed()->whereIn('id', $agentIds)->pluck('name', 'id')->all();
+
+        return ['rows' => array_values($rows), 'agents' => $agents, 'regions' => [...CountryRegions::REGIONS, CountryRegions::UNASSIGNED], 'truncated' => $truncated];
     }
 
     private function rate(int $value, int $total): ?float

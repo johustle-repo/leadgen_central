@@ -1,5 +1,21 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import {
+    AlertTriangle,
+    Building2,
+    CheckCircle2,
+    Copy,
+    Database,
+    FileWarning,
+    Globe2,
+    Layers,
+    Mail,
+    MapPinOff,
+    SearchCheck,
+    Sparkles,
+    Upload,
+    XCircle,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import {
     Bar,
@@ -10,20 +26,18 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+import { BarList, KpiCard, Visual } from '@/components/bi-visuals';
 import {
-    changeLabel,
     ChartLegend,
     ChartTooltip,
-    DistributionChart,
     formatLabel,
     GrowthChart,
     percent,
     summarize,
 } from '@/components/database-charts';
 import { HeaderActionsPortal } from '@/components/header-actions';
-import { Section } from '@/components/report-section';
+import { countryLabel, LeadDemographics } from '@/components/lead-demographics';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -52,6 +66,8 @@ type Props = {
     };
     replyClassifications: { label: string; value: number }[];
 };
+type Tab = 'overview' | 'demographics' | 'quality' | 'agents' | 'replies';
+
 const periods: Record<string, string> = {
     today: 'Today',
     week: 'This Week',
@@ -64,49 +80,22 @@ const periods: Record<string, string> = {
     '7_days': 'Last 7 Days',
     '90_days': 'Last 90 Days',
 };
-const selectClass =
-    'h-9 rounded-md border border-input bg-background px-3 text-sm';
-const regions = new Intl.DisplayNames(['en'], { type: 'region' });
-function countryName(value: string) {
-    return /^[A-Z]{2}$/.test(value)
-        ? (regions.of(value) ?? value)
-        : formatLabel(value);
-}
-function sharePercent(value: number, total: number): number | null {
-    return total > 0 ? Math.round((1000 * value) / total) / 10 : null;
-}
+const QUALITY_SERIES = [
+    'duplicates',
+    'rejected',
+    'errors',
+    'location_issues',
+] as const;
 const SOURCE_RATE_SERIES = [
     { key: 'duplicates_rate', label: 'Duplicate rate' },
     { key: 'rejected_rate', label: 'Rejection rate' },
     { key: 'errors_rate', label: 'Error rate' },
 ] as const;
-function Metric({
-    label,
-    value,
-    note,
-}: {
-    label: string;
-    value: number | string | null;
-    note?: string;
-}) {
-    return (
-        <Card>
-            <CardContent className="pt-5">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums">
-                    {value === null
-                        ? 'N/A'
-                        : typeof value === 'number'
-                          ? value.toLocaleString()
-                          : value}
-                </p>
-                {note && (
-                    <p className="mt-2 text-xs text-muted-foreground">{note}</p>
-                )}
-            </CardContent>
-        </Card>
-    );
+
+function sharePercent(value: number, total: number): number | null {
+    return total > 0 ? Math.round((1000 * value) / total) / 10 : null;
 }
+
 function ReportTable({
     headings,
     rows,
@@ -115,27 +104,27 @@ function ReportTable({
     rows: ReactNode[][];
 }) {
     return (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-            <table className="w-full text-left text-sm">
-                <thead className="bg-muted/50">
+        <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+                <thead className="border-b text-muted-foreground">
                     <tr>
-                        {headings.map((h) => (
+                        {headings.map((heading, index) => (
                             <th
-                                className="px-4 py-3 whitespace-nowrap"
-                                key={h}
+                                className={`py-2 pr-4 font-medium whitespace-nowrap ${index > 0 ? 'text-right' : ''}`}
+                                key={heading}
                                 scope="col"
                             >
-                                {h}
+                                {heading}
                             </th>
                         ))}
                     </tr>
                 </thead>
                 <tbody className="divide-y">
                     {rows.map((row, index) => (
-                        <tr key={index}>
+                        <tr key={index} className="hover:bg-muted/50">
                             {row.map((cell, column) => (
                                 <td
-                                    className="px-4 py-3 tabular-nums"
+                                    className={`py-2 pr-4 tabular-nums ${column > 0 ? 'text-right' : 'font-medium'}`}
                                     key={column}
                                 >
                                     {cell}
@@ -147,7 +136,7 @@ function ReportTable({
                         <tr>
                             <td
                                 colSpan={headings.length}
-                                className="p-6 text-center text-muted-foreground"
+                                className="py-6 text-center text-muted-foreground"
                             >
                                 No data for this period.
                             </td>
@@ -157,6 +146,37 @@ function ReportTable({
             </table>
         </div>
     );
+}
+
+function DataBar({ value, max }: { value: number; max: number }) {
+    return (
+        <span className="relative ml-auto flex h-5 w-28 items-center justify-end">
+            <span
+                className="absolute inset-y-0.5 left-0 rounded-r-[3px] bg-chart-1/20"
+                style={{ width: `${max > 0 ? (value / max) * 100 : 0}%` }}
+                aria-hidden="true"
+            />
+            <span className="relative">{value.toLocaleString()}</span>
+        </span>
+    );
+}
+
+function initialTab(): Tab {
+    if (typeof window === 'undefined') {
+        return 'overview';
+    }
+
+    const hash = window.location.hash.slice(1);
+
+    return [
+        'overview',
+        'demographics',
+        'quality',
+        'agents',
+        'replies',
+    ].includes(hash)
+        ? (hash as Tab)
+        : 'overview';
 }
 
 export default function Analytics({
@@ -175,19 +195,49 @@ export default function Analytics({
     const [granularity, setGranularity] = useState(data.growth.granularity);
     const [mode, setMode] = useState<'count' | 'rate'>('count');
     const [processing, setProcessing] = useState(false);
+    const [tab, setTab] = useState<Tab>(initialTab);
     const selected = `${filters.date_from} – ${filters.date_to}`;
     const quality = data.quality;
+    const isSuperAdministrator = auth.user.role === 'super_administrator';
     const appliedQuery = {
         period,
         ...filters,
         granularity: data.growth.granularity,
     };
-    const qualitySeries = [
-        'duplicates',
-        'rejected',
-        'errors',
-        'location_issues',
-    ] as const;
+    const possibleLeads = data.demographics.rows.reduce(
+        (sum, row) => sum + row.possible,
+        0,
+    );
+    const possibleByAgent = new Map<number, number>();
+    data.demographics.rows.forEach((row) => {
+        if (row.agent_id !== null) {
+            possibleByAgent.set(
+                row.agent_id,
+                (possibleByAgent.get(row.agent_id) ?? 0) + row.possible,
+            );
+        }
+    });
+    const tabs: Array<{ key: Tab; label: string }> = [
+        { key: 'overview', label: 'Overview' },
+        { key: 'demographics', label: 'Demographics' },
+        { key: 'quality', label: 'Data quality' },
+        ...(data.can_compare_agents
+            ? [{ key: 'agents' as const, label: 'Agents' }]
+            : []),
+        ...(isSuperAdministrator
+            ? [{ key: 'replies' as const, label: 'Replies' }]
+            : []),
+    ];
+    const activeTab = tabs.some((item) => item.key === tab) ? tab : 'overview';
+
+    useEffect(() => {
+        window.history.replaceState(
+            window.history.state,
+            '',
+            `${window.location.pathname}${window.location.search}#${activeTab}`,
+        );
+    }, [activeTab]);
+
     function applyPeriod(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -205,16 +255,16 @@ export default function Analytics({
             },
             {
                 preserveScroll: true,
+                preserveState: true,
                 onStart: () => setProcessing(true),
                 onFinish: () => setProcessing(false),
             },
         );
     }
-    const geo = data.geographic_detail;
 
     return (
         <>
-            <Head title="Database reports" />
+            <Head title="Lead reports" />
             <HeaderActionsPortal>
                 <form
                     onSubmit={applyPeriod}
@@ -290,35 +340,31 @@ export default function Analytics({
                     </Button>
                 </form>
             </HeaderActionsPortal>
-            <div className="flex min-w-0 flex-1 flex-col gap-8 p-4 md:p-6">
-                <header className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            Database intelligence reports
+            <div className="flex min-w-0 flex-1 flex-col gap-4 bg-muted/40 p-4 md:p-6">
+                <header className="flex flex-wrap items-end justify-between gap-3 rounded-lg bg-primary px-5 py-4 text-primary-foreground shadow-xs">
+                    <div className="min-w-0">
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            Lead reports
                         </h1>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            Representation, quality, growth and contribution ·{' '}
+                        <p className="mt-1 text-sm opacity-90">
+                            {summarize(data)}
+                        </p>
+                        <p className="mt-1 text-xs opacity-80">
+                            {selected} · vs {data.previous_period.from} –{' '}
+                            {data.previous_period.to} ·{' '}
                             {auth.user.role === 'agent'
                                 ? 'Your data only'
-                                : 'All-owner data'}
+                                : 'All records'}{' '}
+                            · {data.timezone}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            All panels follow {selected}, except values
-                            explicitly labeled All time. Reporting timezone:{' '}
-                            {data.timezone}.
-                        </p>
-                        {Object.entries(errors).map(([key, message]) => (
-                            <p
-                                role="alert"
-                                className="mt-2 text-sm text-destructive"
-                                key={key}
-                            >
-                                {message}
-                            </p>
-                        ))}
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" asChild>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            asChild
+                            className="bg-card text-foreground hover:bg-card/90"
+                        >
                             <a
                                 href={reportExport.url({
                                     query: appliedQuery,
@@ -327,7 +373,12 @@ export default function Analytics({
                                 Export CSV
                             </a>
                         </Button>
-                        <Button variant="outline" asChild>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            asChild
+                            className="bg-card text-foreground hover:bg-card/90"
+                        >
                             <a
                                 href={reportExportPdf.url({
                                     query: appliedQuery,
@@ -338,612 +389,787 @@ export default function Analytics({
                         </Button>
                     </div>
                 </header>
-
-                <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-4">
-                    <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
-                    <p className="pl-3 text-sm leading-relaxed font-medium text-foreground">
-                        {summarize(data)}
+                {Object.entries(errors).map(([key, message]) => (
+                    <p
+                        role="alert"
+                        className="text-sm text-destructive"
+                        key={key}
+                    >
+                        {message}
                     </p>
-                </div>
+                ))}
 
-                <Section
-                    title="Database summary"
-                    note={`Selected period · ${selected}. Counts exclude soft-deleted leads. Unique emails are addresses, not verified individual people.`}
+                <nav
+                    role="tablist"
+                    aria-label="Report pages"
+                    className="flex gap-1 overflow-x-auto border-b"
                 >
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                        <Metric
-                            label="Records added · selected period"
-                            value={data.overview.records}
-                            note={`${data.all_time.records.toLocaleString()} total records · All time`}
-                        />
-                        <Metric
-                            label="Unique companies · selected period"
-                            value={data.overview.companies}
-                            note={`${data.all_time.companies.toLocaleString()} · All time`}
-                        />
-                        <Metric
-                            label="Unique emails · selected period"
-                            value={data.overview.emails}
-                            note={`${data.all_time.emails.toLocaleString()} · All time`}
-                        />
-                        <Metric
-                            label="Duplicates detected · selected period"
-                            value={quality.duplicates}
-                            note="Exact and possible duplicate import rows"
-                        />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <Metric
-                            label="Countries represented"
-                            value={data.overview.countries}
-                        />
-                        <Metric
-                            label="Raw data sources represented"
-                            value={data.overview.sources}
-                        />
-                        <Metric
-                            label="Upload batches"
-                            value={data.overview.uploads}
-                        />
-                        <Metric
-                            label="Import rows with issues"
-                            value={quality.issues}
-                            note="Each affected row counted once"
-                        />
-                    </div>
-                </Section>
-                <Section
-                    title="Database growth"
-                    note={`Selected period compared with ${data.previous_period.from} – ${data.previous_period.to}. Company and email growth uses first-seen identities across surviving, scoped records.`}
+                    {tabs.map((item) => (
+                        <button
+                            key={item.key}
+                            type="button"
+                            role="tab"
+                            id={`tab-${item.key}`}
+                            aria-selected={activeTab === item.key}
+                            aria-controls={`panel-${item.key}`}
+                            onClick={() => setTab(item.key)}
+                            className={`-mb-px border-b-2 px-4 py-2 text-sm whitespace-nowrap transition-colors ${activeTab === item.key ? 'border-primary font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        >
+                            {item.label}
+                        </button>
+                    ))}
+                </nav>
+
+                <div
+                    role="tabpanel"
+                    id={`panel-${activeTab}`}
+                    aria-labelledby={`tab-${activeTab}`}
+                    className="flex flex-col gap-4"
                 >
-                    <div className="grid gap-3 sm:grid-cols-3">
-                        {(['records', 'companies', 'emails'] as const).map(
-                            (key) => (
-                                <Metric
-                                    key={key}
-                                    label={`${key === 'records' ? 'Contact records' : `First-seen ${key}`} added`}
-                                    value={data.growth.totals[key]}
-                                    note={changeLabel(
-                                        data.growth.totals[`${key}_change`],
-                                    )}
+                    {activeTab === 'overview' && (
+                        <>
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                                <KpiCard
+                                    label="Records added"
+                                    value={data.overview.records}
+                                    change={data.changes.records}
+                                    footnote={`${data.all_time.records.toLocaleString()} all time`}
+                                    icon={Database}
+                                    trend={data.growth.points.map((point) => ({
+                                        date: point.date,
+                                        value: point.records,
+                                    }))}
+                                    trendLabel="Records added"
                                 />
-                            ),
-                        )}
-                    </div>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <GrowthChart growth={data.growth} />
-                        </CardContent>
-                    </Card>
-                </Section>
-                <Section
-                    title="Database distribution"
-                    note={`Share of period-created records · ${selected}. Classifications describe current status; they do not imply sequential conversion.`}
-                >
-                    <div className="grid items-start gap-4 lg:grid-cols-3">
-                        <DistributionChart
-                            title="Country distribution"
-                            rows={data.distributions.countries.map((row) => ({
-                                ...row,
-                                label: countryName(row.label),
-                            }))}
-                            description="Country codes take priority; name-only historical values may remain separate."
-                        />
-                        <DistributionChart
-                            title="Data sources"
-                            rows={data.distributions.sources}
-                            description="Conservative analytical grouping; original source values are preserved."
-                        />
-                        <DistributionChart
-                            title="Database classification distribution"
-                            rows={data.distributions.statuses}
-                        />
-                    </div>
-                    {data.show_industries && (
-                        <DistributionChart
-                            title="Industry distribution"
-                            rows={data.distributions.industries}
-                            description={`${percent(data.industry_coverage)} of period records have a known industry. Shown when coverage reaches 20%.`}
+                                <KpiCard
+                                    label="Unique companies"
+                                    value={data.overview.companies}
+                                    change={data.changes.companies}
+                                    footnote={`${data.all_time.companies.toLocaleString()} all time`}
+                                    icon={Building2}
+                                    trend={data.growth.points.map((point) => ({
+                                        date: point.date,
+                                        value: point.companies,
+                                    }))}
+                                    trendLabel="First-seen companies"
+                                />
+                                <KpiCard
+                                    label="Unique emails"
+                                    value={data.overview.emails}
+                                    change={data.changes.emails}
+                                    footnote={`${data.all_time.emails.toLocaleString()} all time`}
+                                    icon={Mail}
+                                    trend={data.growth.points.map((point) => ({
+                                        date: point.date,
+                                        value: point.emails,
+                                    }))}
+                                    trendLabel="First-seen emails"
+                                />
+                                <KpiCard
+                                    label="Possible leads"
+                                    value={possibleLeads}
+                                    footnote={`${percent(sharePercent(possibleLeads, data.overview.records))} of records`}
+                                    icon={Sparkles}
+                                />
+                                <KpiCard
+                                    label="Countries"
+                                    value={data.overview.countries}
+                                    change={data.changes.countries}
+                                    icon={Globe2}
+                                />
+                                <KpiCard
+                                    label="Data sources"
+                                    value={data.overview.sources}
+                                    icon={Layers}
+                                />
+                                <KpiCard
+                                    label="Upload batches"
+                                    value={data.overview.uploads}
+                                    change={data.changes.uploads}
+                                    icon={Upload}
+                                />
+                                <KpiCard
+                                    label="Duplicates detected"
+                                    value={quality.duplicates}
+                                    footnote="Exact and possible duplicate rows"
+                                    icon={Copy}
+                                />
+                            </div>
+                            <div className="grid gap-4 lg:grid-cols-12">
+                                <Visual
+                                    title="Database growth"
+                                    subtitle={`Per ${data.growth.granularity} · first-seen companies and emails count their earliest record`}
+                                    className="lg:col-span-8"
+                                >
+                                    <GrowthChart growth={data.growth} />
+                                </Visual>
+                                <Visual
+                                    title="Lead status"
+                                    subtitle="Current classification, not a funnel"
+                                    className="lg:col-span-4"
+                                >
+                                    <BarList
+                                        rows={data.distributions.statuses}
+                                    />
+                                </Visual>
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                <Visual title="Data sources">
+                                    <BarList
+                                        rows={data.distributions.sources}
+                                    />
+                                </Visual>
+                                <Visual
+                                    title="Top countries"
+                                    subtitle="See Demographics for regions and cities"
+                                >
+                                    <BarList
+                                        rows={data.distributions.countries.map(
+                                            (row) => ({
+                                                ...row,
+                                                label: countryLabel(row.label),
+                                            }),
+                                        )}
+                                    />
+                                </Visual>
+                                <Visual
+                                    title="Top companies"
+                                    subtitle={`By contact records · ${data.company_analysis.unnamed_records.toLocaleString()} unnamed records excluded`}
+                                >
+                                    <BarList
+                                        rows={data.companies.map((row) => ({
+                                            label: row.label,
+                                            value: row.contacts,
+                                        }))}
+                                        uppercase
+                                        empty="No named companies in this period."
+                                    />
+                                </Visual>
+                                {data.show_industries && (
+                                    <Visual
+                                        title="Industries"
+                                        subtitle={`${percent(data.industry_coverage)} of records have a known industry`}
+                                    >
+                                        <BarList
+                                            rows={data.distributions.industries}
+                                        />
+                                    </Visual>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+                                <KpiCard
+                                    label="Average contacts per company"
+                                    value={
+                                        data.company_analysis
+                                            .average_contacts ?? 'N/A'
+                                    }
+                                    icon={Building2}
+                                />
+                                <KpiCard
+                                    label="Companies with one contact"
+                                    value={data.company_analysis.single_contact}
+                                    icon={Building2}
+                                />
+                                <KpiCard
+                                    label="Companies with multiple contacts"
+                                    value={
+                                        data.company_analysis.multiple_contacts
+                                    }
+                                    footnote="Repeated names are not automatically duplicates"
+                                    icon={Building2}
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    {activeTab === 'demographics' && (
+                        <LeadDemographics
+                            demographics={data.demographics}
+                            showAgents={data.can_compare_agents}
                         />
                     )}
-                </Section>
-                <Section
-                    title="Company and contact analysis"
-                    note="Selected period · normalized company names group contact records. Repeated company names alone do not establish duplication."
-                >
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                        <Metric
-                            label="Unique companies"
-                            value={data.overview.companies}
-                        />
-                        <Metric
-                            label="Unique contact emails"
-                            value={data.overview.emails}
-                        />
-                        <Metric
-                            label="Average contact records per company"
-                            value={data.company_analysis.average_contacts}
-                        />
-                        <Metric
-                            label="Companies with one contact record"
-                            value={data.company_analysis.single_contact}
-                        />
-                        <Metric
-                            label="Companies with multiple contact records"
-                            value={data.company_analysis.multiple_contacts}
-                        />
-                    </div>
-                    <DistributionChart
-                        title="Top companies by contact records"
-                        rows={data.companies.map((company) => ({
-                            label: company.label,
-                            value: company.contacts,
-                            percent:
-                                data.overview.records > 0
-                                    ? Math.round(
-                                          (1000 * company.contacts) /
-                                              data.overview.records,
-                                      ) / 10
-                                    : null,
-                        }))}
-                        description={`Top 15 · percentage of all period-created records. ${data.company_analysis.unnamed_records.toLocaleString()} unnamed records excluded from company averages.`}
-                    />
-                </Section>
-                <Section
-                    title="Data quality"
-                    note="Rows from uploads created in the selected period. Accepted includes Needs Review; possible duplicates can overlap review rows. Rates use processed rows and N/A means no denominator."
-                >
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        {(
-                            [
-                                'accepted',
-                                'needs_review',
-                                'duplicates',
-                                'rejected',
-                                'errors',
-                                'location_issues',
-                            ] as const
-                        ).map((key) => (
-                            <Metric
-                                key={key}
-                                label={formatLabel(key)}
-                                value={quality[key]}
-                                note={
-                                    key === 'needs_review'
-                                        ? 'Included in accepted rows'
-                                        : percent(quality[`${key}_rate`])
-                                }
-                            />
-                        ))}
-                    </div>
-                    <Card>
-                        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-                            <CardTitle>Data quality trend</CardTitle>
-                            <label className="flex items-center gap-2 text-xs">
-                                Display
-                                <select
-                                    className={selectClass}
-                                    value={mode}
-                                    onChange={(e) =>
-                                        setMode(e.target.value as typeof mode)
-                                    }
-                                >
-                                    <option value="count">Count</option>
-                                    <option value="rate">Rate</option>
-                                </select>
-                            </label>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="mb-4 text-xs text-muted-foreground">
-                                Grouped by upload creation date. Location issues
-                                reflect recorded location flags; other review
-                                flags can mask additional location problems.
-                            </p>
-                            <div
-                                className="h-64 min-w-0"
-                                role="img"
-                                aria-label={`Data quality trend by ${mode}, one bar group per period; exact values in table below`}
-                            >
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={data.quality_trend}
-                                        barGap={2}
-                                        barCategoryGap="20%"
-                                        accessibilityLayer
-                                    >
-                                        <CartesianGrid
-                                            vertical={false}
-                                            stroke="var(--color-border)"
-                                        />
-                                        <XAxis
-                                            dataKey="date"
-                                            tick={{ fontSize: 11 }}
-                                            minTickGap={40}
-                                        />
-                                        <YAxis
-                                            unit={mode === 'rate' ? '%' : ''}
-                                            allowDecimals={mode === 'rate'}
-                                            tick={{ fontSize: 11 }}
-                                        />
-                                        <Tooltip
-                                            content={ChartTooltip}
-                                            cursor={{
-                                                fill: 'var(--color-muted)',
-                                                opacity: 0.4,
-                                            }}
-                                        />
-                                        {qualitySeries.map((key, index) => (
-                                            <Bar
-                                                key={key}
-                                                dataKey={
-                                                    mode === 'rate'
-                                                        ? `${key}_rate`
-                                                        : key
-                                                }
-                                                name={formatLabel(key)}
-                                                fill={`var(--color-chart-${index + 1})`}
-                                                maxBarSize={20}
-                                                radius={[4, 4, 0, 0]}
-                                                isAnimationActive={false}
-                                            />
-                                        ))}
-                                    </BarChart>
-                                </ResponsiveContainer>
+
+                    {activeTab === 'quality' && (
+                        <>
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
+                                <KpiCard
+                                    label="Accepted"
+                                    value={quality.accepted}
+                                    footnote={`${percent(quality.accepted_rate)} · includes review`}
+                                    icon={CheckCircle2}
+                                />
+                                <KpiCard
+                                    label="Needs review"
+                                    value={quality.needs_review}
+                                    footnote="Included in accepted"
+                                    icon={SearchCheck}
+                                />
+                                <KpiCard
+                                    label="Duplicates"
+                                    value={quality.duplicates}
+                                    footnote={percent(quality.duplicates_rate)}
+                                    icon={Copy}
+                                />
+                                <KpiCard
+                                    label="Rejected"
+                                    value={quality.rejected}
+                                    footnote={percent(quality.rejected_rate)}
+                                    icon={XCircle}
+                                />
+                                <KpiCard
+                                    label="Errors"
+                                    value={quality.errors}
+                                    footnote={percent(quality.errors_rate)}
+                                    icon={AlertTriangle}
+                                />
+                                <KpiCard
+                                    label="Location issues"
+                                    value={quality.location_issues}
+                                    footnote={percent(
+                                        quality.location_issues_rate,
+                                    )}
+                                    icon={MapPinOff}
+                                />
                             </div>
-                            <ChartLegend
-                                items={qualitySeries.map((key, index) => ({
-                                    key,
-                                    label: formatLabel(key),
-                                    color: `var(--color-chart-${index + 1})`,
-                                }))}
-                            />
-                            <details className="mt-4">
-                                <summary className="cursor-pointer text-sm text-primary">
-                                    View quality data
-                                </summary>
+                            <Visual
+                                title="Data quality trend"
+                                subtitle="Grouped by upload date · outcomes can overlap"
+                                action={
+                                    <div
+                                        className="inline-flex rounded-md border bg-muted/40 p-0.5"
+                                        role="radiogroup"
+                                        aria-label="Display quality as"
+                                    >
+                                        {(['count', 'rate'] as const).map(
+                                            (value) => (
+                                                <button
+                                                    key={value}
+                                                    type="button"
+                                                    role="radio"
+                                                    aria-checked={
+                                                        mode === value
+                                                    }
+                                                    onClick={() =>
+                                                        setMode(value)
+                                                    }
+                                                    className={`rounded px-3 py-1 text-xs capitalize ${mode === value ? 'bg-card font-semibold text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
+                                                >
+                                                    {value}
+                                                </button>
+                                            ),
+                                        )}
+                                    </div>
+                                }
+                            >
+                                <div
+                                    className="h-64 min-w-0"
+                                    role="img"
+                                    aria-label={`Data quality trend by ${mode}, one bar group per period; exact values in the table below`}
+                                >
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
+                                        <BarChart
+                                            data={data.quality_trend}
+                                            barGap={2}
+                                            barCategoryGap="20%"
+                                            accessibilityLayer
+                                        >
+                                            <CartesianGrid
+                                                vertical={false}
+                                                stroke="var(--border)"
+                                            />
+                                            <XAxis
+                                                dataKey="date"
+                                                tick={{
+                                                    fill: 'var(--muted-foreground)',
+                                                    fontSize: 11,
+                                                }}
+                                                minTickGap={40}
+                                            />
+                                            <YAxis
+                                                unit={
+                                                    mode === 'rate' ? '%' : ''
+                                                }
+                                                allowDecimals={mode === 'rate'}
+                                                tick={{
+                                                    fill: 'var(--muted-foreground)',
+                                                    fontSize: 11,
+                                                }}
+                                                width={45}
+                                            />
+                                            <Tooltip
+                                                content={ChartTooltip}
+                                                cursor={{
+                                                    fill: 'var(--muted)',
+                                                    opacity: 0.4,
+                                                }}
+                                            />
+                                            {QUALITY_SERIES.map(
+                                                (key, index) => (
+                                                    <Bar
+                                                        key={key}
+                                                        dataKey={
+                                                            mode === 'rate'
+                                                                ? `${key}_rate`
+                                                                : key
+                                                        }
+                                                        name={formatLabel(key)}
+                                                        fill={`var(--color-chart-${index + 1})`}
+                                                        maxBarSize={20}
+                                                        radius={[4, 4, 0, 0]}
+                                                        isAnimationActive={
+                                                            false
+                                                        }
+                                                    />
+                                                ),
+                                            )}
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <ChartLegend
+                                    items={QUALITY_SERIES.map((key, index) => ({
+                                        key,
+                                        label: formatLabel(key),
+                                        color: `var(--color-chart-${index + 1})`,
+                                    }))}
+                                />
+                                <details className="mt-3 text-xs">
+                                    <summary className="cursor-pointer text-muted-foreground">
+                                        View data
+                                    </summary>
+                                    <div className="mt-2">
+                                        <ReportTable
+                                            headings={[
+                                                'Period start',
+                                                'Processed',
+                                                ...QUALITY_SERIES.map(
+                                                    formatLabel,
+                                                ),
+                                            ]}
+                                            rows={data.quality_trend.map(
+                                                (point) => [
+                                                    point.date,
+                                                    point.processed,
+                                                    ...QUALITY_SERIES.map(
+                                                        (key) =>
+                                                            mode === 'rate'
+                                                                ? percent(
+                                                                      point[
+                                                                          `${key}_rate`
+                                                                      ],
+                                                                  )
+                                                                : point[key],
+                                                    ),
+                                                ],
+                                            )}
+                                        />
+                                    </div>
+                                </details>
+                            </Visual>
+                            <div className="grid gap-4 lg:grid-cols-12">
+                                <Visual
+                                    title="Upload volume"
+                                    subtitle="Selected-period uploads"
+                                    className="lg:col-span-4"
+                                >
+                                    <dl className="grid grid-cols-2 gap-4 text-xs">
+                                        {[
+                                            ['Uploads', data.overview.uploads],
+                                            [
+                                                'Rows submitted',
+                                                quality.submitted_rows,
+                                            ],
+                                            [
+                                                'Observed rows',
+                                                quality.observed_rows,
+                                            ],
+                                            [
+                                                'Pending rows',
+                                                quality.observed_rows -
+                                                    quality.processed,
+                                            ],
+                                            [
+                                                'Processed rows',
+                                                quality.processed,
+                                            ],
+                                            [
+                                                'Average batch size',
+                                                quality.average_batch_size ??
+                                                    'N/A',
+                                            ],
+                                        ].map(([label, value]) => (
+                                            <div key={label}>
+                                                <dt className="text-muted-foreground">
+                                                    {label}
+                                                </dt>
+                                                <dd className="mt-0.5 text-lg font-semibold text-foreground">
+                                                    {typeof value === 'number'
+                                                        ? value.toLocaleString()
+                                                        : value}
+                                                </dd>
+                                            </div>
+                                        ))}
+                                    </dl>
+                                </Visual>
+                                <Visual
+                                    title="Row outcomes"
+                                    subtitle="Share of processed rows · outcomes can overlap"
+                                    className="lg:col-span-4"
+                                >
+                                    <BarList
+                                        rows={
+                                            quality.processed > 0
+                                                ? [
+                                                      {
+                                                          label: 'accepted',
+                                                          value:
+                                                              quality.accepted_rate ??
+                                                              0,
+                                                      },
+                                                      {
+                                                          label: 'duplicates',
+                                                          value:
+                                                              quality.duplicates_rate ??
+                                                              0,
+                                                      },
+                                                      {
+                                                          label: 'rejected',
+                                                          value:
+                                                              quality.rejected_rate ??
+                                                              0,
+                                                      },
+                                                      {
+                                                          label: 'errors',
+                                                          value:
+                                                              quality.errors_rate ??
+                                                              0,
+                                                      },
+                                                      {
+                                                          label: 'clean',
+                                                          value:
+                                                              quality.clean_rate ??
+                                                              0,
+                                                      },
+                                                  ]
+                                                : []
+                                        }
+                                        format={(value) => percent(value)}
+                                        scaleMax={100}
+                                        empty="No processed rows in this period."
+                                    />
+                                </Visual>
+                                <Visual
+                                    title="Rates by source"
+                                    subtitle="Import rows with a processed outcome"
+                                    className="lg:col-span-4"
+                                >
+                                    <div
+                                        className="h-52 min-w-0"
+                                        role="img"
+                                        aria-label="Duplicate, rejection and error rate by source; exact values in the source table below"
+                                    >
+                                        <ResponsiveContainer
+                                            width="100%"
+                                            height="100%"
+                                        >
+                                            <BarChart
+                                                data={data.source_quality.filter(
+                                                    (source) =>
+                                                        source.processed > 0,
+                                                )}
+                                                barGap={2}
+                                                barCategoryGap="20%"
+                                                accessibilityLayer
+                                            >
+                                                <CartesianGrid
+                                                    vertical={false}
+                                                    stroke="var(--border)"
+                                                />
+                                                <XAxis
+                                                    dataKey="label"
+                                                    tick={{
+                                                        fill: 'var(--muted-foreground)',
+                                                        fontSize: 11,
+                                                    }}
+                                                />
+                                                <YAxis
+                                                    unit="%"
+                                                    width={40}
+                                                    tick={{
+                                                        fill: 'var(--muted-foreground)',
+                                                        fontSize: 11,
+                                                    }}
+                                                />
+                                                <Tooltip
+                                                    content={ChartTooltip}
+                                                    cursor={{
+                                                        fill: 'var(--muted)',
+                                                        opacity: 0.4,
+                                                    }}
+                                                />
+                                                {SOURCE_RATE_SERIES.map(
+                                                    (series, index) => (
+                                                        <Bar
+                                                            key={series.key}
+                                                            dataKey={series.key}
+                                                            name={series.label}
+                                                            fill={`var(--color-chart-${index + 1})`}
+                                                            maxBarSize={24}
+                                                            radius={[
+                                                                4, 4, 0, 0,
+                                                            ]}
+                                                            isAnimationActive={
+                                                                false
+                                                            }
+                                                        />
+                                                    ),
+                                                )}
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <ChartLegend
+                                        items={SOURCE_RATE_SERIES.map(
+                                            (series, index) => ({
+                                                key: series.key,
+                                                label: series.label,
+                                                color: `var(--color-chart-${index + 1})`,
+                                            }),
+                                        )}
+                                    />
+                                </Visual>
+                            </div>
+                            <Visual
+                                title="Source quality"
+                                subtitle="Total records use current lead sources; import outcomes use saved source snapshots, so the two are distinct populations"
+                            >
                                 <ReportTable
                                     headings={[
-                                        'Period start',
-                                        'Processed',
-                                        ...qualitySeries.map(formatLabel),
+                                        'Source',
+                                        'Total records',
+                                        'Import rows',
+                                        'Processed rows',
+                                        'Accepted rows',
+                                        'Duplicate rate',
+                                        'Rejection rate',
+                                        'Error rate',
                                     ]}
-                                    rows={data.quality_trend.map((point) => [
-                                        point.date,
-                                        point.processed,
-                                        ...qualitySeries.map((key) =>
-                                            mode === 'rate'
-                                                ? percent(point[`${key}_rate`])
-                                                : point[key],
-                                        ),
+                                    rows={data.source_quality.map((source) => [
+                                        source.label,
+                                        source.records.toLocaleString(),
+                                        source.observed_rows.toLocaleString(),
+                                        source.processed.toLocaleString(),
+                                        source.accepted.toLocaleString(),
+                                        percent(source.duplicates_rate),
+                                        percent(source.rejected_rate),
+                                        percent(source.errors_rate),
                                     ])}
                                 />
-                            </details>
-                        </CardContent>
-                    </Card>
-                </Section>
-                <Section
-                    title="Upload quality analysis"
-                    note="Selected-period uploads · submitted rows use batch totals; observed and processed counts use retained import rows. Unstarted uploads may not yet have row outcomes."
-                >
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <Metric
-                            label="Total uploads"
-                            value={data.overview.uploads}
-                        />
-                        <Metric
-                            label="Rows submitted · batch totals"
-                            value={quality.submitted_rows}
-                        />
-                        <Metric
-                            label="Observed import rows"
-                            value={quality.observed_rows}
-                        />
-                        <Metric
-                            label="Average batch size"
-                            value={quality.average_batch_size}
-                        />
-                    </div>
-                    <ReportTable
-                        headings={[
-                            'Processed',
-                            'Pending',
-                            'Accepted',
-                            'Duplicates',
-                            'Rejected',
-                            'Errors',
-                            'Acceptance rate',
-                            'Duplicate rate',
-                            'Rejection rate',
-                            'Error rate',
-                        ]}
-                        rows={[
-                            [
-                                quality.processed,
-                                quality.observed_rows - quality.processed,
-                                quality.accepted,
-                                quality.duplicates,
-                                quality.rejected,
-                                quality.errors,
-                                percent(quality.accepted_rate),
-                                percent(quality.duplicates_rate),
-                                percent(quality.rejected_rate),
-                                percent(quality.errors_rate),
-                            ],
-                        ]}
-                    />
-                    <DistributionChart
-                        title="Row outcomes · selected period"
-                        rows={[
-                            {
-                                label: 'Accepted',
-                                value: quality.accepted,
-                                percent: quality.accepted_rate,
-                            },
-                            {
-                                label: 'Duplicates',
-                                value: quality.duplicates,
-                                percent: quality.duplicates_rate,
-                            },
-                            {
-                                label: 'Rejected',
-                                value: quality.rejected,
-                                percent: quality.rejected_rate,
-                            },
-                            {
-                                label: 'Errors',
-                                value: quality.errors,
-                                percent: quality.errors_rate,
-                            },
-                            {
-                                label: 'Pending',
-                                value:
-                                    quality.observed_rows - quality.processed,
-                                percent: sharePercent(
-                                    quality.observed_rows - quality.processed,
-                                    quality.observed_rows,
-                                ),
-                            },
-                        ]}
-                        description="Share of processed rows by outcome; Pending is a share of observed rows instead."
-                    />
-                </Section>
-                <Section
-                    title="Source quality analysis"
-                    note="Selected period · Total records uses current lead sources. Import outcomes use saved source snapshots, including updates to existing leads. These are distinct populations; accepted rows are not necessarily new records. Missing snapshots are Unknown; manual records have no import-quality rate."
-                >
-                    <ReportTable
-                        headings={[
-                            'Source',
-                            'Total records',
-                            'Import rows',
-                            'Processed rows',
-                            'Accepted rows',
-                            'Duplicate rate',
-                            'Rejection rate',
-                            'Error rate',
-                        ]}
-                        rows={data.source_quality.map((source) => [
-                            source.label,
-                            source.records,
-                            source.observed_rows,
-                            source.processed,
-                            source.accepted,
-                            percent(source.duplicates_rate),
-                            percent(source.rejected_rate),
-                            percent(source.errors_rate),
-                        ])}
-                    />
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                Duplicate, rejection and error rate by source
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div
-                                className="h-64 min-w-0"
-                                role="img"
-                                aria-label="Duplicate, rejection and error rate by source, one bar group per source; exact values in the table above"
-                            >
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={data.source_quality.filter(
-                                            (source) => source.processed > 0,
+                            </Visual>
+                            {uploadTimingHeatmap.length > 0 && (
+                                <Visual
+                                    title="Upload timing"
+                                    subtitle={`Batches by weekday and hour · ${data.timezone}`}
+                                >
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-center text-xs">
+                                            <thead>
+                                                <tr>
+                                                    <th
+                                                        scope="col"
+                                                        className="text-left font-medium text-muted-foreground"
+                                                    >
+                                                        Day / hour
+                                                    </th>
+                                                    {Array.from(
+                                                        { length: 24 },
+                                                        (_, hour) => (
+                                                            <th
+                                                                key={hour}
+                                                                className="min-w-7 p-1 font-medium text-muted-foreground"
+                                                                scope="col"
+                                                            >
+                                                                {hour}
+                                                            </th>
+                                                        ),
+                                                    )}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {uploadTimingHeatmap.map(
+                                                    (row) => {
+                                                        const max = Math.max(
+                                                            ...uploadTimingHeatmap.flatMap(
+                                                                (day) =>
+                                                                    day.hours,
+                                                            ),
+                                                            1,
+                                                        );
+
+                                                        return (
+                                                            <tr key={row.day}>
+                                                                <th
+                                                                    scope="row"
+                                                                    className="p-1.5 text-left font-medium"
+                                                                >
+                                                                    {row.day}
+                                                                </th>
+                                                                {row.hours.map(
+                                                                    (
+                                                                        count,
+                                                                        hour,
+                                                                    ) => (
+                                                                        <td
+                                                                            key={
+                                                                                hour
+                                                                            }
+                                                                            title={`${row.day} ${hour}:00 · ${count} uploads`}
+                                                                            className={`border-2 border-card p-1 tabular-nums ${count > 0 ? 'font-medium text-foreground' : 'bg-muted/40 text-muted-foreground'}`}
+                                                                            style={
+                                                                                count >
+                                                                                0
+                                                                                    ? {
+                                                                                          backgroundColor: `color-mix(in oklab, var(--color-chart-1) ${Math.round(15 + (count / max) * 55)}%, transparent)`,
+                                                                                      }
+                                                                                    : undefined
+                                                                            }
+                                                                        >
+                                                                            {count ||
+                                                                                '·'}
+                                                                        </td>
+                                                                    ),
+                                                                )}
+                                                            </tr>
+                                                        );
+                                                    },
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </Visual>
+                            )}
+                        </>
+                    )}
+
+                    {activeTab === 'agents' && (
+                        <>
+                            <div className="grid gap-4 lg:grid-cols-2">
+                                <Visual
+                                    title="Records by agent"
+                                    subtitle="Currently owned records added in the period"
+                                >
+                                    <BarList
+                                        rows={data.contribution.map(
+                                            (agent) => ({
+                                                label: agent.name,
+                                                value: agent.records,
+                                            }),
                                         )}
-                                        barGap={2}
-                                        barCategoryGap="20%"
-                                        accessibilityLayer
-                                    >
-                                        <CartesianGrid
-                                            vertical={false}
-                                            stroke="var(--color-border)"
-                                        />
-                                        <XAxis
-                                            dataKey="label"
-                                            tick={{ fontSize: 11 }}
-                                        />
-                                        <YAxis
-                                            unit="%"
-                                            tick={{ fontSize: 11 }}
-                                        />
-                                        <Tooltip
-                                            content={ChartTooltip}
-                                            cursor={{
-                                                fill: 'var(--color-muted)',
-                                                opacity: 0.4,
-                                            }}
-                                        />
-                                        {SOURCE_RATE_SERIES.map(
-                                            (series, index) => (
-                                                <Bar
-                                                    key={series.key}
-                                                    dataKey={series.key}
-                                                    name={series.label}
-                                                    fill={`var(--color-chart-${index + 1})`}
-                                                    maxBarSize={30}
-                                                    radius={[4, 4, 0, 0]}
-                                                    isAnimationActive={false}
-                                                />
-                                            ),
-                                        )}
-                                    </BarChart>
-                                </ResponsiveContainer>
+                                    />
+                                </Visual>
+                                <Visual
+                                    title="Possible leads by agent"
+                                    subtitle="Current status is Possible lead"
+                                >
+                                    <BarList
+                                        rows={data.contribution
+                                            .map((agent) => ({
+                                                label: agent.name,
+                                                value:
+                                                    possibleByAgent.get(
+                                                        agent.id,
+                                                    ) ?? 0,
+                                            }))
+                                            .filter((row) => row.value > 0)
+                                            .sort((a, b) => b.value - a.value)}
+                                        empty="No possible leads in this period."
+                                    />
+                                </Visual>
                             </div>
-                            <ChartLegend
-                                items={SOURCE_RATE_SERIES.map(
-                                    (series, index) => ({
-                                        key: series.key,
-                                        label: series.label,
-                                        color: `var(--color-chart-${index + 1})`,
-                                    }),
-                                )}
-                            />
-                        </CardContent>
-                    </Card>
-                </Section>
-                <Section
-                    title="Geographic analysis"
-                    note="Selected period · total leads by country."
-                >
-                    <p className="text-xs text-muted-foreground">
-                        Top 50 countries · {geo.records.toLocaleString()}{' '}
-                        matching records.
-                    </p>
-                    <ReportTable
-                        headings={['Country', 'Records']}
-                        rows={geo.rows.map((row) => [
-                            countryName(row.country),
-                            row.records,
-                        ])}
-                    />
-                    <DistributionChart
-                        title="Top countries by records"
-                        rows={geo.rows.slice(0, 15).map((row) => ({
-                            label: countryName(row.country),
-                            value: row.records,
-                            percent: sharePercent(row.records, geo.records),
-                        }))}
-                        description="Top 15 countries above · share of matching records."
-                    />
-                </Section>
-                {data.can_compare_agents && (
-                    <Section
-                        title="Database contribution by agent"
-                        note="Selected period · top 20 agents by currently owned records, including historical owners. Upload quality follows the uploader. Data quality rate = accepted rows with no recorded issue ÷ processed rows; it does not verify deliverability."
-                        collapsible
-                        defaultOpen={false}
-                    >
-                        <ReportTable
-                            headings={[
-                                'Agent',
-                                'Records added',
-                                'Unique companies',
-                                'Uploads',
-                                'Average batch size',
-                                'Duplicate rate',
-                                'Rejection rate',
-                                'Error rate',
-                                'Data quality rate',
-                            ]}
-                            rows={data.contribution.map((agent) => [
-                                agent.name,
-                                agent.records,
-                                agent.companies,
-                                agent.uploads,
-                                agent.average_batch_size ?? 'N/A',
-                                percent(agent.duplicates_rate),
-                                percent(agent.rejected_rate),
-                                percent(agent.errors_rate),
-                                percent(agent.clean_rate),
-                            ])}
-                        />
-                    </Section>
-                )}
-                {uploadTimingHeatmap.length > 0 && (
-                    <Section
-                        title="Upload timing"
-                        note={`Selected period · uploads by weekday and hour in ${data.timezone}. Each cell shows the number of batches.`}
-                        collapsible
-                        defaultOpen={false}
-                    >
-                        <div className="overflow-x-auto rounded-xl border bg-card p-4">
-                            <table className="w-full text-center text-xs">
-                                <thead>
-                                    <tr>
-                                        <th scope="col">Day / hour</th>
-                                        {Array.from(
-                                            { length: 24 },
-                                            (_, hour) => (
-                                                <th
-                                                    key={hour}
-                                                    className="min-w-8 p-1"
-                                                    scope="col"
-                                                >
-                                                    {hour}
-                                                </th>
-                                            ),
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {uploadTimingHeatmap.map((row) => (
-                                        <tr key={row.day}>
-                                            <th scope="row" className="p-2">
-                                                {row.day}
-                                            </th>
-                                            {row.hours.map((count, hour) => (
-                                                <td
-                                                    key={hour}
-                                                    title={`${row.day} ${hour}:00 · ${count} uploads`}
-                                                    className={`border-2 border-card p-1 tabular-nums ${count > 0 ? 'bg-primary/20 font-medium text-foreground' : 'bg-muted/40 text-muted-foreground'}`}
-                                                >
-                                                    {count || '·'}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Section>
-                )}
-                {auth.user.role === 'super_administrator' && (
-                    <Section
-                        title="Reply activity"
-                        note={`Existing restricted reply analytics · ${selected}.`}
-                        collapsible
-                        defaultOpen={false}
-                    >
-                        <div className="grid gap-3 sm:grid-cols-3">
-                            <Metric label="Replies" value={summary.replies} />
-                            <Metric
-                                label="Interested replies"
-                                value={summary.interested_replies}
-                            />
-                            <Metric
-                                label="Reply rate"
-                                value={percent(summary.reply_rate)}
-                            />
-                        </div>
-                        <DistributionChart
-                            title="Reply classifications"
-                            rows={replyClassifications.map((row) => ({
-                                ...row,
-                                percent:
-                                    summary.replies > 0
-                                        ? Math.round(
-                                              (1000 * row.value) /
-                                                  summary.replies,
-                                          ) / 10
-                                        : null,
-                            }))}
-                        />
-                    </Section>
-                )}
+                            <Visual
+                                title="Agent contribution"
+                                subtitle="Top 20 agents · upload quality follows the uploader · data quality rate = accepted rows with no recorded issue ÷ processed rows"
+                            >
+                                <ReportTable
+                                    headings={[
+                                        'Agent',
+                                        'Records added',
+                                        'Possible leads',
+                                        'Unique companies',
+                                        'Uploads',
+                                        'Avg batch size',
+                                        'Duplicate rate',
+                                        'Rejection rate',
+                                        'Error rate',
+                                        'Data quality rate',
+                                    ]}
+                                    rows={data.contribution.map((agent) => [
+                                        agent.name,
+                                        <DataBar
+                                            key="records"
+                                            value={agent.records}
+                                            max={Math.max(
+                                                ...data.contribution.map(
+                                                    (row) => row.records,
+                                                ),
+                                            )}
+                                        />,
+                                        (
+                                            possibleByAgent.get(agent.id) ?? 0
+                                        ).toLocaleString(),
+                                        agent.companies.toLocaleString(),
+                                        agent.uploads.toLocaleString(),
+                                        agent.average_batch_size ?? 'N/A',
+                                        percent(agent.duplicates_rate),
+                                        percent(agent.rejected_rate),
+                                        percent(agent.errors_rate),
+                                        percent(agent.clean_rate),
+                                    ])}
+                                />
+                            </Visual>
+                        </>
+                    )}
+
+                    {activeTab === 'replies' && (
+                        <>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+                                <KpiCard
+                                    label="Replies"
+                                    value={summary.replies}
+                                    icon={Mail}
+                                />
+                                <KpiCard
+                                    label="Interested replies"
+                                    value={summary.interested_replies}
+                                    icon={Sparkles}
+                                />
+                                <KpiCard
+                                    label="Reply rate"
+                                    value={percent(summary.reply_rate)}
+                                    icon={FileWarning}
+                                />
+                            </div>
+                            <Visual title="Reply classifications">
+                                <BarList
+                                    rows={replyClassifications.map((row) => ({
+                                        ...row,
+                                        percent: sharePercent(
+                                            row.value,
+                                            summary.replies,
+                                        ),
+                                    }))}
+                                    empty="No replies in this period."
+                                />
+                            </Visual>
+                        </>
+                    )}
+                </div>
             </div>
         </>
     );
 }
+
 Analytics.layout = {
     breadcrumbs: [{ title: 'Lead Reports', href: reportIndex() }],
 };

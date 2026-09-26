@@ -156,6 +156,65 @@ test('contribution by agent is visible only to administrators and super administ
     'super administrator' => ['super_administrator', true],
 ]);
 
+test('demographics count leads and possible leads per region, country, city and agent', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create(['name' => 'Ana Agent']);
+    Lead::factory()->for($agent, 'agent')->create(['country_code' => 'PH', 'country' => 'Philippines', 'city' => 'Manila', 'status' => 'possible_lead']);
+    Lead::factory()->for($agent, 'agent')->create(['country_code' => 'PH', 'country' => 'Philippines', 'city' => ' manila ', 'status' => 'raw']);
+    Lead::factory()->for($agent, 'agent')->create(['country_code' => null, 'country' => 'United Arab Emirates', 'city' => 'Dubai', 'status' => 'qualified_lead']);
+    Lead::factory()->for($agent, 'agent')->create(['country_code' => null, 'country' => 'Atlantis', 'city' => null, 'status' => 'possible_lead']);
+
+    $this->actingAs($administrator)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('databaseReport.demographics.truncated', false)
+        ->where("databaseReport.demographics.agents.{$agent->id}", 'Ana Agent')
+        ->where('databaseReport.demographics.rows', function ($rows) use ($agent) {
+            $rows = collect($rows);
+            $manila = $rows->firstWhere('country', 'PH');
+            $dubai = $rows->firstWhere('country', 'AE');
+            $unknown = $rows->firstWhere('country', 'atlantis');
+
+            return $rows->count() === 3
+                && $manila['region'] === 'Asia' && $manila['records'] === 2 && $manila['possible'] === 1 && $manila['agent_id'] === $agent->id
+                && $dubai['region'] === 'Middle East' && $dubai['qualified'] === 1 && $dubai['possible'] === 0
+                && $unknown['region'] === 'Unassigned' && $unknown['city'] === 'Unknown' && $unknown['possible'] === 1;
+        }));
+});
+
+test('mexico belongs to the americas region even though the regions reference omits it', function () {
+    $user = User::factory()->create();
+    Lead::factory()->for($user, 'agent')->create(['country_code' => 'MX', 'country' => 'Mexico']);
+    Lead::factory()->for($user, 'agent')->create(['country_code' => null, 'country' => 'Mexico']);
+
+    $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('databaseReport.demographics.rows', fn ($rows) => collect($rows)->every(fn ($row) => $row['country'] === 'MX' && $row['region'] === 'The Americas')));
+});
+
+test('an agent only sees their own leads in the demographics', function () {
+    $agent = User::factory()->create();
+    $other = User::factory()->create(['name' => 'Other Agent']);
+    Lead::factory()->for($agent, 'agent')->create(['country_code' => 'US']);
+    Lead::factory()->for($other, 'agent')->create(['country_code' => 'CA']);
+
+    $this->actingAs($agent)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->has('databaseReport.demographics.rows', 1)
+        ->where('databaseReport.demographics.rows.0.country', 'US')
+        ->where('databaseReport.demographics.agents', fn ($agents) => collect($agents)->keys()->all() === [$agent->id]));
+});
+
+test('csv export breaks leads down by region, country, city and agent with possible lead counts', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create(['name' => 'Ana Agent']);
+    Lead::factory()->for($agent, 'agent')->count(2)->create(['country_code' => 'AU', 'city' => 'Canberra', 'status' => 'possible_lead']);
+
+    $csv = (string) $this->actingAs($administrator)->get(route('report.export'))->assertOk()->streamedContent();
+
+    expect($csv)
+        ->toContain("\"Leads by region - selected period\"\nRegion,Leads,\"Possible leads\",\"Qualified leads\",Forwarded,\"Possible lead rate\"\nOceania,2,2,0,0,100%")
+        ->toContain('Australia,2,2,0,0,100%')
+        ->toContain('"Canberra, Australia",2,2,0,0,100%')
+        ->toContain('"Ana Agent",2,2,0,0,100%');
+});
+
 test('csv and pdf exports include the new database intelligence sections without dropping legacy ones', function () {
     $administrator = User::factory()->administrator()->create();
     $agent = User::factory()->create();
