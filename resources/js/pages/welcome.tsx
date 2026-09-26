@@ -255,6 +255,16 @@ export default function Welcome() {
                 <footer className="relative z-10 mx-auto flex max-w-7xl flex-col justify-between gap-3 px-5 py-8 text-xs text-slate-500 sm:flex-row lg:px-8">
                     <span>© {new Date().getFullYear()} LeadGen Central</span>
                     <span>
+                        Powered by:{' '}
+                        <span className="font-medium text-slate-300">
+                            EBNLeadgen
+                        </span>{' '}
+                        · Developed by:{' '}
+                        <span className="font-medium text-slate-300">
+                            Elmar Noche &amp; Jonathan Quiles
+                        </span>
+                    </span>
+                    <span>
                         Lead generation, validation, and intelligence
                         management.
                     </span>
