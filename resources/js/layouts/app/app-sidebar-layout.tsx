@@ -16,7 +16,7 @@ export default function AppSidebarLayout({
                 <AppSidebar />
                 <AppContent
                     variant="sidebar"
-                    className="app-workspace relative min-w-0 overflow-x-clip"
+                    className="app-workspace relative min-w-0 overflow-clip"
                 >
                     <ImpersonationBanner />
                     <AppSidebarHeader breadcrumbs={breadcrumbs} />
