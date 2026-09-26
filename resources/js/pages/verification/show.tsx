@@ -1,19 +1,26 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
     ClipboardCopy,
     Download,
+    ExternalLink,
     FileText,
+    Globe,
     History,
+    Linkedin,
+    ListChecks,
+    Mail,
     Paperclip,
     Send,
     StickyNote,
     Trash2,
     Upload,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { toast } from 'sonner';
+import { formatLabel } from '@/components/database-charts';
 import { HeaderActionsPortal } from '@/components/header-actions';
 import InputError from '@/components/input-error';
 import { StatusBadge } from '@/components/status-badge';
@@ -101,6 +108,62 @@ type Lead = Record<string, string | number | null | object[]> & {
     attachments: Attachment[];
     upload_batch: { batch_code: string } | null;
 };
+type Queue = {
+    status: string;
+    agent_id: number | null;
+    search: string;
+    total: number;
+    position: number | null;
+};
+const QUEUE_LABELS: Record<string, string> = {
+    needs_review: 'Needs review',
+    possible_lead: 'Possible leads',
+    qualified_lead: 'Qualified leads',
+    not_a_lead: 'Not a lead',
+    forwarded: 'Forwarded',
+};
+
+/** The list-page filters a lead was opened from, carried between leads. */
+function queueQuery(queue: Queue | null): Record<string, string | number> {
+    if (queue === null) {
+        return {};
+    }
+
+    if (queue.search !== '') {
+        return { search: queue.search };
+    }
+
+    return queue.agent_id === null
+        ? { status: queue.status }
+        : { status: queue.status, agent_id: queue.agent_id };
+}
+
+function externalUrl(value: string): string {
+    return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+function QuickLink({
+    href,
+    icon: Icon,
+    children,
+}: {
+    href: string;
+    icon: typeof Globe;
+    children: ReactNode;
+}) {
+    return (
+        <a
+            href={href}
+            target={href.startsWith('mailto:') ? undefined : '_blank'}
+            rel="noreferrer noopener"
+            className="inline-flex max-w-full items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs text-foreground hover:border-primary hover:text-primary"
+        >
+            <Icon className="size-3.5 shrink-0" />
+            <span className="truncate">{children}</span>
+        </a>
+    );
+}
+
 const SELECT_COUNTRY = '__select__';
 const COUNTRY_OPTIONS = Object.entries(COUNTRY_CAPITALS)
     .map(([code, { name }]) => ({ code, name }))
@@ -226,6 +289,7 @@ export default function VerificationShow({
     lead,
     previousId,
     nextId,
+    queue,
     reviewers,
     agents,
     canDelete,
@@ -233,6 +297,7 @@ export default function VerificationShow({
     lead: Lead;
     previousId: number | null;
     nextId: number | null;
+    queue: Queue | null;
     reviewers: User[];
     agents: User[];
     canDelete: boolean;
@@ -276,6 +341,58 @@ export default function VerificationShow({
         }
     };
 
+    const query = queueQuery(queue);
+    const previousUrl = previousId ? show.url(previousId, { query }) : null;
+    const nextUrl = nextId ? show.url(nextId, { query }) : null;
+    const queueLabel =
+        queue === null
+            ? 'All leads'
+            : queue.search !== ''
+              ? `Search “${queue.search}”`
+              : [
+                    QUEUE_LABELS[queue.status] ?? formatLabel(queue.status),
+                    queue.agent_id === null
+                        ? null
+                        : (agents.find((agent) => agent.id === queue.agent_id)
+                              ?.name ?? 'Selected agent'),
+                ]
+                    .filter(Boolean)
+                    .join(' · ');
+    const text = (name: string) => {
+        const value = lead[name];
+
+        return typeof value === 'string' ? value.trim() : '';
+    };
+    const leadDate = text('lead_date');
+
+    useEffect(() => {
+        const navigate = (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement | null;
+
+            if (
+                !event.altKey ||
+                target?.closest('input, textarea, select, [contenteditable]')
+            ) {
+                return;
+            }
+
+            const url =
+                event.key === 'ArrowLeft'
+                    ? previousUrl
+                    : event.key === 'ArrowRight'
+                      ? nextUrl
+                      : null;
+
+            if (url) {
+                event.preventDefault();
+                router.visit(url);
+            }
+        };
+        window.addEventListener('keydown', navigate);
+
+        return () => window.removeEventListener('keydown', navigate);
+    }, [previousUrl, nextUrl]);
+
     return (
         <>
             <Head title={`Verify ${lead.company_name}`} />
@@ -285,26 +402,6 @@ export default function VerificationShow({
                         <ClipboardCopy />
                         Copy details
                     </Button>
-                    <Button asChild variant="outline" size="sm">
-                        <Link href={index()}>Queue</Link>
-                    </Button>
-                    {previousId && (
-                        <Button asChild variant="outline" size="icon">
-                            <Link
-                                href={show(previousId)}
-                                aria-label="Previous lead"
-                            >
-                                <ArrowLeft />
-                            </Link>
-                        </Button>
-                    )}
-                    {nextId && (
-                        <Button asChild variant="outline" size="icon">
-                            <Link href={show(nextId)} aria-label="Next lead">
-                                <ArrowRight />
-                            </Link>
-                        </Button>
-                    )}
                     {canDelete && (
                         <Dialog>
                             <DialogTrigger asChild>
@@ -348,20 +445,153 @@ export default function VerificationShow({
                         </Dialog>
                     )}
                 </HeaderActionsPortal>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-2.5 shadow-xs">
+                    <div className="flex min-w-0 items-center gap-3 text-sm">
+                        <Link
+                            href={index.url({ query })}
+                            className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+                        >
+                            <ListChecks className="size-4" />
+                            Back to list
+                        </Link>
+                        <span className="truncate text-muted-foreground">
+                            {queueLabel}
+                            {queue !== null &&
+                                (queue.position !== null
+                                    ? ` · Lead ${queue.position.toLocaleString()} of ${queue.total.toLocaleString()}`
+                                    : ` · No longer in this list · ${queue.total.toLocaleString()} remaining`)}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="hidden text-xs text-muted-foreground md:inline">
+                            Alt + ← / → to move between leads
+                        </span>
+                        {previousUrl ? (
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={previousUrl}>
+                                    <ArrowLeft />
+                                    Previous
+                                </Link>
+                            </Button>
+                        ) : (
+                            <Button variant="outline" size="sm" disabled>
+                                <ArrowLeft />
+                                Previous
+                            </Button>
+                        )}
+                        {nextUrl ? (
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={nextUrl}>
+                                    Next
+                                    <ArrowRight />
+                                </Link>
+                            </Button>
+                        ) : (
+                            <Button variant="outline" size="sm" disabled>
+                                Next
+                                <ArrowRight />
+                            </Button>
+                        )}
+                    </div>
+                </div>
+                <div className="rounded-lg border bg-card p-4 shadow-xs">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <h1 className="text-xl font-semibold tracking-tight break-words">
+                                {lead.company_name}
+                            </h1>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {[
+                                    lead.lead_code,
+                                    `Owner: ${lead.agent?.name ?? 'Unassigned'}`,
+                                    lead.upload_batch
+                                        ? `Batch ${lead.upload_batch.batch_code}`
+                                        : 'Added manually',
+                                    leadDate
+                                        ? `Lead date ${formatApStyleDate(leadDate)}`
+                                        : null,
+                                    text('data_source') || null,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <StatusBadge value={lead.status} />
+                            <StatusBadge value={lead.validation_status} />
+                        </div>
+                    </div>
+                    {(text('website') ||
+                        text('email') ||
+                        text('linkedin_url') ||
+                        text('source_url')) && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {text('website') && (
+                                <QuickLink
+                                    href={externalUrl(text('website'))}
+                                    icon={Globe}
+                                >
+                                    {text('website_domain') || text('website')}
+                                </QuickLink>
+                            )}
+                            {text('email') && (
+                                <QuickLink
+                                    href={`mailto:${text('email')}`}
+                                    icon={Mail}
+                                >
+                                    {text('email')}
+                                </QuickLink>
+                            )}
+                            {text('linkedin_url') && (
+                                <QuickLink
+                                    href={externalUrl(text('linkedin_url'))}
+                                    icon={Linkedin}
+                                >
+                                    LinkedIn
+                                </QuickLink>
+                            )}
+                            {text('source_url') && (
+                                <QuickLink
+                                    href={externalUrl(text('source_url'))}
+                                    icon={ExternalLink}
+                                >
+                                    Source link
+                                </QuickLink>
+                            )}
+                        </div>
+                    )}
+                </div>
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
                     <Form key={lead.id} {...update.form(lead.id)}>
                         {({ errors, processing }) => (
                             <Card>
                                 <CardHeader className="flex-row items-center justify-between">
                                     <CardTitle>Lead details</CardTitle>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <StatusBadge value={lead.status} />
-                                        <StatusBadge
-                                            value={lead.validation_status}
-                                        />
-                                    </div>
+                                    <CardDescription>
+                                        Correct the details, choose a
+                                        classification, then save.
+                                    </CardDescription>
                                 </CardHeader>
                                 <CardContent>
+                                    {queue !== null && (
+                                        <>
+                                            <input
+                                                type="hidden"
+                                                name="queue_status"
+                                                value={queue.status}
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name="queue_agent_id"
+                                                value={queue.agent_id ?? ''}
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name="queue_search"
+                                                value={queue.search}
+                                            />
+                                        </>
+                                    )}
                                     <div className="grid gap-4 md:grid-cols-2">
                                         {fieldsBeforeCountry.map(
                                             ([name, label]) => (
@@ -509,11 +739,17 @@ export default function VerificationShow({
                                             <Input
                                                 id="remarks"
                                                 name="remarks"
+                                                placeholder="Why this classification?"
                                                 className="mt-2"
                                             />
                                         </div>
                                     </div>
-                                    <div className="mt-5 flex justify-end gap-2">
+                                    <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+                                        <p className="mr-auto text-xs text-muted-foreground">
+                                            {nextId
+                                                ? 'Next saves this lead and opens the next one in this list.'
+                                                : 'This is the last lead in this list.'}
+                                        </p>
                                         <Button
                                             type="submit"
                                             name="intent"
@@ -797,6 +1033,14 @@ export default function VerificationShow({
                                                 placeholder="Remarks"
                                             />
                                             <InputError message={errors.lead} />
+                                            {lead.status !==
+                                                'qualified_lead' && (
+                                                <p className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
+                                                    Classify this lead as a
+                                                    Qualified Lead and save
+                                                    before forwarding it.
+                                                </p>
+                                            )}
                                             <Button
                                                 size="sm"
                                                 disabled={
@@ -859,14 +1103,30 @@ export default function VerificationShow({
                             </CardHeader>
                             <CardContent>
                                 <div className="flex flex-col gap-3">
+                                    {lead.status_history.length === 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            No status changes yet.
+                                        </p>
+                                    )}
                                     {lead.status_history.map((item) => (
                                         <div
                                             key={item.id}
                                             className="border-l-2 pl-3 text-sm"
                                         >
-                                            <p>
-                                                {item.old_status || 'Created'} →{' '}
-                                                {item.new_status}
+                                            <p className="flex flex-wrap items-center gap-1.5">
+                                                {item.old_status ? (
+                                                    <StatusBadge
+                                                        value={item.old_status}
+                                                    />
+                                                ) : (
+                                                    <span className="text-muted-foreground">
+                                                        Created
+                                                    </span>
+                                                )}
+                                                <ArrowRight className="size-3.5 text-muted-foreground" />
+                                                <StatusBadge
+                                                    value={item.new_status}
+                                                />
                                             </p>
                                             <p className="text-xs text-muted-foreground">
                                                 {item.changer?.name ||

@@ -1,14 +1,14 @@
 import { Form, Head, Link, router } from '@inertiajs/react';
 import {
+    ChevronRight,
     Download,
-    FileText,
+    Paperclip,
     Plus,
     Search,
     SlidersHorizontal,
     Sparkles,
     Trash2,
     Upload,
-    UserCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -16,7 +16,6 @@ import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
 import { HeaderActionsPortal } from '@/components/header-actions';
 import { Pagination } from '@/components/pagination';
-import { StatTile } from '@/components/stat-tile';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -64,6 +63,8 @@ type Lead = {
     product_requested: string | null;
     status: string;
     validation_status: string;
+    created_at: string;
+    attachments_count: number;
     agent: { name: string } | null;
 };
 type Filters = { status: string; search: string; agent_id: string };
@@ -80,11 +81,29 @@ const statuses = [
     ['forwarded', 'Forwarded'],
 ] as const;
 const ALL_AGENTS = '__all__';
+const relativeFormat = new Intl.RelativeTimeFormat(undefined, {
+    numeric: 'auto',
+});
+
+function addedLabel(value: string): string {
+    const days = Math.round(
+        (new Date(value).getTime() - Date.now()) / 86400000,
+    );
+
+    return Math.abs(days) < 30
+        ? relativeFormat.format(days, 'day')
+        : new Date(value).toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+          });
+}
 
 export default function VerificationIndex({
     leads,
     filters,
     summary,
+    statusCounts,
     agents,
     canDelete,
 }: {
@@ -97,6 +116,7 @@ export default function VerificationIndex({
     };
     filters: Filters;
     summary: Summary;
+    statusCounts: Partial<Record<string, number>>;
     agents: Agent[];
     canDelete: boolean;
 }) {
@@ -104,6 +124,16 @@ export default function VerificationIndex({
     const [agentFilter, setAgentFilter] = useState(
         filters.agent_id || ALL_AGENTS,
     );
+    const activeStatus = filters.search
+        ? ''
+        : filters.status || 'possible_lead';
+    // Carried into Review so Next/Previous stay within this same list.
+    const queueQuery = filters.search
+        ? { search: filters.search }
+        : {
+              status: activeStatus,
+              agent_id: filters.agent_id || undefined,
+          };
     const exportUrl = possibleLeads.export.url({
         query: { search: filters.search || undefined },
     });
@@ -168,33 +198,34 @@ export default function VerificationIndex({
                     </Button>
                 </HeaderActionsPortal>
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                    {(
-                        [
-                            [
-                                'Possible leads',
-                                summary.possible_leads,
-                                Sparkles,
-                            ],
-                            ['Qualified', summary.qualified_leads, UserCheck],
-                            ['Documents', summary.documents, FileText],
-                        ] as const
-                    ).map(([label, value, Icon]) => (
-                        <StatTile
-                            key={label}
-                            label={label}
-                            value={value}
-                            icon={Icon}
-                        />
+                <nav
+                    aria-label="Lead categories"
+                    className="flex gap-1 overflow-x-auto border-b"
+                >
+                    {statuses.map(([value, label]) => (
+                        <button
+                            key={value}
+                            type="button"
+                            aria-current={
+                                activeStatus === value ? 'page' : undefined
+                            }
+                            onClick={() => applyStatusFilter(value)}
+                            className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm whitespace-nowrap ${activeStatus === value ? 'border-primary font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        >
+                            {label}
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+                                {(statusCounts[value] ?? 0).toLocaleString()}
+                            </span>
+                        </button>
                     ))}
-                </div>
+                </nav>
 
                 <FilterBar
                     as="div"
                     icon={SlidersHorizontal}
                     label="Filters"
                     gridClassName="grid-cols-1"
-                    hint="Search matches contact, email, company, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of the status tab and agent filter below."
+                    hint="Search (or press Enter) looks across every lead in the database, ignoring the category tabs and agent filter."
                 >
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -232,32 +263,6 @@ export default function VerificationIndex({
                                     Search
                                 </Button>
                             </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5 lg:w-56">
-                            <label
-                                htmlFor="verification-status"
-                                className="text-xs text-muted-foreground"
-                            >
-                                Lead category
-                            </label>
-                            <Select
-                                value={filters.status || 'possible_lead'}
-                                onValueChange={applyStatusFilter}
-                            >
-                                <SelectTrigger
-                                    id="verification-status"
-                                    className="w-full"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {statuses.map(([value, label]) => (
-                                        <SelectItem key={value} value={value}>
-                                            {label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
                         </div>
                         {agents.length > 0 && (
                             <div className="flex flex-col gap-1.5 lg:w-56">
@@ -303,11 +308,18 @@ export default function VerificationIndex({
                     </div>
                 </FilterBar>
 
-                <p className="px-1 text-sm text-muted-foreground">
-                    Showing {leads.from ?? 0}–{leads.to ?? 0} of {leads.total}{' '}
-                    contacts
-                    {filters.search && ` for “${filters.search}”`}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-sm text-muted-foreground">
+                    <p>
+                        Showing {leads.from ?? 0}–{leads.to ?? 0} of{' '}
+                        {leads.total.toLocaleString()} contacts
+                        {filters.search && ` for “${filters.search}”`}
+                    </p>
+                    <p className="flex items-center gap-1.5 text-xs">
+                        <Paperclip className="size-3.5" />
+                        {summary.documents.toLocaleString()} documents on
+                        possible leads
+                    </p>
+                </div>
                 {leads.data.length ? (
                     <Table className="text-xs">
                         <TableHeader>
@@ -317,6 +329,8 @@ export default function VerificationIndex({
                                 <TableHead>Location</TableHead>
                                 <TableHead>Product requested</TableHead>
                                 <TableHead>Owner</TableHead>
+                                <TableHead>Docs</TableHead>
+                                <TableHead>Added</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>
                                     <span className="sr-only">Actions</span>
@@ -327,9 +341,14 @@ export default function VerificationIndex({
                             {leads.data.map((lead) => (
                                 <TableRow key={lead.id}>
                                     <TableCell>
-                                        <p className="font-medium">
+                                        <Link
+                                            href={show.url(lead.id, {
+                                                query: queueQuery,
+                                            })}
+                                            className="font-medium hover:underline"
+                                        >
                                             {lead.company_name}
-                                        </p>
+                                        </Link>
                                         <p className="text-xs text-muted-foreground">
                                             {lead.website_domain ||
                                                 lead.lead_code}
@@ -357,6 +376,26 @@ export default function VerificationIndex({
                                     </TableCell>
                                     <TableCell>
                                         {lead.agent?.name || 'Unassigned'}
+                                    </TableCell>
+                                    <TableCell>
+                                        {lead.attachments_count > 0 ? (
+                                            <span className="inline-flex items-center gap-1 text-foreground">
+                                                <Paperclip className="size-3.5 text-primary" />
+                                                {lead.attachments_count}
+                                            </span>
+                                        ) : (
+                                            <span className="text-muted-foreground">
+                                                —
+                                            </span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell
+                                        className="whitespace-nowrap text-muted-foreground"
+                                        title={new Date(
+                                            lead.created_at,
+                                        ).toLocaleString()}
+                                    >
+                                        {addedLabel(lead.created_at)}
                                     </TableCell>
                                     <TableCell>
                                         <StatusBadge value={lead.status} />
@@ -393,8 +432,13 @@ export default function VerificationIndex({
                                                 </Form>
                                             )}
                                             <Button asChild size="sm">
-                                                <Link href={show(lead.id)}>
+                                                <Link
+                                                    href={show.url(lead.id, {
+                                                        query: queueQuery,
+                                                    })}
+                                                >
                                                     Review
+                                                    <ChevronRight />
                                                 </Link>
                                             </Button>
                                             {canDelete && (
@@ -402,11 +446,12 @@ export default function VerificationIndex({
                                                     <DialogTrigger asChild>
                                                         <Button
                                                             type="button"
-                                                            size="sm"
-                                                            variant="destructive"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="size-8 text-muted-foreground hover:text-destructive"
+                                                            aria-label={`Delete ${lead.company_name}`}
                                                         >
                                                             <Trash2 />
-                                                            Delete
                                                         </Button>
                                                     </DialogTrigger>
                                                     <DialogContent>

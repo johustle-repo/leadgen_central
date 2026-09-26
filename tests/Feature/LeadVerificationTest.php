@@ -349,3 +349,59 @@ it('renders verification records after their owner account is deleted', function
         ->where('lead.id', $lead->id)
         ->where('lead.agent', null));
 });
+
+it('navigates between leads within the list a lead was opened from', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $agent = User::factory()->create();
+    $otherAgent = User::factory()->create();
+    $oldest = Lead::factory()->for($agent, 'agent')->create(['status' => 'possible_lead', 'created_at' => now()->subDays(3)]);
+    Lead::factory()->for($agent, 'agent')->create(['status' => 'raw', 'created_at' => now()->subDays(2)]);
+    Lead::factory()->for($otherAgent, 'agent')->create(['status' => 'possible_lead', 'created_at' => now()->subDays(2)]);
+    $middle = Lead::factory()->for($agent, 'agent')->create(['status' => 'possible_lead', 'created_at' => now()->subDay()]);
+    $newest = Lead::factory()->for($agent, 'agent')->create(['status' => 'possible_lead', 'created_at' => now()]);
+
+    $this->actingAs($reviewer)->get(route('verification.show', ['lead' => $middle, 'status' => 'possible_lead', 'agent_id' => $agent->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('previousId', $newest->id)
+            ->where('nextId', $oldest->id)
+            ->where('queue.status', 'possible_lead')
+            ->where('queue.agent_id', $agent->id)
+            ->where('queue.position', 2)
+            ->where('queue.total', 3));
+
+    $this->actingAs($reviewer)->get(route('verification.show', $middle))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('queue', null)
+            ->where('nextId', $newest->id));
+});
+
+it('moves to the next lead in the same list after saving, even when the lead leaves it', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $older = Lead::factory()->create(['status' => 'possible_lead', 'created_at' => now()->subDay()]);
+    Lead::factory()->create(['status' => 'raw', 'created_at' => now()->subHours(12)]);
+    $current = Lead::factory()->create(['status' => 'possible_lead', 'created_at' => now()]);
+
+    $this->actingAs($reviewer)->put(route('verification.update', $current), [
+        'company_name' => $current->company_name, 'status' => 'qualified_lead', 'intent' => 'save_next', 'queue_status' => 'possible_lead',
+    ])->assertRedirect(route('verification.show', ['lead' => $older->id, 'status' => 'possible_lead']));
+    expect($current->refresh()->status->value)->toBe('qualified_lead');
+
+    $this->actingAs($reviewer)->put(route('verification.update', $older), [
+        'company_name' => $older->company_name, 'status' => 'possible_lead', 'intent' => 'save_next', 'queue_status' => 'possible_lead',
+    ])->assertRedirect(route('verification.index', ['status' => 'possible_lead']))
+        ->assertSessionHas('toast.message', 'Lead verified. That was the last lead in this list.');
+});
+
+it('counts each review category and each leads documents on the list', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create(['status' => 'possible_lead']);
+    Lead::factory()->for($agent, 'agent')->count(2)->create(['status' => 'needs_review']);
+    Lead::factory()->create(['status' => 'needs_review']);
+    LeadAttachment::factory()->for($lead)->count(2)->create();
+
+    $this->actingAs($reviewer)->get(route('verification.index', ['agent_id' => $agent->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('statusCounts', ['needs_review' => 2, 'possible_lead' => 1])
+            ->where('leads.data.0.attachments_count', 2));
+});

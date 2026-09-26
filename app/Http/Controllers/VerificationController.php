@@ -26,37 +26,35 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class VerificationController extends Controller
 {
+    /** The Lead Review categories, in the order the queue tabs show them. */
+    private const QUEUE_STATUSES = ['needs_review', 'possible_lead', 'qualified_lead', 'not_a_lead', 'forwarded'];
+
     public function index(FilterVerificationRequest $request): Response
     {
         $filters = $request->validated();
         $search = trim((string) ($filters['search'] ?? ''));
         $status = $filters['status'] ?? 'possible_lead';
-        $agentId = $filters['agent_id'] ?? null;
-        $query = $this->searchQuery($search)
+        $agentId = isset($filters['agent_id']) ? (int) $filters['agent_id'] : null;
+        $query = $this->ordered($this->queueQuery($search, $status, $agentId))
             ->with('agent:id,name')
-            ->latest();
-        // A search reaches across every lead in the database on its own,
-        // ignoring the status tab and agent filter, rather than searching
-        // only within whichever narrower view happens to be selected.
-        // Possible Leads is the default and primary view otherwise - there's
-        // no longer a combined "review queue" landing state.
-        if ($search === '') {
-            $query->where('status', $status);
-            if ($agentId) {
-                $query->where('agent_id', $agentId);
-            }
-        }
+            ->withCount('attachments');
 
         $summary = [
             'possible_leads' => (clone $this->searchQuery($search))->where('status', 'possible_lead')->count(),
             'qualified_leads' => (clone $this->searchQuery($search))->where('status', 'qualified_lead')->count(),
             'documents' => LeadAttachment::query()->whereIn('lead_id', $this->searchQuery($search)->where('status', 'possible_lead')->select('id'))->count(),
         ];
+        $statusCounts = $this->searchQuery('')
+            ->when($agentId, fn (Builder $query) => $query->where('agent_id', $agentId))
+            ->whereIn('status', self::QUEUE_STATUSES)
+            ->toBase()->selectRaw('status, COUNT(*) as aggregate')->groupBy('status')->pluck('aggregate', 'status')
+            ->map(fn (mixed $count): int => (int) $count)->all();
 
         return Inertia::render('verification/index', [
             'leads' => $query->paginate(20)->withQueryString(),
             'filters' => ['status' => $search === '' ? $status : '', 'search' => $search, 'agent_id' => $search === '' && $agentId ? (string) $agentId : ''],
             'summary' => $summary,
+            'statusCounts' => $statusCounts,
             'agents' => $request->user()->canViewAllLeads() ? User::query()->where('role', UserRole::Agent)->orderBy('name')->get(['id', 'name']) : [],
             'canDelete' => $request->user()->isAdministrator(),
         ]);
@@ -117,20 +115,51 @@ class VerificationController extends Controller
     {
         abort_unless($request->user()->canViewAllLeads(), 403);
         Gate::authorize('view', $lead);
+        $context = $this->queueContext($request->validate((new FilterVerificationRequest)->rules()));
         $lead->load(['agent:id,name', 'uploadBatch:id,batch_code', 'structuredNotes.user:id,name', 'statusHistory.changer:id,name', 'forwardings.forwarder:id,name', 'attachments.uploader:id,name']);
 
-        return Inertia::render('verification/show', ['lead' => $lead, 'previousId' => Lead::query()->where('id', '<', $lead->id)->max('id'), 'nextId' => Lead::query()->where('id', '>', $lead->id)->min('id'), 'reviewers' => User::query()->whereIn('role', [UserRole::SuperAdministrator, UserRole::Administrator, UserRole::SubAdministrator])->where('status', 'active')->get(['id', 'name']), 'agents' => User::query()->where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'canDelete' => $request->user()->isAdministrator()]);
+        if ($context === null) {
+            $previousId = Lead::query()->where('id', '<', $lead->id)->max('id');
+            $nextId = Lead::query()->where('id', '>', $lead->id)->min('id');
+            $queue = null;
+        } else {
+            $queueQuery = $this->queueQuery($context['search'], $context['status'], $context['agent_id']);
+            $previousId = $this->neighbor($queueQuery, $lead, before: true);
+            $nextId = $this->neighbor($queueQuery, $lead, before: false);
+            $isInQueue = (clone $queueQuery)->whereKey($lead->id)->exists();
+            $queue = [
+                ...$context,
+                'total' => (clone $queueQuery)->count(),
+                'position' => $isInQueue ? $this->positionQuery($queueQuery, $lead, before: true)->count() + 1 : null,
+            ];
+        }
+
+        return Inertia::render('verification/show', ['lead' => $lead, 'previousId' => $previousId, 'nextId' => $nextId, 'queue' => $queue, 'reviewers' => User::query()->whereIn('role', [UserRole::SuperAdministrator, UserRole::Administrator, UserRole::SubAdministrator])->where('status', 'active')->get(['id', 'name']), 'agents' => User::query()->where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']), 'canDelete' => $request->user()->isAdministrator()]);
     }
 
     public function update(VerifyLeadRequest $request, Lead $lead, LeadVerificationService $service): RedirectResponse
     {
         $data = $request->validated();
-        unset($data['intent']);
+        $context = $this->queueContext([
+            'status' => $data['queue_status'] ?? null,
+            'agent_id' => $data['queue_agent_id'] ?? null,
+            'search' => $data['queue_search'] ?? null,
+        ]);
+        unset($data['intent'], $data['queue_status'], $data['queue_agent_id'], $data['queue_search']);
+        // Captured before saving: a reclassified lead can leave the queue,
+        // but "next" still means the lead after it in the list being worked.
+        $nextId = $context === null
+            ? Lead::query()->where('id', '>', $lead->id)->min('id')
+            : $this->neighbor($this->queueQuery($context['search'], $context['status'], $context['agent_id']), $lead, before: false);
         $service->verify($lead, $data, $request->user());
+
         if ($request->validated('intent') === 'save_next') {
-            $nextId = Lead::query()->where('id', '>', $lead->id)->min('id');
+            $query = $context === null ? [] : $this->queueParameters($context);
             if ($nextId) {
-                return redirect()->route('verification.show', $nextId)->with('toast', ['type' => 'success', 'message' => 'Lead verified.']);
+                return redirect()->route('verification.show', ['lead' => $nextId, ...$query])->with('toast', ['type' => 'success', 'message' => 'Lead verified.']);
+            }
+            if ($context !== null) {
+                return redirect()->route('verification.index', $query)->with('toast', ['type' => 'success', 'message' => 'Lead verified. That was the last lead in this list.']);
             }
         }
 
@@ -179,6 +208,88 @@ class VerificationController extends Controller
             }
             fclose($stream);
         }, 'Possible-Leads-'.today()->format('m-d-Y').'.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * The leads a Lead Review list shows. A search reaches across every lead
+     * in the database on its own, ignoring the status tab and agent filter,
+     * rather than searching only within whichever narrower view is selected.
+     *
+     * @return Builder<Lead>
+     */
+    private function queueQuery(string $search, string $status, ?int $agentId): Builder
+    {
+        $query = $this->searchQuery($search);
+        if ($search === '') {
+            $query->where('status', $status)->when($agentId, fn (Builder $query) => $query->where('agent_id', $agentId));
+        }
+
+        return $query;
+    }
+
+    /**
+     * Newest first, with the id breaking ties so neighbours are well defined.
+     *
+     * @param  Builder<Lead>  $query
+     * @return Builder<Lead>
+     */
+    private function ordered(Builder $query): Builder
+    {
+        return $query->orderByDesc('created_at')->orderByDesc('id');
+    }
+
+    /**
+     * Leads listed before (or after) the given lead in the queue's order.
+     *
+     * @param  Builder<Lead>  $queue
+     * @return Builder<Lead>
+     */
+    private function positionQuery(Builder $queue, Lead $lead, bool $before): Builder
+    {
+        $operator = $before ? '>' : '<';
+
+        return (clone $queue)->where(fn (Builder $query) => $query->where('created_at', $operator, $lead->created_at)
+            ->orWhere(fn (Builder $query) => $query->where('created_at', $lead->created_at)->where('id', $operator, $lead->id)));
+    }
+
+    /** @param  Builder<Lead>  $queue */
+    private function neighbor(Builder $queue, Lead $lead, bool $before): ?int
+    {
+        $query = $this->positionQuery($queue, $lead, $before);
+        $direction = $before ? 'asc' : 'desc';
+        $id = $query->orderBy('created_at', $direction)->orderBy('id', $direction)->value('id');
+
+        return $id === null ? null : (int) $id;
+    }
+
+    /**
+     * The list a lead was opened from, or null when it was opened directly.
+     *
+     * @param  array{status?: string|null, agent_id?: int|string|null, search?: string|null}  $input
+     * @return array{status: string, agent_id: int|null, search: string}|null
+     */
+    private function queueContext(array $input): ?array
+    {
+        if (($input['status'] ?? null) === null && ($input['agent_id'] ?? null) === null && trim((string) ($input['search'] ?? '')) === '') {
+            return null;
+        }
+
+        return [
+            'status' => $input['status'] ?? 'possible_lead',
+            'agent_id' => isset($input['agent_id']) ? (int) $input['agent_id'] : null,
+            'search' => trim((string) ($input['search'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param  array{status: string, agent_id: int|null, search: string}  $context
+     * @return array<string, string|int>
+     */
+    private function queueParameters(array $context): array
+    {
+        return $context['search'] !== ''
+            ? ['search' => $context['search']]
+            : array_filter(['status' => $context['status'], 'agent_id' => $context['agent_id']]);
     }
 
     /** @return Builder<Lead> */
