@@ -51,6 +51,9 @@ type Group = DemographicMetrics & { key: string; label: string };
 type SortKey = keyof DemographicMetrics | 'rate' | 'label';
 
 const ALL = '__all__';
+/** Every bar visual reserves this many rows so tiles line up at one height. */
+const CHART_ROWS = 10;
+const ROW_HEIGHT = 40;
 const SERIES = [
     { key: 'records', label: 'Leads', color: 'var(--color-chart-1)' },
     { key: 'possible', label: 'Possible leads', color: 'var(--color-chart-2)' },
@@ -140,7 +143,7 @@ function ClusteredBars({
     measure,
     selected,
     onSelect,
-    limit = 10,
+    limit = CHART_ROWS,
     empty = 'No leads match the current filters.',
 }: {
     groups: Group[];
@@ -159,85 +162,101 @@ function ClusteredBars({
         )
         .slice(0, limit);
 
-    if (data.length === 0) {
-        return <p className="py-6 text-sm text-muted-foreground">{empty}</p>;
-    }
-
     return (
-        <>
+        <div className="flex flex-1 flex-col">
             <div
                 className="min-w-0"
-                style={{ height: data.length * 40 + 8 }}
-                role="img"
-                aria-label={`Leads and possible leads for ${data.map((row) => `${row.label}: ${row.records} leads, ${row.possible} possible`).join('; ')}`}
+                style={{ height: CHART_ROWS * ROW_HEIGHT + 8 }}
             >
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                        layout="vertical"
-                        data={data}
-                        margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
-                        barGap={2}
-                        barCategoryGap={8}
+                {data.length === 0 ? (
+                    <p className="py-6 text-sm text-muted-foreground">
+                        {empty}
+                    </p>
+                ) : (
+                    <div
+                        className="min-w-0"
+                        style={{ height: data.length * ROW_HEIGHT + 8 }}
+                        role="img"
+                        aria-label={`Leads and possible leads for ${data.map((row) => `${row.label}: ${row.records} leads, ${row.possible} possible`).join('; ')}`}
                     >
-                        <XAxis type="number" hide />
-                        <YAxis
-                            type="category"
-                            dataKey="label"
-                            width={156}
-                            interval={0}
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{
-                                fill: 'var(--muted-foreground)',
-                                fontSize: 11,
-                            }}
-                            tickFormatter={(value: string) =>
-                                value.length > 20
-                                    ? `${value.slice(0, 19)}…`
-                                    : value
-                            }
-                        />
-                        <Tooltip
-                            content={ChartTooltip}
-                            cursor={{ fill: 'var(--muted)', opacity: 0.5 }}
-                        />
-                        {SERIES.map((series) => (
-                            <Bar
-                                key={series.key}
-                                dataKey={series.key}
-                                name={series.label}
-                                fill={series.color}
-                                maxBarSize={14}
-                                radius={[0, 4, 4, 0]}
-                                cursor="pointer"
-                                isAnimationActive={false}
-                                onClick={(_, index) =>
-                                    onSelect(data[index].key)
-                                }
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                layout="vertical"
+                                data={data}
+                                margin={{
+                                    top: 0,
+                                    right: 40,
+                                    left: 0,
+                                    bottom: 0,
+                                }}
+                                barGap={2}
+                                barCategoryGap={8}
                             >
-                                {data.map((row) => (
-                                    <Cell
-                                        key={row.key}
-                                        fillOpacity={
-                                            selected && selected !== row.key
-                                                ? 0.25
-                                                : 1
-                                        }
-                                    />
-                                ))}
-                                <LabelList
-                                    dataKey={series.key}
-                                    position="right"
-                                    fill="var(--foreground)"
-                                    fontSize={11}
-                                    formatter={(value) =>
-                                        Number(value).toLocaleString()
+                                <XAxis type="number" hide />
+                                <YAxis
+                                    type="category"
+                                    dataKey="label"
+                                    width={156}
+                                    interval={0}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tick={{
+                                        fill: 'var(--muted-foreground)',
+                                        fontSize: 11,
+                                    }}
+                                    tickFormatter={(value: string) =>
+                                        value.length > 20
+                                            ? `${value.slice(0, 19)}…`
+                                            : value
                                     }
                                 />
-                            </Bar>
-                        ))}
-                    </BarChart>
-                </ResponsiveContainer>
+                                <Tooltip
+                                    content={ChartTooltip}
+                                    cursor={{
+                                        fill: 'var(--muted)',
+                                        opacity: 0.5,
+                                    }}
+                                />
+                                {SERIES.map((series) => (
+                                    <Bar
+                                        key={series.key}
+                                        dataKey={series.key}
+                                        name={series.label}
+                                        fill={series.color}
+                                        maxBarSize={14}
+                                        radius={[0, 4, 4, 0]}
+                                        cursor="pointer"
+                                        isAnimationActive={false}
+                                        onClick={(_, index) =>
+                                            onSelect(data[index].key)
+                                        }
+                                    >
+                                        {data.map((row) => (
+                                            <Cell
+                                                key={row.key}
+                                                fillOpacity={
+                                                    selected &&
+                                                    selected !== row.key
+                                                        ? 0.25
+                                                        : 1
+                                                }
+                                            />
+                                        ))}
+                                        <LabelList
+                                            dataKey={series.key}
+                                            position="right"
+                                            fill="var(--foreground)"
+                                            fontSize={11}
+                                            formatter={(value) =>
+                                                Number(value).toLocaleString()
+                                            }
+                                        />
+                                    </Bar>
+                                ))}
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                )}
             </div>
             <ChartLegend
                 items={SERIES.map((series) => ({
@@ -246,13 +265,13 @@ function ClusteredBars({
                     color: series.color,
                 }))}
             />
-            {groups.length > limit && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                    Top {limit} of {groups.length.toLocaleString()} · click a
-                    bar to filter the whole page
-                </p>
-            )}
-        </>
+            <p className="mt-2 text-xs text-muted-foreground">
+                {groups.length > limit
+                    ? `Top ${limit} of ${groups.length.toLocaleString()} · `
+                    : ''}
+                Click a bar to filter the whole page
+            </p>
+        </div>
     );
 }
 
@@ -749,7 +768,7 @@ export function LeadDemographics({
                 />
             </div>
 
-            <div className="grid items-start gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-2">
                 <Visual
                     title="Leads by region"
                     subtitle="Regions follow the Regions.xlsx reference"
@@ -759,16 +778,17 @@ export function LeadDemographics({
                         measure={measure}
                         selected={filters.region}
                         onSelect={(key) => select('region', key)}
-                        limit={8}
                     />
                 </Visual>
-                <Visual title="Leads by country">
+                <Visual
+                    title="Leads by country"
+                    subtitle="From the country code or saved country name"
+                >
                     <ClusteredBars
                         groups={countryGroups}
                         measure={measure}
                         selected={filters.country}
                         onSelect={(key) => select('country', key)}
-                        limit={12}
                     />
                 </Visual>
                 {showAgents && (
@@ -778,7 +798,6 @@ export function LeadDemographics({
                             measure={measure}
                             selected={filters.agent}
                             onSelect={(key) => select('agent', key)}
-                            limit={12}
                         />
                     </Visual>
                 )}
@@ -791,7 +810,6 @@ export function LeadDemographics({
                         measure={measure}
                         selected={filters.city}
                         onSelect={(key) => select('city', key)}
-                        limit={12}
                     />
                 </Visual>
                 <Visual
@@ -806,7 +824,6 @@ export function LeadDemographics({
                         measure={measure}
                         selected={filters.city}
                         onSelect={(key) => select('city', key)}
-                        limit={10}
                         empty="No leads in capital cities for the current filters."
                     />
                 </Visual>

@@ -369,18 +369,21 @@ it('renders leads without an assigned owner', function () {
         ->where('leads.data.0.agent', null));
 });
 
-it('exposes the agent roster to administrators and sub-administrators only', function () {
+it('exposes only agents in the roster, and only to administrators and sub-administrators', function () {
     $administrator = User::factory()->administrator()->create();
     $subAdministrator = User::factory()->subAdministrator()->create();
-    $agent = User::factory()->create();
+    User::factory()->superAdministrator()->create();
+    $agent = User::factory()->create(['name' => 'Amy Agent']);
     User::factory()->create(['name' => 'Zoe Agent']);
 
     $this->actingAs($administrator)->get(route('leads.index'))->assertInertia(fn (Assert $page) => $page
         ->component('leads/index')
-        ->has('agents', 4));
+        ->has('agents', 2)
+        ->where('agents.0.name', 'Amy Agent')
+        ->where('agents.1.name', 'Zoe Agent'));
     $this->actingAs($subAdministrator)->get(route('leads.index'))->assertInertia(fn (Assert $page) => $page
         ->component('leads/index')
-        ->has('agents', 4));
+        ->has('agents', 2));
     $this->actingAs($agent)->get(route('leads.index'))->assertInertia(fn (Assert $page) => $page
         ->component('leads/index')
         ->has('agents', 0));
