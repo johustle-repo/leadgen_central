@@ -4,6 +4,7 @@ import { Mail, Plug, RefreshCw, Unplug, UserRound } from 'lucide-react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import InputError from '@/components/input-error';
+import { ProfilePhotoCard } from '@/components/profile-photo-card';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -47,6 +48,8 @@ export default function Profile({
             <Head title="Profile settings" />
 
             <h1 className="sr-only">Profile settings</h1>
+
+            <ProfilePhotoCard user={auth.user} />
 
             <Form
                 {...ProfileController.update.form()}
@@ -158,8 +161,7 @@ export default function Profile({
                                 <CardTitle>Gmail connection</CardTitle>
                                 <CardDescription>
                                     Connect your Gmail mailbox so replies to
-                                    your outreach can be captured
-                                    automatically.
+                                    your outreach can be captured automatically.
                                 </CardDescription>
                             </div>
                         </div>

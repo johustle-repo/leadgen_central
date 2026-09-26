@@ -3,10 +3,11 @@ export type User = {
     name: string;
     company_alias: string | null;
     email: string;
-    role: 'super_administrator' | 'administrator' | 'sub_administrator' | 'agent';
+    role:
+        'super_administrator' | 'administrator' | 'sub_administrator' | 'agent';
     status: 'active' | 'inactive';
     team?: string | null;
-    avatar?: string;
+    avatar?: string | null;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
     created_at: string;

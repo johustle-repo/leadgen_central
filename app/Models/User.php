@@ -25,6 +25,8 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $name
  * @property string|null $company_alias
  * @property string $email
+ * @property string|null $avatar_path
+ * @property-read string|null $avatar
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property UserRole $role
@@ -47,7 +49,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property-read int|null $submitted_rows_sum
  */
 #[Fillable(['name', 'company_alias', 'email', 'password', 'role', 'team', 'status', 'employee_code', 'alias_name', 'alias_email'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'avatar_path', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
@@ -78,6 +80,18 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         }
 
         return "attendance:{$this->qr_token}";
+    }
+
+    /**
+     * URL of the user's profile picture, or null when they have none. The
+     * query string changes whenever the picture does, so browsers never
+     * show a stale cached image.
+     */
+    public function getAvatarAttribute(): ?string
+    {
+        $path = $this->attributes['avatar_path'] ?? null;
+
+        return $path === null ? null : route('avatars.show', ['user' => $this->id, 'v' => substr(md5($path), 0, 10)]);
     }
 
     /**

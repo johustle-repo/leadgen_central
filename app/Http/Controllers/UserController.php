@@ -115,7 +115,7 @@ class UserController extends Controller
     private function baseUserQuery(string $search, string $status): Builder
     {
         $query = User::query()
-            ->select(['id', 'name', 'email', 'role', 'team', 'status', 'created_at'])
+            ->select(['id', 'name', 'email', 'avatar_path', 'role', 'team', 'status', 'created_at'])
             ->selectSub(DB::table(config('session.table'))->selectRaw('MAX(last_activity)')->whereColumn('user_id', 'users.id'), 'last_seen_at')
             ->where('role', '!=', UserRole::SuperAdministrator)
             ->withCount([
@@ -151,6 +151,7 @@ class UserController extends Controller
 
         return [
             ...$user->only(['id', 'name', 'email', 'role', 'team', 'status', 'created_at']),
+            'avatar' => $user->avatar,
             'leads_count' => $user->leads_count,
             'possible_leads_count' => (int) $user->getAttribute('possible_leads_count'),
             'qualified_leads_count' => (int) $user->getAttribute('qualified_leads_count'),

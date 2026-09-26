@@ -42,7 +42,7 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'appVersion' => config('app.version'),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user()?->append('avatar'),
             ],
             'flash' => [
                 'toast' => fn () => $request->session()->get('toast'),

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\Settings\AvatarController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use Illuminate\Auth\Middleware\RequirePassword;
@@ -11,6 +12,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('settings/avatar', [AvatarController::class, 'update'])->middleware('throttle:10,1')->name('avatar.update');
+    Route::delete('settings/avatar', [AvatarController::class, 'destroy'])->name('avatar.destroy');
+    Route::get('avatars/{user}', [AvatarController::class, 'show'])->name('avatars.show');
 
     // QR Attendance self-scanning is temporarily disabled for agents - re-add
     // these two routes and the "QR Attendance" tab in resources/js/layouts/

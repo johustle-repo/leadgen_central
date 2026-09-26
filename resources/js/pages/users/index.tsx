@@ -63,6 +63,7 @@ type User = {
     id: number;
     name: string;
     email: string;
+    avatar: string | null;
     role: string;
     team: string | null;
     status: string;
@@ -157,7 +158,15 @@ function UserIdentity({ user }: { user: User }) {
     return (
         <div className="flex min-w-0 items-center gap-3">
             <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                {initials(user.name)}
+                {user.avatar ? (
+                    <img
+                        src={user.avatar}
+                        alt=""
+                        className="size-9 rounded-full object-cover"
+                    />
+                ) : (
+                    initials(user.name)
+                )}
                 {user.is_online && (
                     <span
                         className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-card bg-success"
