@@ -26,6 +26,9 @@
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
+        <env name="GOOGLE_CLIENT_ID" value="testing-google-client-id"/>
+        <env name="GOOGLE_CLIENT_SECRET" value="testing-google-client-secret"/>
+        <env name="GOOGLE_REDIRECT_URI" value="http://localhost/integrations/gmail/callback"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
