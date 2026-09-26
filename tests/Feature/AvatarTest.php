@@ -31,7 +31,7 @@ it('rejects svg, tiny and oversized profile pictures', function (UploadedFile $f
 })->with([
     'svg' => fn () => UploadedFile::fake()->create('logo.svg', 5, 'image/svg+xml'),
     'too small' => fn () => UploadedFile::fake()->image('tiny.png', 20, 20),
-    'too large' => fn () => UploadedFile::fake()->image('huge.jpg', 400, 400)->size(3000),
+    'too large' => fn () => UploadedFile::fake()->image('huge.jpg', 400, 400)->size(6000),
 ]);
 
 it('shares the avatar url with the page and serves the picture to signed-in users only', function () {
@@ -42,6 +42,7 @@ it('shares the avatar url with the page and serves the picture to signed-in user
 
     $this->actingAs($agent)->get(route('profile.edit'))->assertInertia(fn (Assert $page) => $page
         ->where('auth.user.avatar', $agent->avatar)
+        ->where('auth.user.avatar', fn (string $url) => str_starts_with($url, "/avatars/{$agent->id}?v="))
         ->missing('auth.user.avatar_path'));
     $this->actingAs(User::factory()->create())->get($agent->avatar)->assertOk();
 

@@ -27,7 +27,7 @@ class AvatarUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'avatar' => ['required', File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max('2mb')->dimensions(Rule::dimensions()->minWidth(64)->minHeight(64))],
+            'avatar' => ['required', File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max('5mb')->dimensions(Rule::dimensions()->minWidth(64)->minHeight(64))],
         ];
     }
 }

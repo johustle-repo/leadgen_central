@@ -91,7 +91,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     {
         $path = $this->attributes['avatar_path'] ?? null;
 
-        return $path === null ? null : route('avatars.show', ['user' => $this->id, 'v' => substr(md5($path), 0, 10)]);
+        return $path === null ? null : route('avatars.show', ['user' => $this->id, 'v' => substr(md5($path), 0, 10)], absolute: false);
     }
 
     /**
