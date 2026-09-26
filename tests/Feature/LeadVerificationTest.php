@@ -295,6 +295,25 @@ it('rejects unsafe document types and cross-contact attachment access', function
     Storage::disk('local')->assertExists($attachment->path);
 });
 
+it('accepts images as contact documents but still rejects svg files', function () {
+    Storage::fake('local');
+    $reviewer = User::factory()->administrator()->create();
+    $lead = Lead::factory()->create(['status' => 'possible_lead']);
+
+    $this->actingAs($reviewer)->post(route('leads.attachments.store', $lead), [
+        'attachment' => UploadedFile::fake()->image('business-card.png'),
+        'label' => 'Business card',
+    ])->assertSessionHasNoErrors();
+    $this->actingAs($reviewer)->post(route('leads.attachments.store', $lead), [
+        'attachment' => UploadedFile::fake()->image('storefront.jpg'),
+    ])->assertSessionHasNoErrors();
+    $this->actingAs($reviewer)->post(route('leads.attachments.store', $lead), [
+        'attachment' => UploadedFile::fake()->create('logo.svg', 5, 'image/svg+xml'),
+    ])->assertSessionHasErrors('attachment');
+
+    expect($lead->attachments()->pluck('mime_type')->all())->toBe(['image/png', 'image/jpeg']);
+});
+
 it('prevents agents from using the verification workspace', function () {
     $agent = User::factory()->create();
     $lead = Lead::factory()->create();

@@ -6,6 +6,8 @@ import {
     Download,
     ExternalLink,
     FileText,
+    FolderOpen,
+    ImageIcon,
     Globe,
     History,
     Linkedin,
@@ -16,8 +18,9 @@ import {
     StickyNote,
     Trash2,
     Upload,
+    X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import { formatLabel } from '@/components/database-charts';
@@ -185,6 +188,159 @@ const fieldsAfterCountry = [
     ['product_requested', 'Product Requested'],
 ] as const;
 
+/** Mirrors StoreLeadAttachmentRequest's allowed types and size limit. */
+const DOCUMENT_ACCEPT =
+    '.pdf,.csv,.xls,.xlsx,.doc,.docx,.jpg,.jpeg,.png,.webp,.gif';
+const DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Coloured, drag-and-drop file picker that keeps the real file input (so the
+ * surrounding Inertia Form still submits it) and previews images before they
+ * are uploaded.
+ */
+function DocumentPicker({
+    onChange,
+}: {
+    onChange: (hasFile: boolean) => void;
+}) {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [file, setFile] = useState<File | null>(null);
+    const [dragging, setDragging] = useState(false);
+    const [tooLarge, setTooLarge] = useState(false);
+    const preview = useMemo(
+        () =>
+            file && file.type.startsWith('image/')
+                ? URL.createObjectURL(file)
+                : null,
+        [file],
+    );
+
+    useEffect(
+        () => () => {
+            if (preview) {
+                URL.revokeObjectURL(preview);
+            }
+        },
+        [preview],
+    );
+
+    const choose = (files: FileList | null) => {
+        const chosen = files?.[0] ?? null;
+
+        if (chosen && chosen.size > DOCUMENT_MAX_BYTES) {
+            if (inputRef.current) {
+                inputRef.current.value = '';
+            }
+
+            setTooLarge(true);
+            setFile(null);
+            onChange(false);
+
+            return;
+        }
+
+        setTooLarge(false);
+        setFile(chosen);
+        onChange(chosen !== null);
+    };
+
+    const clear = () => {
+        if (inputRef.current) {
+            inputRef.current.value = '';
+        }
+
+        choose(null);
+    };
+
+    return (
+        <div>
+            <label
+                onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(event) => {
+                    event.preventDefault();
+                    setDragging(false);
+
+                    if (
+                        inputRef.current &&
+                        event.dataTransfer.files.length > 0
+                    ) {
+                        inputRef.current.files = event.dataTransfer.files;
+                        choose(event.dataTransfer.files);
+                    }
+                }}
+                className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-4 text-center transition-colors ${dragging ? 'border-primary bg-primary/15' : 'border-primary/30 bg-primary/5 hover:border-primary/60 hover:bg-primary/10'}`}
+            >
+                <input
+                    ref={inputRef}
+                    name="attachment"
+                    type="file"
+                    required
+                    accept={DOCUMENT_ACCEPT}
+                    className="sr-only"
+                    onChange={(event) => choose(event.target.files)}
+                />
+                {file ? (
+                    <div className="flex w-full items-center gap-3 text-left">
+                        {preview ? (
+                            <img
+                                src={preview}
+                                alt=""
+                                className="size-12 shrink-0 rounded-md border object-cover"
+                            />
+                        ) : (
+                            <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                <FileText className="size-6" />
+                            </span>
+                        )}
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                                {file.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                {fileSize(file.size)} · click to change
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.preventDefault();
+                                clear();
+                            }}
+                            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            aria-label="Remove selected file"
+                        >
+                            <X className="size-4" />
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <span className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-xs">
+                            <FolderOpen className="size-4" />
+                            Choose file
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            or drag and drop it here
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                            PDF, Word, Excel, CSV, JPG, PNG, WEBP or GIF · up to
+                            20 MB
+                        </span>
+                    </>
+                )}
+            </label>
+            {tooLarge && (
+                <p className="mt-1 text-xs text-destructive">
+                    That file is larger than 20 MB.
+                </p>
+            )}
+        </div>
+    );
+}
+
 const fileSize = (bytes: number) =>
     bytes >= 1024 * 1024
         ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
@@ -341,6 +497,8 @@ export default function VerificationShow({
         }
     };
 
+    const [pickerKey, setPickerKey] = useState(0);
+    const [documentLeadId, setDocumentLeadId] = useState<number | null>(null);
     const query = queueQuery(queue);
     const previousUrl = previousId ? show.url(previousId, { query }) : null;
     const nextUrl = nextId ? show.url(nextId, { query }) : null;
@@ -782,8 +940,8 @@ export default function VerificationShow({
                                     <div>
                                         <CardTitle>Contact documents</CardTitle>
                                         <CardDescription>
-                                            Private PDF, Excel, CSV, or Word
-                                            files, up to 20 MB each.
+                                            Private PDF, Word, Excel, CSV or
+                                            image files, up to 20 MB each.
                                         </CardDescription>
                                     </div>
                                 </div>
@@ -796,7 +954,11 @@ export default function VerificationShow({
                                     <Form
                                         {...storeAttachment.form(lead.id)}
                                         resetOnSuccess
-                                        className="mt-4 space-y-3 rounded-lg border border-dashed p-3"
+                                        onSuccess={() => {
+                                            setPickerKey((key) => key + 1);
+                                            setDocumentLeadId(null);
+                                        }}
+                                        className="mt-4 space-y-3"
                                     >
                                         {({ errors, processing, progress }) => (
                                             <>
@@ -804,11 +966,15 @@ export default function VerificationShow({
                                                     name="label"
                                                     placeholder="Document label (optional)"
                                                 />
-                                                <Input
-                                                    name="attachment"
-                                                    type="file"
-                                                    required
-                                                    accept=".pdf,.csv,.xls,.xlsx,.doc,.docx"
+                                                <DocumentPicker
+                                                    key={`${lead.id}-${pickerKey}`}
+                                                    onChange={(hasFile) =>
+                                                        setDocumentLeadId(
+                                                            hasFile
+                                                                ? lead.id
+                                                                : null,
+                                                        )
+                                                    }
                                                 />
                                                 <InputError
                                                     className="text-xs"
@@ -827,7 +993,11 @@ export default function VerificationShow({
                                                 <Button
                                                     size="sm"
                                                     className="w-full"
-                                                    disabled={processing}
+                                                    disabled={
+                                                        processing ||
+                                                        documentLeadId !==
+                                                            lead.id
+                                                    }
                                                 >
                                                     <Upload />
                                                     {processing
@@ -849,7 +1019,13 @@ export default function VerificationShow({
                                             key={attachment.id}
                                             className="flex items-center gap-3 rounded-lg border p-3"
                                         >
-                                            <FileText className="size-5 shrink-0 text-primary" />
+                                            {attachment.mime_type.startsWith(
+                                                'image/',
+                                            ) ? (
+                                                <ImageIcon className="size-5 shrink-0 text-primary" />
+                                            ) : (
+                                                <FileText className="size-5 shrink-0 text-primary" />
+                                            )}
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate text-sm font-medium">
                                                     {attachment.label ||

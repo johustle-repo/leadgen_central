@@ -30,7 +30,7 @@ class StoreLeadAttachmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'attachment' => ['required', File::types(['pdf', 'csv', 'xls', 'xlsx', 'doc', 'docx'])->max('20mb')],
+            'attachment' => ['required', File::types(['pdf', 'csv', 'xls', 'xlsx', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp', 'gif'])->max('20mb')],
             'label' => ['nullable', 'string', 'max:120'],
         ];
     }
