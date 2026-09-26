@@ -34,7 +34,7 @@ it('saves and classifies only Gmail messages sent by an agents lead', function (
             'id' => 'msg-1',
             'threadId' => 'thread-1',
             'historyId' => '2000',
-            'internalDate' => '1787792400000',
+            'internalDate' => (string) now()->subHour()->getTimestampMs(),
             'snippet' => 'Yes, I am interested.',
             'payload' => [
                 'mimeType' => 'text/plain',
