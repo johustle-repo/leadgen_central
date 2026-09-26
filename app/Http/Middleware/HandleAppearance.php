@@ -9,6 +9,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class HandleAppearance
 {
+    /** Accent colours the appearance settings offer; see use-accent.tsx. */
+    private const ACCENTS = ['ocean', 'blue', 'violet', 'emerald', 'amber', 'rose'];
+
     /**
      * Handle an incoming request.
      *
@@ -17,6 +20,8 @@ class HandleAppearance
     public function handle(Request $request, Closure $next): Response
     {
         View::share('appearance', $request->cookie('appearance') ?? 'system');
+        $accent = $request->cookie('accent');
+        View::share('accent', in_array($accent, self::ACCENTS, true) ? $accent : 'ocean');
 
         return $next($request);
     }
