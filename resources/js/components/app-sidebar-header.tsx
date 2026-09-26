@@ -14,8 +14,8 @@ export function AppSidebarHeader({
                 <SidebarTrigger className="-ml-1 rounded-xl border border-border/70 bg-card/70 shadow-sm hover:bg-accent" />
                 <Breadcrumbs breadcrumbs={breadcrumbs} />
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-3">
-                <HeaderActionsSlot className="hidden flex-wrap items-center gap-2 md:flex" />
+            <div className="flex w-full min-w-0 items-center justify-start gap-3 md:w-auto md:justify-end">
+                <HeaderActionsSlot className="flex max-w-full min-w-0 items-center gap-2 overflow-x-auto pb-0.5 md:flex-wrap md:justify-end md:overflow-visible md:pb-0 [&>*]:shrink-0" />
             </div>
         </header>
     );

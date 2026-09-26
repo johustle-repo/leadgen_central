@@ -1,4 +1,6 @@
+import { ChevronDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -31,16 +33,35 @@ export function FilterBar(props: FilterBarProps) {
         gridClassName = 'sm:grid-cols-4',
         children,
     } = props;
+    const [open, setOpen] = useState(false);
     const body = (
         <>
-            <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            {/* On phones the fields fold away behind this toggle so the data
+                is visible first; from md up they are always shown. */}
+            <button
+                type="button"
+                onClick={() => setOpen((current) => !current)}
+                aria-expanded={open}
+                className="flex w-full items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase md:pointer-events-none md:mb-3"
+            >
                 {Icon && <Icon className="size-3.5" />}
                 {label}
+                <ChevronDown
+                    className={cn(
+                        'ml-auto size-4 transition-transform md:hidden',
+                        open && 'rotate-180',
+                    )}
+                    aria-hidden="true"
+                />
+            </button>
+            <div className={cn('mt-3 md:mt-0 md:block', !open && 'hidden')}>
+                <div className={cn('grid gap-3', gridClassName)}>
+                    {children}
+                </div>
+                {hint && (
+                    <p className="mt-3 text-xs text-muted-foreground">{hint}</p>
+                )}
             </div>
-            <div className={cn('grid gap-3', gridClassName)}>{children}</div>
-            {hint && (
-                <p className="mt-3 text-xs text-muted-foreground">{hint}</p>
-            )}
         </>
     );
 
