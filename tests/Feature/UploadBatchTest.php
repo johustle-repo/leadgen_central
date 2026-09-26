@@ -9,7 +9,9 @@ use App\Models\UploadRow;
 use App\Models\User;
 use App\Services\UploadBatchProcessor;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -912,4 +914,22 @@ it('summarizes upload history and filters it by status tab and filename search',
         ->where('summary.uploads', 1)
         ->has('batches.data', 1)
         ->where('batches.data.0.original_filename', 'march-tendata.csv'));
+});
+
+it('builds upload history aggregates without mixing in the listed batch columns', function () {
+    $agent = User::factory()->create();
+    UploadBatch::factory()->for($agent)->create(['processing_status' => 'completed', 'total_rows' => 10]);
+    $aggregateQueries = [];
+    DB::listen(function (QueryExecuted $query) use (&$aggregateQueries): void {
+        if (str_contains($query->sql, 'COUNT(*)') && str_contains($query->sql, 'upload_batches')) {
+            $aggregateQueries[] = $query->sql;
+        }
+    });
+
+    $this->actingAs($agent)->get(route('uploads.index'))->assertOk();
+
+    // SQLite accepts upload_batches.* next to aggregates, but MySQL's
+    // ONLY_FULL_GROUP_BY mode rejects it, so assert the SQL shape directly.
+    expect($aggregateQueries)->not->toBeEmpty()
+        ->each(fn ($sql) => $sql->not->toMatch('/upload_batches["`]?\.\*/'));
 });
