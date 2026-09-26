@@ -44,6 +44,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property-read int|null $rejected_rows_sum
  * @property-read int|null $error_rows_sum
  * @property-read int|null $duplicate_rows_sum
+ * @property-read int|null $submitted_rows_sum
  */
 #[Fillable(['name', 'company_alias', 'email', 'password', 'role', 'team', 'status', 'employee_code', 'alias_name', 'alias_email'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]

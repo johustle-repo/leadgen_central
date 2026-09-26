@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\GmailConnection;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -74,6 +76,62 @@ it('shows each users total upload errors instead of a reply count', function () 
 
     $response->assertInertia(fn (Assert $page) => $page
         ->where('agents.data.0.errors_count', 6));
+});
+
+it('shows each users lead activity, error rate, gmail connection and last seen time', function () {
+    $this->travelTo(now()->startOfMinute());
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create();
+    Lead::factory()->for($agent, 'agent')->create(['status' => 'possible_lead']);
+    Lead::factory()->for($agent, 'agent')->create(['status' => 'qualified_lead']);
+    Lead::factory()->for($agent, 'agent')->create(['status' => 'raw', 'created_at' => now()->subDays(45)]);
+    UploadBatch::factory()->for($agent)->create(['total_rows' => 40, 'rejected_rows' => 2, 'error_rows' => 1, 'duplicate_rows' => 1]);
+    GmailConnection::factory()->for($agent)->create();
+    DB::table('sessions')->insert(['id' => 'agent-session', 'user_id' => $agent->id, 'payload' => '', 'last_activity' => now()->subMinutes(2)->getTimestamp()]);
+
+    $this->actingAs($administrator)->get(route('users.index'))->assertInertia(fn (Assert $page) => $page
+        ->where('agents.data.0.leads_count', 3)
+        ->where('agents.data.0.possible_leads_count', 1)
+        ->where('agents.data.0.qualified_leads_count', 1)
+        ->where('agents.data.0.recent_leads_count', 2)
+        ->where('agents.data.0.error_rate', 10)
+        ->where('agents.data.0.has_gmail', true)
+        ->where('agents.data.0.is_online', true)
+        ->where('agents.data.0.last_seen_at', now()->subMinutes(2)->toIso8601String())
+        ->whereNot('agents.data.0.last_lead_at', null));
+});
+
+it('summarizes the whole team regardless of the list filters', function () {
+    $administrator = User::factory()->administrator()->create();
+    User::factory()->superAdministrator()->create();
+    $busyAgent = User::factory()->create(['name' => 'Busy Agent']);
+    User::factory()->create(['name' => 'Idle Agent']);
+    User::factory()->create(['name' => 'Gone Agent', 'status' => 'inactive']);
+    Lead::factory()->for($busyAgent, 'agent')->count(2)->create(['status' => 'possible_lead']);
+    DB::table('sessions')->insert(['id' => 'busy-session', 'user_id' => $busyAgent->id, 'payload' => '', 'last_activity' => now()->getTimestamp()]);
+
+    $this->actingAs($administrator)->get(route('users.index', ['search' => 'Busy']))->assertInertia(fn (Assert $page) => $page
+        ->has('agents.data', 1)
+        ->where('summary', [
+            'users' => 4, 'active' => 3, 'inactive' => 1, 'agents' => 3, 'administrators' => 1,
+            'online' => 1, 'idle_agents' => 1, 'recent_leads' => 2, 'possible_leads' => 2,
+        ]));
+});
+
+it('sorts the user lists by a whitelisted column and ignores unknown ones', function () {
+    $administrator = User::factory()->administrator()->create();
+    $fewer = User::factory()->create(['name' => 'Fewer Leads']);
+    $more = User::factory()->create(['name' => 'More Leads']);
+    Lead::factory()->for($fewer, 'agent')->create();
+    Lead::factory()->for($more, 'agent')->count(3)->create();
+
+    $this->actingAs($administrator)->get(route('users.index', ['sort' => 'leads_count', 'direction' => 'desc']))->assertInertia(fn (Assert $page) => $page
+        ->where('agents.data.0.id', $more->id)
+        ->where('filters.sort', 'leads_count'));
+    $this->actingAs($administrator)->get(route('users.index', ['sort' => 'leads_count', 'direction' => 'asc']))->assertInertia(fn (Assert $page) => $page
+        ->where('agents.data.0.id', $fewer->id));
+    $this->actingAs($administrator)->get(route('users.index', ['sort' => 'password']))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('filters.sort', 'created_at'));
 });
 
 it('lets a super administrator clear an agents leads and completed upload history', function () {

@@ -1,18 +1,29 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    ArrowDown,
+    ArrowUp,
+    ArrowUpDown,
     Crown,
     Eraser,
+    Mail,
+    MoreHorizontal,
     Pencil,
     Plus,
+    Radio,
     Search,
-    SlidersHorizontal,
+    ShieldCheck,
+    Sparkles,
     Trash2,
+    TrendingUp,
     UserRoundCog,
+    UserRoundX,
     UsersRound,
+    X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import { KpiCard } from '@/components/bi-visuals';
 import { EmptyState } from '@/components/empty-state';
-import { FilterBar } from '@/components/filter-bar';
 import { HeaderActionsPortal } from '@/components/header-actions';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
@@ -24,8 +35,14 @@ import {
     DialogDescription,
     DialogFooter,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -34,19 +51,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { create, destroy, edit, impersonate, index } from '@/routes/users';
 import { clear as clearRecords } from '@/routes/users/records';
 
-const ALL_ROLES = '__all__';
+const ALL_STATUSES = '__all__';
+/** Mirrors UserController::IDLE_DAYS. */
+const IDLE_DAYS = 7;
 
 type User = {
     id: number;
@@ -57,284 +68,671 @@ type User = {
     status: string;
     created_at: string;
     leads_count: number;
+    possible_leads_count: number;
+    qualified_leads_count: number;
+    recent_leads_count: number;
     upload_batches_count: number;
     errors_count: number;
+    error_rate: number | null;
+    last_lead_at: string | null;
+    last_seen_at: string | null;
+    is_online: boolean;
+    has_gmail: boolean;
     can_delete: boolean;
     can_impersonate: boolean;
     can_clear_records: boolean;
 };
 type PaginatedUsers = {
     data: User[];
+    total: number;
     links: Array<{ url: string | null; label: string; active: boolean }>;
 };
+type Summary = {
+    users: number;
+    active: number;
+    inactive: number;
+    agents: number;
+    administrators: number;
+    online: number;
+    idle_agents: number;
+    recent_leads: number;
+    possible_leads: number;
+};
+type Filters = {
+    search?: string;
+    role?: string;
+    status?: string;
+    sort: string;
+    direction: 'asc' | 'desc';
+};
+type Tab = 'agents' | 'administrators';
+
+const relativeFormat = new Intl.RelativeTimeFormat(undefined, {
+    numeric: 'auto',
+});
+
+function relativeTime(value: string | null): string {
+    if (value === null) {
+        return 'Never';
+    }
+
+    const seconds = (new Date(value).getTime() - Date.now()) / 1000;
+    const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+        ['year', 31536000],
+        ['month', 2592000],
+        ['week', 604800],
+        ['day', 86400],
+        ['hour', 3600],
+        ['minute', 60],
+    ];
+
+    for (const [unit, size] of units) {
+        if (Math.abs(seconds) >= size) {
+            return relativeFormat.format(Math.round(seconds / size), unit);
+        }
+    }
+
+    return 'Just now';
+}
+
+function isIdle(user: User): boolean {
+    return (
+        user.status === 'active' &&
+        (user.last_lead_at === null ||
+            Date.now() - new Date(user.last_lead_at).getTime() >
+                IDLE_DAYS * 86400000)
+    );
+}
+
+function initials(name: string): string {
+    return name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('');
+}
+
+function UserIdentity({ user }: { user: User }) {
+    return (
+        <div className="flex min-w-0 items-center gap-3">
+            <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                {initials(user.name)}
+                {user.is_online && (
+                    <span
+                        className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-card bg-success"
+                        title="Online now"
+                    >
+                        <span className="sr-only">Online now</span>
+                    </span>
+                )}
+            </span>
+            <div className="min-w-0">
+                <Link
+                    href={edit(user.id)}
+                    className="flex items-center gap-1.5 font-medium hover:underline"
+                >
+                    {user.role === 'super_administrator' && (
+                        <Crown className="size-3.5 shrink-0 fill-amber-500 text-amber-500" />
+                    )}
+                    <span className="truncate">{user.name}</span>
+                </Link>
+                <p className="truncate text-xs text-muted-foreground">
+                    {user.email}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+type PendingAction = 'impersonate' | 'clear' | 'delete' | null;
 
 function UserActions({ user }: { user: User }) {
+    const [pending, setPending] = useState<PendingAction>(null);
+    const hasMenu =
+        user.can_impersonate || user.can_clear_records || user.can_delete;
+    const close = () => setPending(null);
+
     return (
-        <div className="flex justify-end gap-2">
-            <Button asChild size="sm" variant="outline">
+        <div className="flex items-center justify-end gap-1.5">
+            <Button asChild size="sm" variant="outline" className="h-8">
                 <Link href={edit(user.id)}>
                     <Pencil />
                     Edit
                 </Link>
             </Button>
-            {user.can_impersonate && (
-                <Dialog>
-                    <DialogTrigger asChild>
+            {!hasMenu && <span className="size-8" aria-hidden="true" />}
+            {hasMenu && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
                         <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
+                            size="icon"
+                            variant="ghost"
+                            className="size-8"
+                            aria-label={`More actions for ${user.name}`}
                         >
-                            <UserRoundCog />
-                            Log in as
+                            <MoreHorizontal />
                         </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogTitle>Log in as {user.name}?</DialogTitle>
-                        <DialogDescription>
-                            You&apos;ll see the app exactly as they do. A banner
-                            lets you return to your own account at any time.
-                            This is recorded in the audit log.
-                        </DialogDescription>
-                        <DialogFooter>
-                            <DialogClose asChild>
-                                <Button variant="secondary">Cancel</Button>
-                            </DialogClose>
-                            <Button
-                                type="button"
-                                onClick={() =>
-                                    router.post(impersonate.url(user.id))
-                                }
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                        {user.can_impersonate && (
+                            <DropdownMenuItem
+                                onSelect={() => setPending('impersonate')}
                             >
                                 <UserRoundCog />
-                                Log in as {user.name}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                                Log in as {user.name.split(' ')[0]}
+                            </DropdownMenuItem>
+                        )}
+                        {user.can_clear_records && (
+                            <DropdownMenuItem
+                                onSelect={() => setPending('clear')}
+                            >
+                                <Eraser />
+                                Clear records
+                            </DropdownMenuItem>
+                        )}
+                        {user.can_delete && (
+                            <>
+                                {(user.can_impersonate ||
+                                    user.can_clear_records) && (
+                                    <DropdownMenuSeparator />
+                                )}
+                                <DropdownMenuItem
+                                    variant="destructive"
+                                    onSelect={() => setPending('delete')}
+                                >
+                                    <Trash2 />
+                                    Delete user
+                                </DropdownMenuItem>
+                            </>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             )}
-            {user.can_clear_records && (
-                <Dialog>
-                    <DialogTrigger asChild>
+
+            <Dialog
+                open={pending === 'impersonate'}
+                onOpenChange={(open) => !open && close()}
+            >
+                <DialogContent>
+                    <DialogTitle>Log in as {user.name}?</DialogTitle>
+                    <DialogDescription>
+                        You&apos;ll see the app exactly as they do. A banner
+                        lets you return to your own account at any time. This is
+                        recorded in the audit log.
+                    </DialogDescription>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="secondary">Cancel</Button>
+                        </DialogClose>
                         <Button
                             type="button"
-                            size="sm"
-                            variant="outline"
-                            className="border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/15 hover:text-rose-800 dark:text-rose-300 dark:hover:text-rose-200"
+                            onClick={() =>
+                                router.post(impersonate.url(user.id))
+                            }
                         >
-                            <Eraser />
+                            <UserRoundCog />
+                            Log in as {user.name}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={pending === 'clear'}
+                onOpenChange={(open) => !open && close()}
+            >
+                <DialogContent>
+                    <DialogTitle>Clear {user.name}&apos;s records?</DialogTitle>
+                    <DialogDescription>
+                        This deletes all {user.leads_count.toLocaleString()}{' '}
+                        lead(s) and {user.upload_batches_count.toLocaleString()}{' '}
+                        upload record(s) (including the raw files) owned by{' '}
+                        {user.name}. The upload history cannot be recovered
+                        afterward. Their user account is not affected.
+                    </DialogDescription>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="secondary">Cancel</Button>
+                        </DialogClose>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => {
+                                if (
+                                    !window.confirm(
+                                        `Last chance: this permanently deletes ${user.leads_count.toLocaleString()} lead(s) and ${user.upload_batches_count.toLocaleString()} upload record(s) owned by ${user.name}. This cannot be undone. Continue?`,
+                                    )
+                                ) {
+                                    return;
+                                }
+
+                                router.delete(clearRecords.url(user.id), {
+                                    preserveScroll: true,
+                                    onFinish: close,
+                                });
+                            }}
+                        >
                             Clear records
                         </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogTitle>
-                            Clear {user.name}&apos;s records?
-                        </DialogTitle>
-                        <DialogDescription>
-                            This deletes all {user.leads_count.toLocaleString()}{' '}
-                            lead(s) and{' '}
-                            {user.upload_batches_count.toLocaleString()} upload
-                            record(s) (including the raw files) owned by{' '}
-                            {user.name}. The upload history cannot be recovered
-                            afterward. Their user account is not affected.
-                        </DialogDescription>
-                        <DialogFooter>
-                            <DialogClose asChild>
-                                <Button variant="secondary">Cancel</Button>
-                            </DialogClose>
-                            <Button
-                                type="button"
-                                variant="destructive"
-                                onClick={() => {
-                                    if (
-                                        !window.confirm(
-                                            `Last chance: this permanently deletes ${user.leads_count.toLocaleString()} lead(s) and ${user.upload_batches_count.toLocaleString()} upload record(s) owned by ${user.name}. This cannot be undone. Continue?`,
-                                        )
-                                    ) {
-                                        return;
-                                    }
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
-                                    router.delete(clearRecords.url(user.id), {
-                                        preserveScroll: true,
-                                    });
-                                }}
-                            >
-                                Clear records
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            )}
-            {user.can_delete && (
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <Button type="button" size="sm" variant="destructive">
-                            <Trash2 />
-                            Delete
+            <Dialog
+                open={pending === 'delete'}
+                onOpenChange={(open) => !open && close()}
+            >
+                <DialogContent>
+                    <DialogTitle>Delete {user.name}?</DialogTitle>
+                    <DialogDescription>
+                        This removes the user from active access. Their
+                        historical leads and replies remain stored.
+                    </DialogDescription>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="secondary">Cancel</Button>
+                        </DialogClose>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() =>
+                                router.delete(destroy.url(user.id), {
+                                    preserveScroll: true,
+                                    onFinish: close,
+                                })
+                            }
+                        >
+                            Delete user
                         </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogTitle>Delete {user.name}?</DialogTitle>
-                        <DialogDescription>
-                            This removes the user from active access. Their
-                            historical leads and replies remain stored.
-                        </DialogDescription>
-                        <DialogFooter>
-                            <DialogClose asChild>
-                                <Button variant="secondary">Cancel</Button>
-                            </DialogClose>
-                            <Button
-                                type="button"
-                                variant="destructive"
-                                onClick={() =>
-                                    router.delete(destroy.url(user.id), {
-                                        preserveScroll: true,
-                                    })
-                                }
-                            >
-                                Delete user
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
 
-function UsersSection({
-    title,
-    users,
-    emptyDescription,
+function SortHeader({
+    column,
+    label,
+    filters,
+    align = 'left',
 }: {
-    title: string;
-    users: PaginatedUsers;
-    emptyDescription: string;
+    column: string;
+    label: string;
+    filters: Filters;
+    align?: 'left' | 'right';
+}) {
+    const active = filters.sort === column;
+    const Icon = active
+        ? filters.direction === 'desc'
+            ? ArrowDown
+            : ArrowUp
+        : ArrowUpDown;
+
+    return (
+        <th
+            scope="col"
+            className={cn(
+                'px-3 py-3 font-medium whitespace-nowrap',
+                align === 'right' && 'text-right',
+            )}
+            aria-sort={
+                active
+                    ? filters.direction === 'desc'
+                        ? 'descending'
+                        : 'ascending'
+                    : 'none'
+            }
+        >
+            <button
+                type="button"
+                className={cn(
+                    'inline-flex items-center gap-1 hover:text-foreground',
+                    active && 'text-foreground',
+                )}
+                onClick={() =>
+                    router.get(
+                        index.url(),
+                        {
+                            ...filters,
+                            sort: column,
+                            direction:
+                                active && filters.direction === 'desc'
+                                    ? 'asc'
+                                    : column === 'name'
+                                      ? 'asc'
+                                      : 'desc',
+                        },
+                        { preserveState: true, preserveScroll: true },
+                    )
+                }
+            >
+                {label}
+                <Icon
+                    className={cn('size-3', !active && 'opacity-40')}
+                    aria-hidden="true"
+                />
+            </button>
+        </th>
+    );
+}
+
+function PlainHeader({
+    children,
+    align = 'left',
+}: {
+    children: ReactNode;
+    align?: 'left' | 'right';
 }) {
     return (
-        <section className="flex flex-col gap-3">
-            <h2 className="px-1 text-sm font-semibold text-muted-foreground">
-                {title}
-            </h2>
-            {users.data.length ? (
-                <>
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="hover:bg-transparent">
-                                <TableHead className="py-4">User</TableHead>
-                                <TableHead className="py-4">Role</TableHead>
-                                <TableHead className="py-4">Team</TableHead>
-                                <TableHead className="py-4">Status</TableHead>
-                                <TableHead align="right" className="py-4">
-                                    Total leads
-                                </TableHead>
-                                <TableHead align="right" className="py-4">
-                                    Errors
-                                </TableHead>
-                                <TableHead
-                                    align="center"
-                                    className="py-4 pl-8"
-                                >
-                                    Created
-                                </TableHead>
-                                <TableHead align="right" className="py-4">
-                                    Actions
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {users.data.map((user) => (
-                                <TableRow key={user.id}>
-                                    <TableCell className="py-4">
-                                        <Link
-                                            href={edit(user.id)}
-                                            className="font-medium hover:underline"
-                                        >
-                                            {user.name}
-                                        </Link>
-                                        <div className="text-xs text-muted-foreground">
-                                            {user.email}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="py-4 capitalize">
-                                        <span className="inline-flex items-center gap-1.5">
-                                            {user.role ===
-                                                'super_administrator' && (
-                                                <Crown className="size-3.5 shrink-0 fill-amber-500 text-amber-500" />
-                                            )}
-                                            {user.role.replaceAll('_', ' ')}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="py-4">
-                                        {user.team || '—'}
-                                    </TableCell>
-                                    <TableCell className="py-4">
-                                        <StatusBadge value={user.status} />
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        className="py-4 font-medium"
-                                    >
-                                        {user.leads_count.toLocaleString()}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        className={cn(
-                                            'py-4',
-                                            user.errors_count > 0
-                                                ? 'font-medium text-destructive'
-                                                : 'text-muted-foreground',
-                                        )}
-                                    >
-                                        {user.errors_count.toLocaleString()}
-                                    </TableCell>
-                                    <TableCell
-                                        align="center"
-                                        className="py-4 pl-8"
-                                    >
-                                        {new Date(
-                                            user.created_at,
-                                        ).toLocaleDateString()}
-                                    </TableCell>
-                                    <TableCell align="right" className="py-4">
-                                        <UserActions user={user} />
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                    <Pagination links={users.links} />
-                </>
-            ) : (
-                <div className="rounded-xl border bg-card">
-                    <EmptyState
-                        icon={UsersRound}
-                        title={`No ${title.toLowerCase()} match your filters`}
-                        description={emptyDescription}
-                    />
-                </div>
+        <th
+            scope="col"
+            className={cn(
+                'px-3 py-3 font-medium whitespace-nowrap',
+                align === 'right' && 'text-right',
             )}
-        </section>
+        >
+            {children}
+        </th>
     );
+}
+
+function ErrorRate({ user }: { user: User }) {
+    if (user.error_rate === null) {
+        return <span className="text-muted-foreground">—</span>;
+    }
+
+    const tone =
+        user.error_rate >= 20
+            ? 'text-destructive'
+            : user.error_rate >= 10
+              ? 'text-warning'
+              : 'text-muted-foreground';
+
+    return (
+        <span
+            className={cn('font-medium', tone)}
+            title={`${user.errors_count.toLocaleString()} rejected, error or duplicate rows`}
+        >
+            {user.error_rate}%
+        </span>
+    );
+}
+
+function AgentsTable({ users, filters }: { users: User[]; filters: Filters }) {
+    const maxLeads = Math.max(...users.map((user) => user.leads_count), 1);
+
+    return (
+        <table className="w-full min-w-[68rem] text-left text-sm">
+            <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                    <SortHeader column="name" label="Agent" filters={filters} />
+                    <PlainHeader>Team</PlainHeader>
+                    <PlainHeader>Status</PlainHeader>
+                    <SortHeader
+                        column="leads_count"
+                        label="Total leads"
+                        filters={filters}
+                        align="right"
+                    />
+                    <SortHeader
+                        column="possible_leads_count"
+                        label="Possible"
+                        filters={filters}
+                        align="right"
+                    />
+                    <SortHeader
+                        column="recent_leads_count"
+                        label="Last 30 days"
+                        filters={filters}
+                        align="right"
+                    />
+                    <PlainHeader align="right">Error rate</PlainHeader>
+                    <PlainHeader>Gmail</PlainHeader>
+                    <SortHeader
+                        column="last_lead_at"
+                        label="Last lead"
+                        filters={filters}
+                    />
+                    <SortHeader
+                        column="last_seen_at"
+                        label="Last seen"
+                        filters={filters}
+                    />
+                    <PlainHeader align="right">
+                        <span className="sr-only">Actions</span>
+                    </PlainHeader>
+                </tr>
+            </thead>
+            <tbody className="divide-y">
+                {users.map((user) => (
+                    <tr key={user.id} className="hover:bg-muted/40">
+                        <td className="px-3 py-3">
+                            <UserIdentity user={user} />
+                        </td>
+                        <td className="px-3 py-3">{user.team || '—'}</td>
+                        <td className="px-3 py-3">
+                            <StatusBadge value={user.status} />
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                            <span className="relative ml-auto flex h-6 w-28 items-center justify-end">
+                                <span
+                                    className="absolute inset-y-1 left-0 rounded-r-[3px] bg-chart-1/20"
+                                    style={{
+                                        width: `${(user.leads_count / maxLeads) * 100}%`,
+                                    }}
+                                    aria-hidden="true"
+                                />
+                                <span className="relative font-semibold tabular-nums">
+                                    {user.leads_count.toLocaleString()}
+                                </span>
+                            </span>
+                        </td>
+                        <td className="px-3 py-3 text-right tabular-nums">
+                            {user.possible_leads_count.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right tabular-nums">
+                            {user.recent_leads_count.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right tabular-nums">
+                            <ErrorRate user={user} />
+                        </td>
+                        <td className="px-3 py-3">
+                            {user.has_gmail ? (
+                                <span className="inline-flex items-center gap-1 text-xs text-success">
+                                    <Mail className="size-3.5" />
+                                    Connected
+                                </span>
+                            ) : (
+                                <span className="text-xs text-muted-foreground">
+                                    Not connected
+                                </span>
+                            )}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                            <span
+                                title={
+                                    user.last_lead_at
+                                        ? new Date(
+                                              user.last_lead_at,
+                                          ).toLocaleString()
+                                        : undefined
+                                }
+                            >
+                                {relativeTime(user.last_lead_at)}
+                            </span>
+                            {isIdle(user) && (
+                                <span className="ml-2 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                                    Idle
+                                </span>
+                            )}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
+                            {user.is_online ? (
+                                <span className="font-medium text-success">
+                                    Online now
+                                </span>
+                            ) : (
+                                relativeTime(user.last_seen_at)
+                            )}
+                        </td>
+                        <td className="px-3 py-3">
+                            <UserActions user={user} />
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+}
+
+function AdministratorsTable({
+    users,
+    filters,
+}: {
+    users: User[];
+    filters: Filters;
+}) {
+    return (
+        <table className="w-full min-w-[56rem] text-left text-sm">
+            <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                    <SortHeader
+                        column="name"
+                        label="Administrator"
+                        filters={filters}
+                    />
+                    <PlainHeader>Role</PlainHeader>
+                    <PlainHeader>Team</PlainHeader>
+                    <PlainHeader>Status</PlainHeader>
+                    <SortHeader
+                        column="leads_count"
+                        label="Leads owned"
+                        filters={filters}
+                        align="right"
+                    />
+                    <SortHeader
+                        column="last_seen_at"
+                        label="Last seen"
+                        filters={filters}
+                    />
+                    <SortHeader
+                        column="created_at"
+                        label="Member since"
+                        filters={filters}
+                    />
+                    <PlainHeader align="right">
+                        <span className="sr-only">Actions</span>
+                    </PlainHeader>
+                </tr>
+            </thead>
+            <tbody className="divide-y">
+                {users.map((user) => (
+                    <tr key={user.id} className="hover:bg-muted/40">
+                        <td className="px-3 py-3">
+                            <UserIdentity user={user} />
+                        </td>
+                        <td className="px-3 py-3">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs capitalize">
+                                <ShieldCheck className="size-3 text-primary" />
+                                {user.role.replaceAll('_', ' ')}
+                            </span>
+                        </td>
+                        <td className="px-3 py-3">{user.team || '—'}</td>
+                        <td className="px-3 py-3">
+                            <StatusBadge value={user.status} />
+                        </td>
+                        <td className="px-3 py-3 text-right font-medium tabular-nums">
+                            {user.leads_count.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
+                            {user.is_online ? (
+                                <span className="font-medium text-success">
+                                    Online now
+                                </span>
+                            ) : (
+                                relativeTime(user.last_seen_at)
+                            )}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
+                            {new Date(user.created_at).toLocaleDateString(
+                                undefined,
+                                {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                },
+                            )}
+                        </td>
+                        <td className="px-3 py-3">
+                            <UserActions user={user} />
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+}
+
+function initialTab(administrators: PaginatedUsers | null): Tab {
+    if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+
+        if (
+            params.get('tab') === 'administrators' ||
+            params.has('admins_page')
+        ) {
+            return administrators ? 'administrators' : 'agents';
+        }
+    }
+
+    return 'agents';
 }
 
 export default function UsersIndex({
     administrators,
     agents,
+    summary,
     filters,
 }: {
     administrators: PaginatedUsers | null;
     agents: PaginatedUsers | null;
-    filters: Record<string, string>;
+    summary: Summary;
+    filters: Filters;
 }) {
-    const [roleFilter, setRoleFilter] = useState(filters.role || ALL_ROLES);
+    const [statusFilter, setStatusFilter] = useState(
+        filters.status || ALL_STATUSES,
+    );
+    const [tab, setTab] = useState<Tab>(() => initialTab(administrators));
+    const activeTab: Tab =
+        tab === 'administrators' && administrators
+            ? 'administrators'
+            : agents
+              ? 'agents'
+              : 'administrators';
+    const current = activeTab === 'agents' ? agents : administrators;
+    const hasFilters = Boolean(filters.search || filters.status);
 
-    const search = (event: React.FormEvent<HTMLFormElement>) => {
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', activeTab);
+        window.history.replaceState(window.history.state, '', url);
+    }, [activeTab]);
+
+    const search = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        const form = new FormData(event.currentTarget);
         router.get(
             index.url(),
-            Object.fromEntries(new FormData(event.currentTarget)),
+            {
+                search: String(form.get('search') ?? ''),
+                status: statusFilter === ALL_STATUSES ? '' : statusFilter,
+                role: filters.role ?? '',
+                sort: filters.sort,
+                direction: filters.direction,
+                tab: activeTab,
+            },
             { preserveState: true, replace: true },
         );
     };
@@ -342,92 +740,198 @@ export default function UsersIndex({
     return (
         <>
             <Head title="Users" />
-            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <HeaderActionsPortal>
-                    <Button asChild size="sm">
-                        <Link href={create()}>
-                            <Plus />
-                            Add user
-                        </Link>
-                    </Button>
-                </HeaderActionsPortal>
-                <FilterBar
-                    as="form"
-                    onSubmit={search}
-                    icon={SlidersHorizontal}
-                    label="Filters"
-                >
-                    <div className="flex flex-col gap-1.5 sm:col-span-2">
-                        <label
-                            htmlFor="users-search"
-                            className="text-xs text-muted-foreground"
+            <HeaderActionsPortal>
+                <Button asChild size="sm">
+                    <Link href={create()}>
+                        <Plus />
+                        Add user
+                    </Link>
+                </Button>
+            </HeaderActionsPortal>
+            <div className="flex min-w-0 flex-1 flex-col gap-4 bg-muted/40 p-4 md:p-6">
+                <header>
+                    <h1 className="text-xl font-semibold tracking-tight">
+                        Team &amp; access
+                    </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Manage accounts, see who is active, and spot agents who
+                        need attention.
+                    </p>
+                </header>
+
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
+                    <KpiCard
+                        label="Team members"
+                        value={summary.users}
+                        footnote={`${summary.active.toLocaleString()} active · ${summary.inactive.toLocaleString()} inactive`}
+                        icon={UsersRound}
+                    />
+                    <KpiCard
+                        label="Agents"
+                        value={summary.agents}
+                        footnote={`${summary.administrators.toLocaleString()} administrators`}
+                        icon={ShieldCheck}
+                    />
+                    <KpiCard
+                        label="Online now"
+                        value={summary.online}
+                        footnote="Active in the last 5 minutes"
+                        icon={Radio}
+                    />
+                    <KpiCard
+                        label="Idle agents"
+                        value={summary.idle_agents}
+                        footnote={`Active, no new leads in ${IDLE_DAYS} days`}
+                        icon={UserRoundX}
+                    />
+                    <KpiCard
+                        label="Leads · last 30 days"
+                        value={summary.recent_leads}
+                        footnote="Owned by team members"
+                        icon={TrendingUp}
+                    />
+                    <KpiCard
+                        label="Possible leads"
+                        value={summary.possible_leads}
+                        footnote="Current status, all time"
+                        icon={Sparkles}
+                    />
+                </div>
+
+                <section className="flex min-w-0 flex-col rounded-lg border bg-card shadow-xs">
+                    <div className="flex flex-wrap items-end justify-between gap-3 border-b px-4 pt-3">
+                        <nav
+                            role="tablist"
+                            aria-label="User lists"
+                            className="-mb-px flex gap-1"
                         >
-                            Search
-                        </label>
-                        <div className="relative">
-                            <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
-                            <Input
-                                id="users-search"
-                                name="search"
-                                defaultValue={filters.search}
-                                placeholder="Search name or email…"
-                                className="pl-9"
-                            />
-                        </div>
+                            {(
+                                [
+                                    ['agents', 'Agents', agents],
+                                    [
+                                        'administrators',
+                                        'Administrators',
+                                        administrators,
+                                    ],
+                                ] as const
+                            ).map(
+                                ([key, label, list]) =>
+                                    list && (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            role="tab"
+                                            aria-selected={activeTab === key}
+                                            onClick={() => setTab(key)}
+                                            className={cn(
+                                                'flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm',
+                                                activeTab === key
+                                                    ? 'border-primary font-semibold text-foreground'
+                                                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                                            )}
+                                        >
+                                            {label}
+                                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+                                                {list.total.toLocaleString()}
+                                            </span>
+                                        </button>
+                                    ),
+                            )}
+                        </nav>
+                        <form
+                            onSubmit={search}
+                            className="flex flex-wrap items-center gap-2 pb-3"
+                        >
+                            <div className="relative">
+                                <Search className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
+                                <Input
+                                    name="search"
+                                    defaultValue={filters.search}
+                                    placeholder="Search name or email…"
+                                    aria-label="Search users"
+                                    className="h-8 w-56 pl-8"
+                                />
+                            </div>
+                            <Select
+                                value={statusFilter}
+                                onValueChange={setStatusFilter}
+                            >
+                                <SelectTrigger
+                                    size="sm"
+                                    className="w-32"
+                                    aria-label="Status"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ALL_STATUSES}>
+                                        All statuses
+                                    </SelectItem>
+                                    <SelectItem value="active">
+                                        Active
+                                    </SelectItem>
+                                    <SelectItem value="inactive">
+                                        Inactive
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Button type="submit" size="sm" variant="secondary">
+                                Apply
+                            </Button>
+                            {hasFilters && (
+                                <Button
+                                    asChild
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-muted-foreground"
+                                >
+                                    <Link
+                                        href={index.url({
+                                            query: { tab: activeTab },
+                                        })}
+                                    >
+                                        <X />
+                                        Clear
+                                    </Link>
+                                </Button>
+                            )}
+                        </form>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                        <label
-                            htmlFor="users-role"
-                            className="text-xs text-muted-foreground"
-                        >
-                            Role
-                        </label>
-                        <input
-                            type="hidden"
-                            name="role"
-                            value={roleFilter === ALL_ROLES ? '' : roleFilter}
+
+                    {current && current.data.length > 0 ? (
+                        <>
+                            <div className="overflow-x-auto">
+                                {activeTab === 'agents' ? (
+                                    <AgentsTable
+                                        users={current.data}
+                                        filters={filters}
+                                    />
+                                ) : (
+                                    <AdministratorsTable
+                                        users={current.data}
+                                        filters={filters}
+                                    />
+                                )}
+                            </div>
+                            {current.links.length > 3 && (
+                                <div className="border-t px-4 py-3">
+                                    <Pagination links={current.links} />
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <EmptyState
+                            icon={UsersRound}
+                            title={`No ${activeTab} match your filters`}
+                            description="Try a broader search or another status."
                         />
-                        <Select
-                            value={roleFilter}
-                            onValueChange={setRoleFilter}
-                        >
-                            <SelectTrigger id="users-role">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={ALL_ROLES}>
-                                    All roles
-                                </SelectItem>
-                                <SelectItem value="administrator">
-                                    Administrator
-                                </SelectItem>
-                                <SelectItem value="sub_administrator">
-                                    Sub-Administrator
-                                </SelectItem>
-                                <SelectItem value="agent">Agent</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex flex-col justify-end">
-                        <Button type="submit" variant="secondary">
-                            Apply filters
-                        </Button>
-                    </div>
-                </FilterBar>
-                {administrators && (
-                    <UsersSection
-                        title="Administrators"
-                        users={administrators}
-                        emptyDescription="Try a broader search or another status."
-                    />
-                )}
-                {agents && (
-                    <UsersSection
-                        title="Agents"
-                        users={agents}
-                        emptyDescription="Try a broader search or another status."
-                    />
-                )}
+                    )}
+                </section>
+                <p className="text-xs text-muted-foreground">
+                    Error rate = rejected, error and duplicate rows ÷ rows
+                    uploaded. Idle = active agent with no new leads in the last{' '}
+                    {IDLE_DAYS} days.
+                </p>
             </div>
         </>
     );
