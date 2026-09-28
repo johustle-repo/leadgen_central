@@ -170,6 +170,8 @@ it('lists the batches behind a source in the lead report source quality table', 
     UploadRow::factory()->for($unknown)->create(['processing_status' => 'rejected', 'processed_data' => ['company_name' => 'Orphan']]);
     $tendata = UploadBatch::factory()->create(['original_filename' => 'tendata.csv']);
     UploadRow::factory()->for($tendata)->create(['processing_status' => 'accepted', 'processed_data' => ['source_url' => 'https://bizr.tendata.cn/enterprise']]);
+    // A row with no source in a Tendata batch counts as Tendata, so the batch is not Unknown.
+    UploadRow::factory()->for($tendata)->create(['row_number' => 3, 'processing_status' => 'rejected', 'processed_data' => ['company_name' => 'Rejected']]);
 
     foreach (['Other' => $other, 'Unknown' => $unknown, 'Tendata' => $tendata] as $source => $batch) {
         $this->actingAs($administrator)->get(route('uploads.index', ['row_source' => $source]))

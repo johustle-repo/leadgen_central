@@ -88,11 +88,17 @@ class UploadBatchController extends Controller
             $query->whereIn('upload_batches.id', $this->rowsWithOutcome($reportFilters['row_outcome'])->select('upload_batch_id'));
         }
         if (isset($reportFilters['row_source'])) {
-            // Same source rule as Lead Reports' source quality table.
-            $query->whereIn('upload_batches.id', UploadRow::query()
-                ->leftJoin('leads as row_leads', 'row_leads.id', '=', 'upload_rows.lead_id')
-                ->whereRaw(LeadReportDimensions::importRowSourceExpression().' = ?', [$reportFilters['row_source']])
-                ->select('upload_rows.upload_batch_id'));
+            // Same source rule as Lead Reports' source quality table, where a
+            // row with no source of its own takes its batch's main source: a
+            // batch is Unknown only when none of its rows has a known source.
+            $rowSource = LeadReportDimensions::importRowSourceExpression();
+            $rows = UploadRow::query()->leftJoin('leads as row_leads', 'row_leads.id', '=', 'upload_rows.lead_id')->select('upload_rows.upload_batch_id');
+            if ($reportFilters['row_source'] === 'Unknown') {
+                $query->whereIn('upload_batches.id', UploadRow::query()->select('upload_batch_id'))
+                    ->whereNotIn('upload_batches.id', $rows->whereRaw("{$rowSource} != ?", ['Unknown']));
+            } else {
+                $query->whereIn('upload_batches.id', $rows->whereRaw("{$rowSource} = ?", [$reportFilters['row_source']]));
+            }
         }
         // Summary figures describe everything matching the owner, agent and
         // search filters; the status tab only narrows the list below them.

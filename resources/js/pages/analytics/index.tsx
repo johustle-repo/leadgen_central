@@ -1028,7 +1028,7 @@ export default function Analytics({
                             </div>
                             <Visual
                                 title="Source quality"
-                                subtitle="Total records use current lead sources; import rows use the source in the file, else their link, else the lead they created. Click a source for its leads, or an import row count for its upload batches"
+                                subtitle="Total records use current lead sources; import rows use the source in the file, else their link, else the lead they created, else their upload's main source. Click a source for its leads, or an import row count for its upload batches"
                             >
                                 <ReportTable
                                     headings={[
@@ -1041,53 +1041,60 @@ export default function Analytics({
                                         'Rejection rate',
                                         'Error rate',
                                     ]}
-                                    rows={data.source_quality.map((source) => [
-                                        // A source opens its leads; one with
-                                        // only import rows opens its batches.
-                                        <Link
-                                            key="source"
-                                            href={
-                                                source.records > 0
-                                                    ? (leadDrilldownUrl(
-                                                          filters,
-                                                          source.label,
-                                                          {
-                                                              source_group:
-                                                                  source.label,
-                                                          },
-                                                      ) ?? '#')
-                                                    : uploadDrilldownUrl(
-                                                          filters,
-                                                          undefined,
-                                                          source.label,
-                                                      )
-                                            }
-                                            className="hover:underline"
-                                        >
-                                            {source.label}
-                                        </Link>,
-                                        source.records.toLocaleString(),
-                                        source.observed_rows > 0 ? (
+                                    rows={data.source_quality
+                                        // Sources with no leads and no import rows are left out.
+                                        .filter(
+                                            (source) =>
+                                                source.records > 0 ||
+                                                source.observed_rows > 0,
+                                        )
+                                        .map((source) => [
+                                            // A source opens its leads; one with
+                                            // only import rows opens its batches.
                                             <Link
-                                                key="rows"
-                                                href={uploadDrilldownUrl(
-                                                    filters,
-                                                    undefined,
-                                                    source.label,
-                                                )}
+                                                key="source"
+                                                href={
+                                                    source.records > 0
+                                                        ? (leadDrilldownUrl(
+                                                              filters,
+                                                              source.label,
+                                                              {
+                                                                  source_group:
+                                                                      source.label,
+                                                              },
+                                                          ) ?? '#')
+                                                        : uploadDrilldownUrl(
+                                                              filters,
+                                                              undefined,
+                                                              source.label,
+                                                          )
+                                                }
                                                 className="hover:underline"
                                             >
-                                                {source.observed_rows.toLocaleString()}
-                                            </Link>
-                                        ) : (
-                                            '0'
-                                        ),
-                                        source.processed.toLocaleString(),
-                                        source.accepted.toLocaleString(),
-                                        percent(source.duplicates_rate),
-                                        percent(source.rejected_rate),
-                                        percent(source.errors_rate),
-                                    ])}
+                                                {source.label}
+                                            </Link>,
+                                            source.records.toLocaleString(),
+                                            source.observed_rows > 0 ? (
+                                                <Link
+                                                    key="rows"
+                                                    href={uploadDrilldownUrl(
+                                                        filters,
+                                                        undefined,
+                                                        source.label,
+                                                    )}
+                                                    className="hover:underline"
+                                                >
+                                                    {source.observed_rows.toLocaleString()}
+                                                </Link>
+                                            ) : (
+                                                '0'
+                                            ),
+                                            source.processed.toLocaleString(),
+                                            source.accepted.toLocaleString(),
+                                            percent(source.duplicates_rate),
+                                            percent(source.rejected_rate),
+                                            percent(source.errors_rate),
+                                        ])}
                                 />
                             </Visual>
                             {uploadTimingHeatmap.length > 0 && (

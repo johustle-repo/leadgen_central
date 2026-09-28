@@ -64,14 +64,12 @@ class DatabaseIntelligenceReport
         ];
         $source = LeadReportDimensions::sourceExpression('data_source', 'source');
         $sourceCounts = (clone $leads)->selectRaw("{$source} as label, COUNT(*) as records")->groupBy('label')->toBase()->get()->keyBy('label');
-        $rowSource = LeadReportDimensions::importRowSourceExpression();
-        $sourceQuality = $this->rowMetrics((clone $rows)->leftJoin('leads as row_leads', 'row_leads.id', '=', 'upload_rows.lead_id'))
-            ->selectRaw("{$rowSource} as label")->groupBy('label')->get()->keyBy('label');
+        $sourceQuality = $this->sourceQualityCounts($rows);
         $data['source_quality'] = [];
         $data['distributions']['sources'] = [];
         foreach (LeadReportDimensions::SOURCE_GROUPS as $label) {
             $records = (int) ($sourceCounts->get($label)->records ?? 0);
-            $metrics = $this->metrics($sourceQuality->get($label));
+            $metrics = $this->metrics($sourceQuality[$label] ?? null);
             $data['source_quality'][] = ['label' => $label, 'records' => $records, ...$metrics];
             if ($records > 0) {
                 $data['distributions']['sources'][] = ['label' => $label, 'value' => $records, 'percent' => $this->rate($records, $data['overview']['records'])];
@@ -108,7 +106,7 @@ class DatabaseIntelligenceReport
             'Upload quality - selected-period batches' => [['Metric', 'Value'], ['Submitted rows (batch totals)', $quality['submitted_rows']], ['Observed rows', $quality['observed_rows']], ['Processed rows', $quality['processed']], ['Accepted including review', $quality['accepted']], ['Needs review', $quality['needs_review']], ['Duplicates', $quality['duplicates']], ['Rejected', $quality['rejected']], ['Processing errors', $quality['errors']], ['Location issues', $quality['location_issues']], ['Average batch size', $quality['average_batch_size'] ?? 'N/A'], ['Acceptance rate', $rate($quality['accepted_rate'])], ['Duplicate rate', $rate($quality['duplicates_rate'])], ['Rejection rate', $rate($quality['rejected_rate'])], ['Error rate', $rate($quality['errors_rate'])]],
             'Source quality - selected period' => [['Source', 'Records', 'Processed rows', 'Accepted rows', 'Duplicate rate', 'Rejection rate', 'Error rate'], ...array_map(fn (array $row): array => [$row['label'], $row['records'], $row['processed'], $row['accepted'], $rate($row['duplicates_rate']), $rate($row['rejected_rate']), $rate($row['errors_rate'])], $data['source_quality'])],
             'Geographic analysis - selected period' => [['Country code or label', 'Records'], ...array_map(fn (array $row): array => [$row['country'], $row['records']], $data['geographic_detail']['rows'])],
-            'Metric definitions' => [['Definition'], ['Period metrics exclude soft-deleted leads. Emails are addresses, not verified people. Repeated company names are not automatically duplicates.'], ['Quality categories overlap. Rates exclude pending rows. Import outcomes use the source recorded on each import row, else its link, else the current source of the lead it created or matched; rows with none are Unknown.'], ['Data quality rate is accepted rows without recorded issues divided by processed rows. Location flags may be incomplete. Geography preserves historical labels.']],
+            'Metric definitions' => [['Definition'], ['Period metrics exclude soft-deleted leads. Emails are addresses, not verified people. Repeated company names are not automatically duplicates.'], ['Quality categories overlap. Rates exclude pending rows. Import outcomes use the source recorded on each import row, else its link, else the current source of the lead it created or matched, else the main source of its upload batch; rows with none are Unknown.'], ['Data quality rate is accepted rows without recorded issues divided by processed rows. Location flags may be incomplete. Geography preserves historical labels.']],
         ];
         if ($data['can_compare_agents']) {
             $sections['Database contribution by agent - selected period'] = [['Agent', 'Records', 'Companies', 'Uploads', 'Avg batch', 'Duplicate rate', 'Rejection rate', 'Error rate', 'Quality rate'], ...array_map(fn (array $row): array => [$row['name'], $row['records'], $row['companies'], $row['uploads'], $row['average_batch_size'] ?? 'N/A', $rate($row['duplicates_rate']), $rate($row['rejected_rate']), $rate($row['errors_rate']), $rate($row['clean_rate'])], $data['contribution'])];
@@ -169,6 +167,40 @@ class DatabaseIntelligenceReport
             array_keys(array_slice($totals, 0, $limit, true)),
             array_slice($totals, 0, $limit, true),
         );
+    }
+
+    /**
+     * Import-row outcome counts per source. Rows placed by neither their own
+     * source, their link nor a lead (rejected and error rows create no lead)
+     * take their upload batch's main source, since one file comes from one
+     * source; otherwise "Unknown" would hold only failed rows and show
+     * misleadingly high rejection and duplicate rates.
+     *
+     * @return array<string, object>
+     */
+    private function sourceQualityCounts(QueryBuilder $rows): array
+    {
+        $rowSource = LeadReportDimensions::importRowSourceExpression();
+        $perBatch = $this->rowMetrics((clone $rows)->leftJoin('leads as row_leads', 'row_leads.id', '=', 'upload_rows.lead_id'))
+            ->selectRaw("upload_rows.upload_batch_id as batch_id, {$rowSource} as label")
+            ->groupBy('upload_rows.upload_batch_id', 'label')->get();
+
+        $mainSource = [];
+        foreach ($perBatch->where('label', '!=', 'Unknown')->sortByDesc('observed_rows') as $group) {
+            $mainSource[$group->batch_id] ??= $group->label;
+        }
+
+        $totals = [];
+        foreach ($perBatch as $group) {
+            $label = $group->label === 'Unknown' ? ($mainSource[$group->batch_id] ?? 'Unknown') : $group->label;
+            foreach ((array) $group as $metric => $count) {
+                if (! in_array($metric, ['batch_id', 'label'], true)) {
+                    $totals[$label][$metric] = ($totals[$label][$metric] ?? 0) + (int) $count;
+                }
+            }
+        }
+
+        return array_map(fn (array $counts): object => (object) $counts, $totals);
     }
 
     private function rowMetrics(QueryBuilder $rows): QueryBuilder

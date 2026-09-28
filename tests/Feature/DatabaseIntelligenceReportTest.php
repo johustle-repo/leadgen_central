@@ -87,16 +87,23 @@ test('source quality buckets upload row outcomes from the processed-data snapsho
         ->where('databaseReport.source_quality', fn ($rows) => collect($rows)->firstWhere('label', 'Lusha')['accepted'] === 1));
 });
 
-test('source quality places import rows without a source by their link, then by the lead they created', function () {
+test('source quality places import rows without a source by their link, their lead, then their batch', function () {
     $user = User::factory()->create();
-    $batch = UploadBatch::factory()->for($user)->create();
     $lushaLead = Lead::factory()->for($user, 'agent')->create(['data_source' => 'Lusha', 'source_url' => 'https://example.com/lead']);
-    UploadRow::factory()->for($batch)->create(['row_number' => 1, 'processing_status' => 'accepted', 'processed_data' => ['data_source' => 'N/A', 'source_url' => 'https://bizr.tendata.cn/enterprise']]);
-    UploadRow::factory()->for($batch)->create(['row_number' => 2, 'processing_status' => 'accepted', 'processed_data' => ['company_name' => 'Acme'], 'lead_id' => $lushaLead->id]);
-    UploadRow::factory()->for($batch)->create(['row_number' => 3, 'processing_status' => 'rejected', 'processed_data' => ['company_name' => 'Orphan']]);
+    $tendataBatch = UploadBatch::factory()->for($user)->create();
+    UploadRow::factory()->for($tendataBatch)->create(['row_number' => 1, 'processing_status' => 'accepted', 'processed_data' => ['data_source' => 'N/A', 'source_url' => 'https://bizr.tendata.cn/enterprise']]);
+    UploadRow::factory()->for($tendataBatch)->create(['row_number' => 2, 'processing_status' => 'accepted', 'processed_data' => ['source_url' => 'https://bizr.tendata.cn/other']]);
+    // A rejected row creates no lead; it takes its batch's main source.
+    UploadRow::factory()->for($tendataBatch)->create(['row_number' => 3, 'processing_status' => 'rejected', 'processed_data' => ['company_name' => 'Rejected']]);
+    $lushaBatch = UploadBatch::factory()->for($user)->create();
+    UploadRow::factory()->for($lushaBatch)->create(['row_number' => 1, 'processing_status' => 'accepted', 'processed_data' => ['company_name' => 'Acme'], 'lead_id' => $lushaLead->id]);
+    // A batch with no row of a known source stays Unknown.
+    $unknownBatch = UploadBatch::factory()->for($user)->create();
+    UploadRow::factory()->for($unknownBatch)->create(['row_number' => 1, 'processing_status' => 'rejected', 'processed_data' => ['company_name' => 'Orphan']]);
 
     $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('databaseReport.source_quality', fn ($rows) => collect($rows)->pluck('processed', 'label')->only(['Tendata', 'Lusha', 'Unknown'])->all() === ['Tendata' => 1, 'Lusha' => 1, 'Unknown' => 1]));
+        ->where('databaseReport.source_quality', fn ($rows) => collect($rows)->pluck('processed', 'label')->only(['Tendata', 'Lusha', 'Unknown'])->all() === ['Tendata' => 3, 'Lusha' => 1, 'Unknown' => 1])
+        ->where('databaseReport.source_quality', fn ($rows) => collect($rows)->firstWhere('label', 'Tendata')['rejected'] === 1));
 });
 
 test('quality trend reports both counts and rates together at day week and month granularity', function (string $granularity, string $firstBucket) {
