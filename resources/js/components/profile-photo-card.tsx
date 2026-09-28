@@ -165,9 +165,8 @@ export function ProfilePhotoCard({ user }: { user: User }) {
     const busy = preparing || uploading;
 
     return (
-        <Card className="overflow-hidden">
-            <div className="accent-banner h-16" aria-hidden="true" />
-            <CardHeader className="-mt-6">
+        <Card>
+            <CardHeader>
                 <div className="flex items-center gap-3">
                     <div className="rounded-lg bg-primary/10 p-2 text-primary">
                         <Camera className="size-5" />
