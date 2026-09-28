@@ -8,6 +8,11 @@ export const ACCENTS = [
     { value: 'emerald', label: 'Emerald', swatch: 'oklch(0.65 0.16 162)' },
     { value: 'amber', label: 'Amber', swatch: 'oklch(0.65 0.16 70)' },
     { value: 'rose', label: 'Rose', swatch: 'oklch(0.65 0.16 12)' },
+    {
+        value: 'midnight',
+        label: 'Midnight',
+        swatch: 'linear-gradient(135deg, oklch(0.2 0.045 262) 50%, oklch(0.8 0.14 150) 50%)',
+    },
 ] as const;
 
 export type Accent = (typeof ACCENTS)[number]['value'];

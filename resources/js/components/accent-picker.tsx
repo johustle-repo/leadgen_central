@@ -9,7 +9,7 @@ export function AccentPicker() {
         <div
             role="radiogroup"
             aria-label="Accent colour"
-            className="grid grid-cols-3 gap-2 sm:grid-cols-6"
+            className="grid grid-cols-4 gap-2 sm:grid-cols-7"
         >
             {ACCENTS.map((option) => {
                 const selected = accent === option.value;
@@ -30,7 +30,7 @@ export function AccentPicker() {
                     >
                         <span
                             className="flex size-8 items-center justify-center rounded-full text-white shadow-sm ring-2 ring-background"
-                            style={{ backgroundColor: option.swatch }}
+                            style={{ background: option.swatch }}
                         >
                             {selected && <Check className="size-4" />}
                         </span>

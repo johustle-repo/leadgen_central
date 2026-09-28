@@ -2,12 +2,12 @@
 
 use App\Models\User;
 
-it('renders the saved accent colour on the page so it applies before scripts load', function () {
+it('renders the saved accent colour on the page so it applies before scripts load', function (string $accent) {
     $user = User::factory()->create();
 
-    $this->actingAs($user)->withUnencryptedCookie('accent', 'violet')->get(route('dashboard'))
-        ->assertOk()->assertSee('data-accent="violet"', false);
-});
+    $this->actingAs($user)->withUnencryptedCookie('accent', $accent)->get(route('dashboard'))
+        ->assertOk()->assertSee('data-accent="'.$accent.'"', false);
+})->with(['violet', 'midnight']);
 
 it('falls back to the default accent for a missing or unknown cookie', function (?string $cookie) {
     $user = User::factory()->create();

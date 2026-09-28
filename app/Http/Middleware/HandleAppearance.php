@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 class HandleAppearance
 {
     /** Accent colours the appearance settings offer; see use-accent.tsx. */
-    private const ACCENTS = ['ocean', 'blue', 'violet', 'emerald', 'amber', 'rose'];
+    private const ACCENTS = ['ocean', 'blue', 'violet', 'emerald', 'amber', 'rose', 'midnight'];
 
     /**
      * Handle an incoming request.

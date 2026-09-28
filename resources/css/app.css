@@ -113,20 +113,22 @@
 :root {
     /* Hue of the user-selectable accent colour (see use-accent.tsx). */
     --accent-h: 220;
-    --background: oklch(0.975 0.012 calc(var(--accent-h) + 20));
-    --foreground: oklch(0.22 0.035 calc(var(--accent-h) + 30));
-    --card: oklch(0.995 0.006 calc(var(--accent-h) + 20));
-    --card-foreground: oklch(0.22 0.035 calc(var(--accent-h) + 30));
+    /* Hue of backgrounds, borders and the sidebar; follows the accent unless an accent overrides it. */
+    --surface-h: var(--accent-h);
+    --background: oklch(0.975 0.012 calc(var(--surface-h) + 20));
+    --foreground: oklch(0.22 0.035 calc(var(--surface-h) + 30));
+    --card: oklch(0.995 0.006 calc(var(--surface-h) + 20));
+    --card-foreground: oklch(0.22 0.035 calc(var(--surface-h) + 30));
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
     --primary: oklch(0.65 0.16 var(--accent-h));
-    --primary-foreground: oklch(0.16 0.04 calc(var(--accent-h) + 25));
-    --secondary: oklch(0.965 0.012 calc(var(--accent-h) + 20));
-    --secondary-foreground: oklch(0.205 0.02 calc(var(--accent-h) + 30));
-    --muted: oklch(0.965 0.01 calc(var(--accent-h) + 20));
-    --muted-foreground: oklch(0.54 0.02 calc(var(--accent-h) + 30));
-    --accent: oklch(0.955 0.025 calc(var(--accent-h) + 10));
-    --accent-foreground: oklch(0.205 0.03 calc(var(--accent-h) + 30));
+    --primary-foreground: oklch(0.16 0.04 calc(var(--surface-h) + 25));
+    --secondary: oklch(0.965 0.012 calc(var(--surface-h) + 20));
+    --secondary-foreground: oklch(0.205 0.02 calc(var(--surface-h) + 30));
+    --muted: oklch(0.965 0.01 calc(var(--surface-h) + 20));
+    --muted-foreground: oklch(0.54 0.02 calc(var(--surface-h) + 30));
+    --accent: oklch(0.955 0.025 calc(var(--surface-h) + 10));
+    --accent-foreground: oklch(0.205 0.03 calc(var(--surface-h) + 30));
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.577 0.245 27.325);
     --success: #047857;
@@ -135,8 +137,8 @@
     --warning-foreground: #fffbeb;
     --info: #0e7490;
     --info-foreground: #ecfeff;
-    --border: oklch(0.9 0.025 calc(var(--accent-h) + 20));
-    --input: oklch(0.9 0.025 calc(var(--accent-h) + 20));
+    --border: oklch(0.9 0.025 calc(var(--surface-h) + 20));
+    --input: oklch(0.9 0.025 calc(var(--surface-h) + 20));
     --ring: oklch(0.7 0.13 var(--accent-h));
     --chart-1: #2a78d6;
     --chart-2: #eb6834;
@@ -154,30 +156,30 @@
     --funnel-4: #1c5cab;
     --funnel-5: #104281;
     --radius: 0.8rem;
-    --sidebar: oklch(0.18 0.045 calc(var(--accent-h) + 30));
-    --sidebar-foreground: oklch(0.96 0.015 calc(var(--accent-h) + 10));
+    --sidebar: oklch(0.18 0.045 calc(var(--surface-h) + 30));
+    --sidebar-foreground: oklch(0.96 0.015 calc(var(--surface-h) + 10));
     --sidebar-primary: oklch(0.72 0.15 calc(var(--accent-h) - 5));
-    --sidebar-primary-foreground: oklch(0.16 0.04 calc(var(--accent-h) + 25));
-    --sidebar-accent: oklch(0.25 0.055 calc(var(--accent-h) + 25));
-    --sidebar-accent-foreground: oklch(0.97 0.01 calc(var(--accent-h) + 10));
-    --sidebar-border: oklch(0.32 0.045 calc(var(--accent-h) + 25));
+    --sidebar-primary-foreground: oklch(0.16 0.04 calc(var(--surface-h) + 25));
+    --sidebar-accent: oklch(0.25 0.055 calc(var(--surface-h) + 25));
+    --sidebar-accent-foreground: oklch(0.97 0.01 calc(var(--surface-h) + 10));
+    --sidebar-border: oklch(0.32 0.045 calc(var(--surface-h) + 25));
     --sidebar-ring: oklch(0.7 0.15 calc(var(--accent-h) - 5));
 }
 
 .dark {
-    --background: oklch(0.135 0.035 calc(var(--accent-h) + 30));
+    --background: oklch(0.135 0.035 calc(var(--surface-h) + 30));
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.18 0.035 calc(var(--accent-h) + 28));
+    --card: oklch(0.18 0.035 calc(var(--surface-h) + 28));
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.145 0 0);
     --popover-foreground: oklch(0.985 0 0);
     --primary: oklch(0.74 0.15 calc(var(--accent-h) - 5));
-    --primary-foreground: oklch(0.15 0.04 calc(var(--accent-h) + 30));
-    --secondary: oklch(0.27 0.02 calc(var(--accent-h) + 30));
+    --primary-foreground: oklch(0.15 0.04 calc(var(--surface-h) + 30));
+    --secondary: oklch(0.27 0.02 calc(var(--surface-h) + 30));
     --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.27 0.02 calc(var(--accent-h) + 30));
+    --muted: oklch(0.27 0.02 calc(var(--surface-h) + 30));
     --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.29 0.04 calc(var(--accent-h) + 25));
+    --accent: oklch(0.29 0.04 calc(var(--surface-h) + 25));
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.396 0.141 25.723);
     --destructive-foreground: oklch(0.637 0.237 25.331);
@@ -187,8 +189,8 @@
     --warning-foreground: #451a03;
     --info: #67e8f9;
     --info-foreground: #083344;
-    --border: oklch(0.3 0.04 calc(var(--accent-h) + 25));
-    --input: oklch(0.27 0.04 calc(var(--accent-h) + 25));
+    --border: oklch(0.3 0.04 calc(var(--surface-h) + 25));
+    --input: oklch(0.27 0.04 calc(var(--surface-h) + 25));
     --ring: oklch(0.65 0.14 calc(var(--accent-h) - 5));
     --chart-1: #3987e5;
     --chart-2: #d95926;
@@ -205,13 +207,13 @@
     --funnel-3: #3987e5;
     --funnel-4: #6da7ec;
     --funnel-5: #9ec5f4;
-    --sidebar: oklch(0.15 0.045 calc(var(--accent-h) + 32));
+    --sidebar: oklch(0.15 0.045 calc(var(--surface-h) + 32));
     --sidebar-foreground: oklch(0.985 0 0);
     --sidebar-primary: oklch(0.74 0.15 calc(var(--accent-h) - 5));
-    --sidebar-primary-foreground: oklch(0.15 0.04 calc(var(--accent-h) + 30));
-    --sidebar-accent: oklch(0.24 0.055 calc(var(--accent-h) + 25));
+    --sidebar-primary-foreground: oklch(0.15 0.04 calc(var(--surface-h) + 30));
+    --sidebar-accent: oklch(0.24 0.055 calc(var(--surface-h) + 25));
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.28 0.035 calc(var(--accent-h) + 30));
+    --sidebar-border: oklch(0.28 0.035 calc(var(--surface-h) + 30));
     --sidebar-ring: oklch(0.65 0.14 calc(var(--accent-h) - 5));
 }
 
@@ -234,6 +236,12 @@
 
 :root[data-accent='rose'] {
     --accent-h: 12;
+}
+
+/* Navy surfaces with mint highlights, matching the sign-in screen. */
+:root[data-accent='midnight'] {
+    --accent-h: 162;
+    --surface-h: 232;
 }
 
 @layer base {
