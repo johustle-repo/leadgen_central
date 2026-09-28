@@ -5,6 +5,7 @@ namespace App\Models;
 use App\LeadSource;
 use App\LeadStatus;
 use App\Models\Concerns\FlushesReportCache;
+use App\Services\LeadStateResolver;
 use Database\Factories\LeadFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -60,7 +61,8 @@ class Lead extends Model
      * Applied on every save, whatever created or edited the lead: a missing
      * LinkedIn stays blank instead of a placeholder, and a lead with no data
      * source takes it from its Tendata or Lusha link, or is Manual when it
-     * has no link either.
+     * has no link either. A US or Canadian lead's City holds its full state
+     * or province name (see LeadStateResolver).
      *
      * Only fields loaded on this instance are considered, so saving a lead
      * fetched with a partial column list never blanks the columns it skipped.
@@ -71,6 +73,11 @@ class Lead extends Model
 
         if ($loaded('linkedin_url') && $this->linkedin_url !== null && $this->isPlaceholder($this->linkedin_url)) {
             $this->linkedin_url = null;
+        }
+
+        $location = ['city', 'raw_city', 'state_province', 'country', 'country_code'];
+        if ($loaded(...$location) && (! $this->exists || $this->isDirty($location))) {
+            app(LeadStateResolver::class)->normalize($this);
         }
 
         if (! $loaded('data_source', 'source_url') || ! $this->isPlaceholder($this->data_source)) {
