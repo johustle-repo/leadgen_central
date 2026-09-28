@@ -46,6 +46,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { leadDrilldownUrl } from '@/lib/lead-drilldown';
 import {
     exportMethod as reportExport,
     exportPdf as reportExportPdf,
@@ -509,14 +510,35 @@ export default function Analytics({
                                     className="lg:col-span-4"
                                 >
                                     <BarList
-                                        rows={data.distributions.statuses}
+                                        rows={data.distributions.statuses.map(
+                                            (row) => ({
+                                                ...row,
+                                                href: leadDrilldownUrl(
+                                                    filters,
+                                                    row.label,
+                                                    { status: row.label },
+                                                ),
+                                            }),
+                                        )}
                                     />
                                 </Visual>
                             </div>
                             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                <Visual title="Data sources">
+                                <Visual
+                                    title="Data sources"
+                                    subtitle="Click a bar to list its leads"
+                                >
                                     <BarList
-                                        rows={data.distributions.sources}
+                                        rows={data.distributions.sources.map(
+                                            (row) => ({
+                                                ...row,
+                                                href: leadDrilldownUrl(
+                                                    filters,
+                                                    row.label,
+                                                    { source_group: row.label },
+                                                ),
+                                            }),
+                                        )}
                                     />
                                 </Visual>
                                 <Visual
@@ -528,6 +550,14 @@ export default function Analytics({
                                             (row) => ({
                                                 ...row,
                                                 label: countryLabel(row.label),
+                                                href: leadDrilldownUrl(
+                                                    filters,
+                                                    row.label,
+                                                    {
+                                                        country_group:
+                                                            row.label,
+                                                    },
+                                                ),
                                             }),
                                         )}
                                     />
@@ -540,6 +570,11 @@ export default function Analytics({
                                         rows={data.companies.map((row) => ({
                                             label: row.label,
                                             value: row.contacts,
+                                            href: leadDrilldownUrl(
+                                                filters,
+                                                row.label,
+                                                { company: row.label },
+                                            ),
                                         }))}
                                         uppercase
                                         empty="No named companies in this period."
@@ -551,7 +586,18 @@ export default function Analytics({
                                         subtitle={`${percent(data.industry_coverage)} of records have a known industry`}
                                     >
                                         <BarList
-                                            rows={data.distributions.industries}
+                                            rows={data.distributions.industries.map(
+                                                (row) => ({
+                                                    ...row,
+                                                    href: leadDrilldownUrl(
+                                                        filters,
+                                                        row.label,
+                                                        {
+                                                            industry: row.label,
+                                                        },
+                                                    ),
+                                                }),
+                                            )}
                                         />
                                     </Visual>
                                 )}

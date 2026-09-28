@@ -2,6 +2,8 @@ export type Distribution = {
     label: string;
     value: number;
     percent: number | null;
+    /** Identity behind the label (e.g. the owner's user id), when grouped by one. */
+    key?: string | null;
 };
 export type Overview = Record<
     | 'records'

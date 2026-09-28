@@ -15,6 +15,7 @@ use App\Services\LeadBulkDeletion;
 use App\Services\LeadCreator;
 use App\Services\LeadNormalizationService;
 use App\Services\TimezoneReferenceResolver;
+use App\Support\LeadReportDimensions;
 use App\UserRole;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -136,7 +137,7 @@ class LeadController extends Controller
     {
         Gate::authorize('viewAny', Lead::class);
         $user = $request->user();
-        $columns = ['id', 'lead_code', 'agent_id', 'upload_batch_id', 'company_name', 'website', 'website_domain', 'city', 'country', 'country_code', 'contact_person', 'position', 'email', 'phone', 'industry', 'status', 'validation_status', 'source', 'lead_date', 'created_at'];
+        $columns = ['id', 'lead_code', 'agent_id', 'upload_batch_id', 'company_name', 'website', 'website_domain', 'city', 'country', 'country_code', 'contact_person', 'position', 'email', 'phone', 'industry', 'status', 'validation_status', 'source', 'data_source', 'lead_date', 'created_at'];
         $query = Lead::query()->select(array_map(fn (string $column): string => "leads.{$column}", $columns))->with(['agent:id,name', 'uploadBatch:id,batch_code']);
         if ($user->isSuperAdministrator()) {
             $query->withCount(['emailReplies', 'emailReplies as unread_email_replies_count' => fn ($query) => $query->where('is_read', false)]);
@@ -174,6 +175,9 @@ class LeadController extends Controller
         if ($date = $request->string('date')->toString()) {
             $query->whereDate('lead_date', $date);
         }
+        $request->validate(['created_from' => ['nullable', 'date_format:Y-m-d'], 'created_to' => ['nullable', 'date_format:Y-m-d']]);
+        $drilldown = array_filter($request->only(LeadReportDimensions::DRILLDOWN_KEYS), fn (mixed $value): bool => is_string($value) && $value !== '');
+        LeadReportDimensions::applyDrilldown($query, $drilldown);
         $sort = in_array($request->string('sort')->toString(), ['company_name', 'city', 'country', 'status', 'source', 'agent', 'created_at'], true) ? $request->string('sort')->toString() : 'created_at';
         $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
         $requestedPerPage = $request->integer('per_page', 10);
@@ -198,7 +202,7 @@ class LeadController extends Controller
             'can_send_email' => $lead->agent_id === $user->id && filter_var($lead->email, FILTER_VALIDATE_EMAIL) !== false,
         ]);
 
-        return Inertia::render('leads/index', ['leads' => $leads, 'filters' => [...$request->only(['search', 'status', 'source', 'country', 'validation_status', 'agent_id', 'upload_batch_id', 'duplicate_status', 'sort', 'direction']), 'date' => $request->string('date')->toString() ?: today()->toDateString(), 'per_page' => (string) $perPage], 'canBulkDelete' => $user->isAdministrator(), 'agents' => $user->canViewAllLeads() ? User::query()->where('role', UserRole::Agent)->orderBy('name')->get(['id', 'name']) : [], 'batches' => $user->canViewAllLeads() ? UploadBatch::query()->latest()->limit(200)->get(['id', 'batch_code']) : []]);
+        return Inertia::render('leads/index', ['leads' => $leads, 'filters' => [...$request->only(['search', 'status', 'source', 'country', 'validation_status', 'agent_id', 'upload_batch_id', 'duplicate_status', 'sort', 'direction']), ...$drilldown, 'date' => $request->string('date')->toString() ?: ($drilldown === [] ? today()->toDateString() : ''), 'per_page' => (string) $perPage], 'canBulkDelete' => $user->isAdministrator(), 'agents' => $user->canViewAllLeads() ? User::query()->where('role', UserRole::Agent)->orderBy('name')->get(['id', 'name']) : [], 'batches' => $user->canViewAllLeads() ? UploadBatch::query()->latest()->limit(200)->get(['id', 'batch_code']) : []]);
     }
 
     /**

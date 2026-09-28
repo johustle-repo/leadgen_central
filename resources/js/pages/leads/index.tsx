@@ -8,12 +8,14 @@ import {
     SlidersHorizontal,
     Trash2,
     Users,
+    X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
 import { HeaderActionsPortal } from '@/components/header-actions';
+import { countryLabel } from '@/components/lead-demographics';
 import { Pagination } from '@/components/pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +44,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { DRILLDOWN_LABELS } from '@/lib/lead-drilldown';
 import {
     bulkDestroy,
     create,
@@ -59,10 +62,12 @@ type Lead = {
     lead_date: string | null;
     city: string | null;
     country: string | null;
+    country_code: string | null;
     contact_person: string | null;
     email: string | null;
     status: string;
     source: string;
+    data_source: string | null;
     validation_status: string;
     website_domain: string | null;
     upload_batch: { batch_code: string } | null;
@@ -113,6 +118,34 @@ export default function LeadsIndex({
     );
     const [sort, setSort] = useState(filters.sort || 'created_at');
     const [direction, setDirection] = useState(filters.direction || 'desc');
+    // Filters carried over from a clicked report bar; they stay applied while
+    // sorting or changing other filters until cleared.
+    const drilldown = Object.fromEntries(
+        [
+            'created_from',
+            'created_to',
+            ...Object.keys(DRILLDOWN_LABELS).filter(
+                (key) => key !== 'status' && key !== 'agent_id',
+            ),
+        ]
+            .filter((key) => filters[key])
+            .map((key) => [key, filters[key]]),
+    );
+    const drilldownCriteria = Object.keys(DRILLDOWN_LABELS)
+        .filter((key) => filters[key])
+        .map((key) => {
+            const value = filters[key];
+            const shown =
+                key === 'country_group'
+                    ? countryLabel(value)
+                    : key === 'agent_id'
+                      ? (agents.find((agent) => String(agent.id) === value)
+                            ?.name ?? value)
+                      : value;
+
+            return `${DRILLDOWN_LABELS[key]}: ${shown}`;
+        });
+    const fromReport = Boolean(filters.created_from || filters.created_to);
     const visibleLeadIds = leads.data.map((lead) => lead.id);
     const selectedVisibleLeadIds = selectedLeadIds.filter((id) =>
         visibleLeadIds.includes(id),
@@ -181,6 +214,8 @@ export default function LeadsIndex({
         router.get(
             index.url(),
             {
+                ...drilldown,
+                status: filters.status,
                 search: searchTerm,
                 agent_id: agentFilter === ALL_AGENTS ? '' : agentFilter,
                 per_page: filters.per_page,
@@ -270,6 +305,21 @@ export default function LeadsIndex({
                     gridClassName="sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]"
                     hint="Search matches company, contact, email, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of every other filter below."
                 >
+                    {Object.entries(drilldown).map(([key, value]) => (
+                        <input
+                            key={key}
+                            type="hidden"
+                            name={key}
+                            value={value}
+                        />
+                    ))}
+                    {fromReport && filters.status && (
+                        <input
+                            type="hidden"
+                            name="status"
+                            value={filters.status}
+                        />
+                    )}
                     <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
                         <label
                             htmlFor="leads-search"
@@ -456,6 +506,35 @@ export default function LeadsIndex({
                         />
                     </div>
                 </FilterBar>
+                {fromReport && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                        <span className="font-medium">From report</span>
+                        {drilldownCriteria.map((criterion) => (
+                            <span
+                                key={criterion}
+                                className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium"
+                            >
+                                {criterion}
+                            </span>
+                        ))}
+                        <span className="text-xs text-muted-foreground">
+                            Added {filters.created_from || '…'} to{' '}
+                            {filters.created_to || '…'}. Open a lead to fix its
+                            missing or mismatched fields.
+                        </span>
+                        <Button
+                            asChild
+                            size="sm"
+                            variant="ghost"
+                            className="ml-auto"
+                        >
+                            <Link href={index()}>
+                                <X />
+                                Clear report filter
+                            </Link>
+                        </Button>
+                    </div>
+                )}
                 {leads.data.length ? (
                     <Table>
                         <TableHeader>
@@ -528,7 +607,10 @@ export default function LeadsIndex({
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        {[lead.city, lead.country]
+                                        {[
+                                            lead.city,
+                                            lead.country || lead.country_code,
+                                        ]
                                             .filter(Boolean)
                                             .join(', ') || '—'}
                                     </TableCell>
@@ -549,8 +631,14 @@ export default function LeadsIndex({
                                             </span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="capitalize">
-                                        {lead.source}
+                                    <TableCell>
+                                        <span className="capitalize">
+                                            {lead.source}
+                                        </span>
+                                        <div className="text-xs text-muted-foreground">
+                                            {lead.data_source?.trim() ||
+                                                'No data source'}
+                                        </div>
                                     </TableCell>
                                     {isSuperAdministrator && (
                                         <TableCell>

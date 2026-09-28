@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -171,7 +172,8 @@ export function KpiCard({
 
 /**
  * Horizontal bar list scaled to the largest row, with the value printed at the
- * end of every bar - the Power BI "clustered bar with data labels" look.
+ * end of every bar - the Power BI "clustered bar with data labels" look. Rows
+ * with an href open the records behind that bar.
  */
 export function BarList({
     rows,
@@ -180,7 +182,12 @@ export function BarList({
     format = (value: number) => value.toLocaleString(),
     scaleMax,
 }: {
-    rows: Array<{ label: string; value: number; percent?: number | null }>;
+    rows: Array<{
+        label: string;
+        value: number;
+        percent?: number | null;
+        href?: string;
+    }>;
     empty?: string;
     uppercase?: boolean;
     format?: (value: number) => string;
@@ -195,37 +202,59 @@ export function BarList({
 
     return (
         <ul className="flex flex-col gap-2.5">
-            {rows.map((row, index) => (
-                <li
-                    key={`${row.label}-${index}`}
-                    className="group grid grid-cols-[minmax(0,7.5rem)_1fr] items-center gap-3 text-xs"
-                    title={`${formatLabel(row.label)}: ${format(row.value)}`}
-                >
-                    <span
-                        className={`truncate text-muted-foreground ${uppercase ? 'uppercase' : ''}`}
-                    >
-                        {uppercase ? row.label : formatLabel(row.label)}
-                    </span>
-                    <span className="flex min-w-0 items-center gap-2">
+            {rows.map((row, index) => {
+                const label = uppercase ? row.label : formatLabel(row.label);
+                const content = (
+                    <>
                         <span
-                            className="h-4 rounded-r-[4px] bg-chart-1 transition-opacity group-hover:opacity-80"
-                            style={{
-                                width: `${Math.max(2, (row.value / max) * 100)}%`,
-                            }}
-                            aria-hidden="true"
-                        />
-                        <span className="shrink-0 font-medium text-foreground tabular-nums">
-                            {format(row.value)}
-                            {row.percent !== undefined &&
-                                row.percent !== null && (
-                                    <span className="ml-1 font-normal text-muted-foreground">
-                                        {percent(row.percent)}
-                                    </span>
-                                )}
+                            className={`truncate text-muted-foreground ${uppercase ? 'uppercase' : ''} ${row.href ? 'group-hover:text-foreground group-hover:underline' : ''}`}
+                        >
+                            {label}
                         </span>
-                    </span>
-                </li>
-            ))}
+                        <span className="flex min-w-0 items-center gap-2">
+                            <span
+                                className="h-4 rounded-r-[4px] bg-chart-1 transition-opacity group-hover:opacity-80"
+                                style={{
+                                    width: `${Math.max(2, (row.value / max) * 100)}%`,
+                                }}
+                                aria-hidden="true"
+                            />
+                            <span className="shrink-0 font-medium text-foreground tabular-nums">
+                                {format(row.value)}
+                                {row.percent !== undefined &&
+                                    row.percent !== null && (
+                                        <span className="ml-1 font-normal text-muted-foreground">
+                                            {percent(row.percent)}
+                                        </span>
+                                    )}
+                            </span>
+                        </span>
+                    </>
+                );
+                const rowClassName =
+                    'group grid grid-cols-[minmax(0,7.5rem)_1fr] items-center gap-3 text-xs';
+
+                return (
+                    <li key={`${row.label}-${index}`}>
+                        {row.href ? (
+                            <Link
+                                href={row.href}
+                                className={`${rowClassName} -mx-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none`}
+                                title={`View the ${format(row.value)} leads in ${label}`}
+                            >
+                                {content}
+                            </Link>
+                        ) : (
+                            <div
+                                className={rowClassName}
+                                title={`${label}: ${format(row.value)}`}
+                            >
+                                {content}
+                            </div>
+                        )}
+                    </li>
+                );
+            })}
         </ul>
     );
 }

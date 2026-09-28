@@ -8,6 +8,7 @@ use App\Models\UploadBatch;
 use App\Models\UploadRow;
 use App\Models\User;
 use App\Support\CountryRegions;
+use App\Support\LeadReportDimensions;
 use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,36 +19,6 @@ use Illuminate\Support\Facades\DB;
 class DatabaseIntelligenceReport
 {
     private const COMPANY = "COALESCE(NULLIF(LOWER(TRIM(normalized_company_name)), ''), NULLIF(LOWER(TRIM(company_name)), ''))";
-
-    /**
-     * Some imported sources spell a country name differently than the
-     * canonical name on file (e.g. "United States" vs. our "United States
-     * of America", or "Republic of Ireland" vs. our "Ireland"). With no
-     * country_code and no exact name match, that record would count as a
-     * separate "country" in the Geographic analysis totals instead of
-     * folding into the country it actually belongs to. Map the common
-     * variants to their ISO2 code so it groups correctly.
-     *
-     * @var array<string, string>
-     */
-    private const COUNTRY_NAME_ALIASES = [
-        'united states' => 'US',
-        'usa' => 'US',
-        'u.s.a.' => 'US',
-        'u.s.' => 'US',
-        'america' => 'US',
-        'uk' => 'GB',
-        'u.k.' => 'GB',
-        'great britain' => 'GB',
-        'england' => 'GB',
-        'republic of ireland' => 'IE',
-        'south korea' => 'KR',
-        'north korea' => 'KP',
-        'vietnam' => 'VN',
-        'ivory coast' => 'CI',
-        'czech republic' => 'CZ',
-        'russia' => 'RU',
-    ];
 
     /**
      * Upper bound on region/country/city/agent combinations sent to the
@@ -90,15 +61,15 @@ class DatabaseIntelligenceReport
             'average_contacts' => $companySummary->companies > 0 ? round($companySummary->contacts / $companySummary->companies, 2) : null,
             'unnamed_records' => $data['overview']['records'] - (int) $companySummary->contacts,
         ];
-        $source = $this->sourceExpression('data_source', 'source');
+        $source = LeadReportDimensions::sourceExpression('data_source', 'source');
         $sourceCounts = (clone $leads)->selectRaw("{$source} as label, COUNT(*) as records")->groupBy('label')->toBase()->get()->keyBy('label');
         $sqlite = DB::connection()->getDriverName() === 'sqlite';
         $snapshot = $sqlite ? "json_extract(processed_data, '$.data_source')" : "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(processed_data, '$.data_source')), 'null')";
-        $rowSource = $this->sourceExpression($snapshot);
+        $rowSource = LeadReportDimensions::sourceExpression($snapshot);
         $sourceQuality = $this->rowMetrics($rows)->selectRaw("{$rowSource} as label")->groupBy('label')->get()->keyBy('label');
         $data['source_quality'] = [];
         $data['distributions']['sources'] = [];
-        foreach (['Tendata', 'Lusha', 'Manual', 'Email', 'Other', 'Unknown'] as $label) {
+        foreach (LeadReportDimensions::SOURCE_GROUPS as $label) {
             $records = (int) ($sourceCounts->get($label)->records ?? 0);
             $metrics = $this->metrics($sourceQuality->get($label));
             $data['source_quality'][] = ['label' => $label, 'records' => $records, ...$metrics];
@@ -193,22 +164,6 @@ class DatabaseIntelligenceReport
             array_keys(array_slice($totals, 0, $limit, true)),
             array_slice($totals, 0, $limit, true),
         );
-    }
-
-    /**
-     * @param  literal-string  $column
-     * @param  literal-string|null  $entryMethod
-     * @return literal-string
-     */
-    private function sourceExpression(string $column, ?string $entryMethod = null): string
-    {
-        $manual = $entryMethod === null ? '' : "WHEN NULLIF(TRIM({$column}), '') IS NULL AND {$entryMethod} = 'manual' THEN 'Manual'";
-
-        return "CASE WHEN LOWER(TRIM({$column})) = 'tendata' THEN 'Tendata'
-            WHEN LOWER(TRIM({$column})) = 'lusha' THEN 'Lusha'
-            WHEN LOWER(TRIM({$column})) IN ('manual', 'manual entry') THEN 'Manual'
-            WHEN LOWER(TRIM({$column})) IN ('email', 'email reply', 'email outreach') THEN 'Email'
-            {$manual} WHEN NULLIF(TRIM({$column}), '') IS NULL OR LOWER(TRIM({$column})) IN ('unknown', 'n/a') THEN 'Unknown' ELSE 'Other' END";
     }
 
     private function rowMetrics(QueryBuilder $rows): QueryBuilder
@@ -324,7 +279,7 @@ class DatabaseIntelligenceReport
     {
         $aliasCase = '';
         $aliasBindings = [];
-        foreach (self::COUNTRY_NAME_ALIASES as $alias => $iso2) {
+        foreach (LeadReportDimensions::COUNTRY_NAME_ALIASES as $alias => $iso2) {
             $aliasCase .= 'WHEN ? THEN ? ';
             array_push($aliasBindings, $alias, $iso2);
         }

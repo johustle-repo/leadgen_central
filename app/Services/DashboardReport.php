@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\UploadRow;
 use App\Models\User;
+use App\Support\LeadReportDimensions;
 use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -85,10 +86,11 @@ class DashboardReport
         $quality['average_rows_per_upload'] = $overview['uploads'] > 0 ? round($quality['rows'] / $overview['uploads'], 1) : null;
 
         $distributions = [];
-        foreach (['countries' => self::COUNTRY, 'industries' => "NULLIF(LOWER(TRIM(industry)), '')", 'sources' => "NULLIF(LOWER(TRIM(data_source)), '')", 'statuses' => 'status', 'entry_methods' => 'source',
+        foreach (['industries' => "NULLIF(LOWER(TRIM(industry)), '')", 'sources' => "NULLIF(LOWER(TRIM(data_source)), '')", 'statuses' => 'status', 'entry_methods' => 'source',
             'provinces' => "NULLIF(LOWER(TRIM(state_province)), '')", 'cities' => "NULLIF(LOWER(TRIM(city)), '')", 'timezones' => "NULLIF(TRIM(timezone), '')"] as $key => $expression) {
             $distributions[$key] = $this->distribution($leads, $expression, $overview['records'], $key === 'statuses' ? 20 : 10);
         }
+        $distributions['countries'] = $this->countryDistribution($leads, $overview['records']);
         $leadTable = (new Lead)->getTable();
         $userTable = (new User)->getTable();
         $owners = (clone $leads)->leftJoin($userTable.' as owners', 'owners.id', '=', $leadTable.'.agent_id');
@@ -174,12 +176,48 @@ class DashboardReport
     private function overview(Builder $leads): array
     {
         $query = (clone $leads)->selectRaw('COUNT(*) as records');
-        foreach (['companies' => self::COMPANY, 'emails' => self::EMAIL, 'countries' => self::COUNTRY,
+        foreach (['companies' => self::COMPANY, 'emails' => self::EMAIL,
             'cities' => "NULLIF(LOWER(TRIM(city)), '')", 'provinces' => "NULLIF(LOWER(TRIM(state_province)), '')", 'sources' => "NULLIF(LOWER(TRIM(data_source)), '')"] as $key => $expression) {
             $query->selectRaw("COUNT(DISTINCT {$expression}) as {$key}");
         }
+        $overview = $this->numericRow($query->toBase()->first());
+        $countries = array_unique(LeadReportDimensions::resolveCountries(
+            (clone $leads)->selectRaw(self::COUNTRY.' as resolved_country')->distinct()->toBase()->pluck('resolved_country')->all(),
+        ));
+        $overview['countries'] = count(array_diff($countries, ['Unknown']));
 
-        return $this->numericRow($query->toBase()->first());
+        return $overview;
+    }
+
+    /**
+     * Records per country, with differently stored spellings of the same
+     * country ("US", "United States", "united states of america") merged
+     * under its ISO2 code.
+     *
+     * @param  Builder<Lead>  $leads
+     * @return list<array{label: string, value: int, percent: float|null}>
+     */
+    private function countryDistribution(Builder $leads, int $total, int $limit = 10): array
+    {
+        $groups = (clone $leads)->selectRaw(self::COUNTRY.' as resolved_country, COUNT(*) as aggregate')->groupBy('resolved_country')->toBase()->get();
+        $resolved = LeadReportDimensions::resolveCountries($groups->pluck('resolved_country')->all());
+        $totals = [];
+        foreach ($groups as $group) {
+            $country = $resolved[trim((string) $group->resolved_country)];
+            $totals[$country] = ($totals[$country] ?? 0) + (int) $group->aggregate;
+        }
+        uksort($totals, fn (string $a, string $b): int => [$totals[$b], $a] <=> [$totals[$a], $b]);
+
+        $rows = [];
+        foreach (array_slice($totals, 0, $limit, true) as $country => $value) {
+            $rows[] = ['label' => (string) $country, 'value' => $value, 'percent' => $this->rate($value, $total)];
+        }
+        $remaining = $total - array_sum(array_column($rows, 'value'));
+        if ($remaining > 0) {
+            $rows[] = ['label' => 'Other groups', 'value' => $remaining, 'percent' => $this->rate($remaining, $total)];
+        }
+
+        return $rows;
     }
 
     /** @param Builder<UploadRow> $rows
@@ -202,14 +240,19 @@ class DashboardReport
 
     /** @param Builder<Lead> $query
      * @param  literal-string  $expression
-     * @return list<array{label: string, value: int, percent: float|null}>
+     * @return list<array{label: string, value: int, percent: float|null, key?: string|null}>
      */
     private function distribution(Builder $query, string $expression, int $total, int $limit = 10, ?string $identity = null): array
     {
         $groups = (clone $query)->selectRaw("COALESCE({$expression}, 'Unknown') as label, COUNT(*) as aggregate")
-            ->groupBy('label')->when($identity, fn (Builder $builder) => $builder->groupBy($identity))
+            ->when($identity, fn (Builder $builder) => $builder->addSelect("{$identity} as identity_key")->groupBy($identity))->groupBy('label')
             ->orderByDesc('aggregate')->orderBy('label')->limit($limit)->toBase()->get()
-            ->map(fn (object $row): array => ['label' => (string) $row->label, 'value' => (int) $row->aggregate, 'percent' => $this->rate((int) $row->aggregate, $total)])->all();
+            ->map(fn (object $row): array => [
+                'label' => (string) $row->label,
+                'value' => (int) $row->aggregate,
+                'percent' => $this->rate((int) $row->aggregate, $total),
+                ...($identity === null ? [] : ['key' => $row->identity_key === null ? null : (string) $row->identity_key]),
+            ])->all();
         $remaining = $total - array_sum(array_column($groups, 'value'));
         if ($remaining > 0) {
             $groups[] = ['label' => 'Other groups', 'value' => $remaining, 'percent' => $this->rate($remaining, $total)];

@@ -29,6 +29,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { leadDrilldownUrl } from '@/lib/lead-drilldown';
 import { dashboard } from '@/routes';
 import { edit as leadEdit, index as leadsIndex } from '@/routes/leads';
 import { index as reportIndex } from '@/routes/report';
@@ -312,12 +313,26 @@ export default function Dashboard({
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     <Visual title="Leads by status">
                         <BarList
-                            rows={data.distributions.statuses.slice(0, 8)}
+                            rows={data.distributions.statuses
+                                .slice(0, 8)
+                                .map((row) => ({
+                                    ...row,
+                                    href: leadDrilldownUrl(filters, row.label, {
+                                        status: row.label,
+                                    }),
+                                }))}
                         />
                     </Visual>
                     <Visual title="Top countries">
                         <BarList
-                            rows={data.distributions.countries.slice(0, 8)}
+                            rows={data.distributions.countries
+                                .slice(0, 8)
+                                .map((row) => ({
+                                    ...row,
+                                    href: leadDrilldownUrl(filters, row.label, {
+                                        country_group: row.label,
+                                    }),
+                                }))}
                             uppercase
                         />
                     </Visual>
@@ -326,6 +341,9 @@ export default function Dashboard({
                             rows={data.companies.slice(0, 8).map((row) => ({
                                 label: row.label,
                                 value: row.contacts,
+                                href: leadDrilldownUrl(filters, row.label, {
+                                    company: row.label,
+                                }),
                             }))}
                             uppercase
                             empty="No named companies in this period."
@@ -356,8 +374,28 @@ export default function Dashboard({
                     >
                         <BarList
                             rows={(data.can_compare_agents
-                                ? data.distributions.owners
-                                : data.distributions.sources
+                                ? data.distributions.owners.map((row) => ({
+                                      ...row,
+                                      href: row.key
+                                          ? leadDrilldownUrl(
+                                                filters,
+                                                row.label,
+                                                {
+                                                    agent_id: row.key,
+                                                },
+                                            )
+                                          : undefined,
+                                  }))
+                                : data.distributions.sources.map((row) => ({
+                                      ...row,
+                                      href: leadDrilldownUrl(
+                                          filters,
+                                          row.label,
+                                          {
+                                              data_source: row.label,
+                                          },
+                                      ),
+                                  }))
                             ).slice(0, 8)}
                         />
                     </Visual>
