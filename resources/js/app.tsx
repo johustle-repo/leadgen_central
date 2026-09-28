@@ -6,6 +6,7 @@ import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { refreshPagesOnReturn } from '@/lib/refresh-on-return';
 
 const appName = 'LeadGen Central';
 
@@ -40,3 +41,6 @@ createInertiaApp({
 // This will set light / dark mode on load...
 initializeTheme();
 initializeAccent();
+
+// Pages reached with Back/Forward show current data, not a stale snapshot.
+refreshPagesOnReturn();
