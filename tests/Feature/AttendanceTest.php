@@ -168,7 +168,8 @@ it('rejects a second time in for the same day', function () {
     $superAdministrator = User::factory()->superAdministrator()->create();
     $staff = User::factory()->create();
 
-    Attendance::factory()->for($staff)->create(['recorded_at' => now()->subHours(2)]);
+    $this->travelTo(Carbon\Carbon::parse('2026-01-15 04:00:00', 'UTC'));
+    Attendance::factory()->for($staff)->create(['recorded_at' => Attendance::now()->subHours(2)]);
 
     $this->actingAs($superAdministrator)
         ->post(route('attendance.scan'), ['code' => $staff->qr_value, 'entry_type' => 'time_in'])
