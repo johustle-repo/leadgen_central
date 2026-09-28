@@ -39,6 +39,24 @@ it('downloads a report PDF and logs the export', function () {
     ]);
 });
 
+it('renders the full report PDF with agent sections for a super administrator', function () {
+    $this->travelTo('2026-09-01 12:00:00');
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $agent = User::factory()->create();
+    Lead::factory()->count(3)->for($agent, 'agent')->create([
+        'country_code' => 'US',
+        'data_source' => 'Tendata',
+        'created_at' => '2026-08-30 10:00:00',
+    ]);
+    UploadBatch::factory()->for($agent)->create(['created_at' => '2026-08-30 10:00:00', 'total_rows' => 3]);
+
+    $response = $this->actingAs($superAdministrator)->get(route('report.export-pdf', ['period' => '7_days']));
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Type'))->toBe('application/pdf')
+        ->and($response->getContent())->toStartWith('%PDF');
+});
+
 it('downloads a report CSV scoped to the agents own leads and logs the export', function () {
     $this->travelTo('2026-09-01 12:00:00');
     $agent = User::factory()->create();

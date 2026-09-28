@@ -143,34 +143,56 @@ class DatabaseIntelligenceReport
             $sections['Database contribution by agent - selected period'] = [['Agent', 'Records', 'Companies', 'Uploads', 'Avg batch', 'Duplicate rate', 'Rejection rate', 'Error rate', 'Quality rate'], ...array_map(fn (array $row): array => [$row['name'], $row['records'], $row['companies'], $row['uploads'], $row['average_batch_size'] ?? 'N/A', $rate($row['duplicates_rate']), $rate($row['rejected_rate']), $rate($row['errors_rate']), $rate($row['clean_rate'])], $data['contribution'])];
         }
 
-        $demographics = $data['demographics'];
-        $countryName = fn (string $code): string => CountryRegions::COUNTRIES[$code]['name'] ?? $code;
-        $agentName = fn (?int $id): string => $id === null ? 'Unassigned' : ($demographics['agents'][$id] ?? 'Deleted user');
-        $breakdown = function (string $heading, callable $labelOf, ?int $limit = null) use ($demographics, $rate): array {
-            $totals = [];
-            foreach ($demographics['rows'] as $row) {
-                $label = $labelOf($row);
-                $totals[$label] ??= ['records' => 0, 'possible' => 0, 'qualified' => 0, 'forwarded' => 0];
-                foreach (array_keys($totals[$label]) as $metric) {
-                    $totals[$label][$metric] += $row[$metric];
-                }
-            }
-            uasort($totals, fn (array $a, array $b): int => $b['records'] <=> $a['records']);
-            $totals = array_slice($totals, 0, $limit, true);
-
-            return [[$heading, 'Leads', 'Possible leads', 'Qualified leads', 'Forwarded', 'Possible lead rate'], ...array_map(
-                fn (string|int $label, array $total): array => [(string) $label, $total['records'], $total['possible'], $total['qualified'], $total['forwarded'], $rate($this->rate($total['possible'], $total['records']))],
-                array_keys($totals), $totals,
-            )];
-        };
-        $sections['Leads by region - selected period'] = $breakdown('Region', fn (array $row): string => $row['region']);
-        $sections['Leads by country - selected period'] = $breakdown('Country', fn (array $row): string => $countryName($row['country']));
-        $sections['Leads by city or capital - selected period (top 50)'] = $breakdown('City', fn (array $row): string => $row['city'].', '.$countryName($row['country']), 50);
+        $breakdown = fn (string $heading, string $dimension, ?int $limit = null): array => [
+            [$heading, 'Leads', 'Possible leads', 'Qualified leads', 'Forwarded', 'Possible lead rate'],
+            ...array_map(
+                fn (array $total): array => [$total['label'], $total['records'], $total['possible'], $total['qualified'], $total['forwarded'], $rate($total['possible_rate'])],
+                $this->demographicBreakdown($data, $dimension, $limit),
+            ),
+        ];
+        $sections['Leads by region - selected period'] = $breakdown('Region', 'region');
+        $sections['Leads by country - selected period'] = $breakdown('Country', 'country');
+        $sections['Leads by city or capital - selected period (top 50)'] = $breakdown('City', 'city', 50);
         if ($data['can_compare_agents']) {
-            $sections['Leads by agent - selected period'] = $breakdown('Agent', fn (array $row): string => $agentName($row['agent_id']));
+            $sections['Leads by agent - selected period'] = $breakdown('Agent', 'agent');
         }
 
         return $sections;
+    }
+
+    /**
+     * Totals the demographic combinations by one dimension, largest first.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  'region'|'country'|'city'|'agent'  $dimension
+     * @return list<array{label: string, records: int, possible: int, qualified: int, forwarded: int, possible_rate: float|null}>
+     */
+    public function demographicBreakdown(array $data, string $dimension, ?int $limit = null): array
+    {
+        $demographics = $data['demographics'];
+        $countryName = fn (string $code): string => CountryRegions::COUNTRIES[$code]['name'] ?? $code;
+        $labelOf = match ($dimension) {
+            'region' => fn (array $row): string => $row['region'],
+            'country' => fn (array $row): string => $countryName($row['country']),
+            'city' => fn (array $row): string => $row['city'].', '.$countryName($row['country']),
+            'agent' => fn (array $row): string => $row['agent_id'] === null ? 'Unassigned' : ($demographics['agents'][$row['agent_id']] ?? 'Deleted user'),
+        };
+
+        $totals = [];
+        foreach ($demographics['rows'] as $row) {
+            $label = $labelOf($row);
+            $totals[$label] ??= ['records' => 0, 'possible' => 0, 'qualified' => 0, 'forwarded' => 0];
+            foreach (array_keys($totals[$label]) as $metric) {
+                $totals[$label][$metric] += $row[$metric];
+            }
+        }
+        uasort($totals, fn (array $a, array $b): int => $b['records'] <=> $a['records']);
+
+        return array_map(
+            fn (string|int $label, array $total): array => ['label' => (string) $label, ...$total, 'possible_rate' => $this->rate($total['possible'], $total['records'])],
+            array_keys(array_slice($totals, 0, $limit, true)),
+            array_slice($totals, 0, $limit, true),
+        );
     }
 
     /**

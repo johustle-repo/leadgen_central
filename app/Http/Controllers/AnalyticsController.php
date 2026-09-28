@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Http\Requests\AnalyticsRequest;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\AnalyticsPdfReport;
 use App\Services\AnalyticsReport;
 use App\Services\CsvCellSanitizer;
 use App\Services\DatabaseIntelligenceReport;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as PdfDocument;
 use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -83,13 +85,37 @@ class AnalyticsController extends Controller
         }, "Analytics-Report-{$data['filters']['date_from']}-to-{$data['filters']['date_to']}.csv", ['Content-Type' => 'text/csv']);
     }
 
-    public function exportPdf(AnalyticsRequest $request, AnalyticsReport $analytics): HttpResponse
+    public function exportPdf(AnalyticsRequest $request, AnalyticsReport $analytics, AnalyticsPdfReport $pdfReport): HttpResponse
     {
         [$user, $data] = $this->reportData($request, $analytics);
         $this->logExport($request, $user, 'analytics.exported_pdf', 'Downloaded an analytics PDF report.', $data['filters']);
 
-        return Pdf::loadView('reports.analytics', ['data' => $data, 'canViewReplies' => $user->isSuperAdministrator()])
-            ->download("Analytics-Report-{$data['filters']['date_from']}-to-{$data['filters']['date_to']}.pdf");
+        $pdf = Pdf::loadView('reports.analytics', [
+            'data' => $data,
+            'pdf' => $pdfReport->for($data),
+            'canViewReplies' => $user->isSuperAdministrator(),
+            'scope' => $user->canViewAllLeads() ? 'All records' : 'Your records only',
+            'generatedBy' => $user->name,
+        ])->setPaper('a4');
+        $this->stampPageNumbers($pdf);
+
+        return $pdf->download("Analytics-Report-{$data['filters']['date_from']}-to-{$data['filters']['date_to']}.pdf");
+    }
+
+    /**
+     * Writes "Page X of Y" in the footer's right corner once the total is known,
+     * which CSS page counters in Dompdf cannot provide.
+     */
+    private function stampPageNumbers(PdfDocument $pdf): void
+    {
+        $pdf->render();
+        $dompdf = $pdf->getDomPDF();
+        $canvas = $dompdf->getCanvas();
+        $font = $dompdf->getFontMetrics()->getFont('Helvetica');
+        $label = 'Page {PAGE_NUM} of {PAGE_COUNT}';
+        $width = $dompdf->getFontMetrics()->getTextWidth('Page 00 of 00', $font, 6);
+
+        $canvas->page_text($canvas->get_width() - 28.5 - $width, $canvas->get_height() - 27.5, $label, $font, 6, [0.58, 0.64, 0.72]);
     }
 
     /** @return array{0: User, 1: array<string, mixed>} */
