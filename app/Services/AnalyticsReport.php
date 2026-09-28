@@ -33,7 +33,7 @@ class AnalyticsReport
         $scope = $user->canViewAllLeads() ? "role:{$user->role->value}" : "agent:{$user->id}";
         $cacheKey = ReportCache::key('analytics-report', $scope, $filters);
 
-        return Cache::remember($cacheKey, now()->addMinutes(5), fn (): array => $this->build($user, $filters));
+        return Cache::remember($cacheKey, ReportCache::ttl(), fn (): array => $this->build($user, $filters));
     }
 
     /**

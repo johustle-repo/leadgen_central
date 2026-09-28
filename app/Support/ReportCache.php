@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -28,7 +29,17 @@ class ReportCache
     {
         ksort($filters);
 
-        return "{$report}:".self::version().":{$scope}:".md5(serialize($filters));
+        return "{$report}:".self::version().":{$scope}:".now()->toDateString().':'.md5(serialize($filters));
+    }
+
+    /**
+     * How long a report stays cached. Any data change already invalidates it
+     * and the key changes daily, so this only bounds how long an unused entry
+     * lingers in the cache store.
+     */
+    public static function ttl(): CarbonInterface
+    {
+        return now()->addHours(12);
     }
 
     /**

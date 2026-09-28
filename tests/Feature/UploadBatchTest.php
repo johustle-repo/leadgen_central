@@ -143,6 +143,25 @@ it('lists the batches behind a lead report quality figure', function (string $ou
     'no matching rows' => ['errors', [['accepted', null]], false],
 ]);
 
+it('skips the upload totals when the progress poll reloads only the batch list', function () {
+    $administrator = User::factory()->administrator()->create();
+    UploadBatch::factory()->count(2)->create();
+    $queries = [];
+    DB::listen(function (QueryExecuted $query) use (&$queries) {
+        $queries[] = $query->sql;
+    });
+
+    $this->actingAs($administrator)->get(route('uploads.index'), [
+        'X-Inertia-Partial-Component' => 'uploads/index',
+        'X-Inertia-Partial-Data' => 'batches',
+    ])->assertInertia(fn (Assert $page) => $page
+        ->has('batches.data', 2)
+        ->missing('summary')
+        ->missing('statusCounts'));
+
+    expect(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'SUM(total_rows)') || str_contains($sql, 'group by "processing_status"')))->toBeEmpty();
+});
+
 it('rejects an unknown report row outcome for upload history', function () {
     $this->actingAs(User::factory()->administrator()->create())
         ->get(route('uploads.index', ['row_outcome' => 'everything']))

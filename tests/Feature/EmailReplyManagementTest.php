@@ -4,6 +4,8 @@ use App\Models\EmailReply;
 use App\Models\GmailConnection;
 use App\Models\Lead;
 use App\Models\User;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('blocks agents, administrators, and sub-administrators from the email replies inbox', function (?string $factoryState) {
@@ -192,4 +194,22 @@ it('renders a retained reply after its lead is deleted', function () {
         ->component('email-replies/index')
         ->where('replies.data.0.id', $reply->id)
         ->where('replies.data.0.lead', null));
+});
+
+it('skips the gmail connection list when the inbox poll reloads only replies and totals', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    User::factory()->create();
+    $queries = [];
+    DB::listen(function (QueryExecuted $query) use (&$queries) {
+        $queries[] = $query->sql;
+    });
+
+    $this->actingAs($superAdministrator)->get(route('email-replies.index'), [
+        'X-Inertia-Partial-Component' => 'email-replies/index',
+        'X-Inertia-Partial-Data' => 'replies,summary',
+    ])->assertInertia(fn (Assert $page) => $page
+        ->has('summary')
+        ->missing('agentGmailConnections'));
+
+    expect(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'gmail_connections')))->toBeEmpty();
 });

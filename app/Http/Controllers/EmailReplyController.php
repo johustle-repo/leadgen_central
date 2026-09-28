@@ -63,7 +63,8 @@ class EmailReplyController extends Controller
                 'possible' => (clone $authorizedReplies)->whereIn('classification', ['interested', 'possible_lead'])->count(),
                 'needs_review' => (clone $authorizedReplies)->where('classification', 'needs_review')->count(),
             ],
-            'agentGmailConnections' => User::query()
+            // Lazy: the page's poll reloads only replies and summary.
+            'agentGmailConnections' => fn () => User::query()
                 ->where('role', UserRole::Agent)
                 ->where('status', AccountStatus::Active)
                 ->with(['gmailConnections' => fn ($query) => $query->latest('id')->limit(1)])
@@ -74,7 +75,8 @@ class EmailReplyController extends Controller
                     'name' => $agent->name,
                     'role' => $agent->role->value,
                     'connection' => $agent->gmailConnections->first()?->only(['id', 'gmail_address', 'status', 'last_synced_at', 'last_error']),
-                ]),
+                ])
+                ->all(),
         ]);
     }
 

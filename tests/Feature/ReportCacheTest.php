@@ -89,3 +89,17 @@ it('tells an open report page when its data has changed', function () {
 it('keeps the report version behind sign-in', function () {
     $this->getJson(route('report.version'))->assertUnauthorized();
 });
+
+it('keeps an unchanged report cached past five minutes but rebuilds it on a new day', function () {
+    Lead::factory()->create();
+    ($this->report)();
+
+    $this->travel(2)->hours();
+    DB::enableQueryLog();
+    ($this->report)();
+    expect(DB::getQueryLog())->toBeEmpty();
+
+    $this->travelTo('2026-09-29 09:00:00');
+    ($this->report)();
+    expect(DB::getQueryLog())->not->toBeEmpty();
+});

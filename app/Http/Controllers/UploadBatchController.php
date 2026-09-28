@@ -21,6 +21,7 @@ use App\UploadRowStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -88,8 +89,9 @@ class UploadBatchController extends Controller
         // search filters; the status tab only narrows the list below them.
         // select() replaces the list's upload_batches.* columns: MySQL rejects
         // plain columns mixed with aggregates when there is no GROUP BY.
-        $summary = (clone $query)->toBase()->reorder()->select(DB::raw('COUNT(*) as uploads, COALESCE(SUM(total_rows), 0) as rows_total, COALESCE(SUM(accepted_rows), 0) as accepted, COALESCE(SUM(duplicate_rows), 0) as duplicates, COALESCE(SUM(rejected_rows), 0) as rejected, COALESCE(SUM(error_rows), 0) as errors'))->first();
-        $statusCounts = (clone $query)->toBase()->reorder()->select('processing_status', DB::raw('COUNT(*) as aggregate'))->groupBy('processing_status')->pluck('aggregate', 'processing_status');
+        $summaryQuery = (clone $query)->toBase()->reorder();
+        $summary = fn (): object => (clone $summaryQuery)->select(DB::raw('COUNT(*) as uploads, COALESCE(SUM(total_rows), 0) as rows_total, COALESCE(SUM(accepted_rows), 0) as accepted, COALESCE(SUM(duplicate_rows), 0) as duplicates, COALESCE(SUM(rejected_rows), 0) as rejected, COALESCE(SUM(error_rows), 0) as errors'))->first();
+        $statusCounts = fn (): Collection => (clone $summaryQuery)->select('processing_status', DB::raw('COUNT(*) as aggregate'))->groupBy('processing_status')->pluck('aggregate', 'processing_status');
         $status = $request->string('status')->toString();
         $status = array_key_exists($status, self::STATUS_TABS) ? $status : 'all';
         if ($status !== 'all') {
@@ -103,7 +105,7 @@ class UploadBatchController extends Controller
         }
         $query->orderByDesc('upload_batches.id');
 
-        $deletableTotal = $request->user()->isAdministrator()
+        $deletableTotal = fn (): int => $request->user()->isAdministrator()
             ? UploadBatch::query()->whereIn('processing_status', [UploadBatchStatus::Completed, UploadBatchStatus::Failed])->count()
             : 0;
 
@@ -114,17 +116,26 @@ class UploadBatchController extends Controller
             'batches' => $query->paginate($perPage)->withQueryString(),
             'sort' => $sort,
             'filters' => ['agent_id' => $request->string('agent_id')->toString(), 'per_page' => (string) $perPage, 'status' => $status, 'search' => $search, ...$reportFilters],
-            'summary' => [
-                'uploads' => (int) $summary->uploads,
-                'rows' => (int) $summary->rows_total,
-                'accepted' => (int) $summary->accepted,
-                'duplicates' => (int) $summary->duplicates,
-                'rejected' => (int) $summary->rejected,
-                'errors' => (int) $summary->errors,
-            ],
-            'statusCounts' => collect(self::STATUS_TABS)->map(fn (array $statuses): int => collect($statuses)->sum(fn (string $value): int => (int) ($statusCounts[$value] ?? 0)))->all(),
+            // Lazy: the page's progress poll reloads only 'batches'.
+            'summary' => function () use ($summary): array {
+                $totals = $summary();
+
+                return [
+                    'uploads' => (int) $totals->uploads,
+                    'rows' => (int) $totals->rows_total,
+                    'accepted' => (int) $totals->accepted,
+                    'duplicates' => (int) $totals->duplicates,
+                    'rejected' => (int) $totals->rejected,
+                    'errors' => (int) $totals->errors,
+                ];
+            },
+            'statusCounts' => function () use ($statusCounts): array {
+                $counts = $statusCounts();
+
+                return collect(self::STATUS_TABS)->map(fn (array $statuses): int => collect($statuses)->sum(fn (string $value): int => (int) ($counts[$value] ?? 0)))->all();
+            },
             'deletableTotal' => $deletableTotal,
-            'agents' => $request->user()->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [],
+            'agents' => fn () => $request->user()->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [],
         ]);
     }
 
