@@ -1,7 +1,10 @@
 <?php
 
 use App\Models\Lead;
+use App\Models\UploadBatch;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 it('records a lead saved from the form with a Tendata link and no data source as Tendata', function () {
     $agent = User::factory()->create();
@@ -81,16 +84,44 @@ it('records a hand-entered lead with neither a data source nor a link as Manual'
     expect(Lead::firstOrFail()->data_source)->toBe('Manual');
 });
 
-it('marks only hand-entered leads without a source or link as Manual', function (string $entry, ?string $link, ?string $expected) {
-    $lead = Lead::factory()->create(['source' => $entry, 'data_source' => null, 'source_url' => $link]);
+it('marks any lead without a source or link as Manual, imported or hand-entered', function (string $entry, ?string $source, ?string $link, ?string $expected) {
+    $lead = Lead::factory()->create(['source' => $entry, 'data_source' => $source, 'source_url' => $link]);
 
     expect($lead->refresh()->data_source)->toBe($expected);
 })->with([
-    'hand-entered, no link' => ['manual', null, 'Manual'],
-    'hand-entered, placeholder link' => ['manual', 'N/A', 'Manual'],
-    'hand-entered, other link' => ['manual', 'https://example.com', null],
-    'imported, no link' => ['csv', null, null],
+    'hand-entered, no link' => ['manual', null, null, 'Manual'],
+    'hand-entered, placeholder link' => ['manual', null, 'N/A', 'Manual'],
+    'imported, no link' => ['csv', null, null, 'Manual'],
+    'imported, N/A source and link' => ['csv', 'N/A', 'N/A', 'Manual'],
+    'other link' => ['csv', null, 'https://example.com', null],
+    'chosen source kept' => ['csv', 'Lusha', null, 'Lusha'],
 ]);
+
+it('records an imported row with no source or link as Manual', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent('blank-source.csv', "Company,Email,Sources of Data,Link\nAcme,ada@acme.test,,\n");
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'data_source', 3 => 'source_url',
+    ]]);
+
+    expect(Lead::firstOrFail()->data_source)->toBe('Manual');
+});
+
+it('backfills every lead without a source or link as Manual', function () {
+    $imported = Lead::factory()->create(['source' => 'csv']);
+    $linked = Lead::factory()->create(['source' => 'csv']);
+    Lead::query()->whereKey($imported->id)->update(['data_source' => 'N/A', 'source_url' => 'N/A']);
+    Lead::query()->whereKey($linked->id)->update(['data_source' => 'N/A', 'source_url' => 'https://example.com']);
+
+    (require database_path('migrations/2026_09_28_054957_backfill_manual_data_source_for_leads_without_source_or_link.php'))->up();
+
+    expect($imported->refresh()->data_source)->toBe('Manual')
+        ->and($linked->refresh()->data_source)->toBe('N/A');
+});
 
 it('backfills hand-entered leads without a source or link as Manual', function () {
     $manual = Lead::factory()->create();

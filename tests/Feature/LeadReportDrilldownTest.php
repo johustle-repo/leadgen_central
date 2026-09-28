@@ -41,11 +41,11 @@ it('merges differently stored spellings of a country in the report', function ()
 
 it('lists the leads behind a data source bar, limited to the report period', function () {
     $administrator = User::factory()->administrator()->create();
-    Lead::factory()->create(['company_name' => 'Blank Source', 'data_source' => null, 'source' => 'csv']);
-    Lead::factory()->create(['company_name' => 'Unknown Source', 'data_source' => 'n/a', 'source' => 'csv']);
+    Lead::factory()->create(['company_name' => 'Blank Source', 'data_source' => null, 'source' => 'csv', 'source_url' => 'https://example.com/lead']);
+    Lead::factory()->create(['company_name' => 'Unknown Source', 'data_source' => 'n/a', 'source' => 'csv', 'source_url' => 'https://example.com/lead']);
     Lead::factory()->create(['company_name' => 'Tendata Source', 'data_source' => 'Tendata']);
     Lead::factory()->create(['company_name' => 'Combined Source', 'data_source' => 'Tendata/Lusha']);
-    Lead::factory()->create(['company_name' => 'Old Blank Source', 'data_source' => null, 'source' => 'csv', 'created_at' => '2026-07-01 10:00:00']);
+    Lead::factory()->create(['company_name' => 'Old Blank Source', 'data_source' => null, 'source' => 'csv', 'source_url' => 'https://example.com/lead', 'created_at' => '2026-07-01 10:00:00']);
 
     expect(drilldownCompanies($administrator, ['created_from' => '2026-09-01', 'created_to' => '2026-09-28', 'source_group' => 'Unknown']))
         ->toBe(['Blank Source', 'Unknown Source'])
@@ -110,8 +110,8 @@ it('lists the leads of the owner picked on the demographics tab', function () {
 
 it('keeps an agent drill-down to their own leads and clears the default lead date', function () {
     $agent = User::factory()->create();
-    Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Mine', 'data_source' => null, 'source' => 'csv']);
-    Lead::factory()->create(['company_name' => 'Colleague', 'data_source' => null, 'source' => 'csv']);
+    Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Mine', 'data_source' => null, 'source' => 'csv', 'source_url' => 'https://example.com/lead']);
+    Lead::factory()->create(['company_name' => 'Colleague', 'data_source' => null, 'source' => 'csv', 'source_url' => 'https://example.com/lead']);
 
     $this->actingAs($agent)->get(route('leads.index', ['source_group' => 'Unknown']))
         ->assertInertia(fn (Assert $page) => $page

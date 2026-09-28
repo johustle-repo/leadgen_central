@@ -46,9 +46,9 @@ test('lead-level source distribution buckets known vendors case-insensitively an
     Lead::factory()->for($user, 'agent')->create(['data_source' => 'Apollo']);
     Lead::factory()->for($user, 'agent')->create(['data_source' => 'Tendata/Lusha']);
     Lead::factory()->for($user, 'agent')->create(['data_source' => 'lusha/tendata']);
-    // A blank data_source on a *manually entered* lead is bucketed as "Manual" (the entry
-    // method itself), so this one must come from a non-manual source to land in "Unknown".
-    Lead::factory()->for($user, 'agent')->create(['data_source' => '', 'source' => 'csv']);
+    // A lead with neither a data source nor a link is saved as "Manual", so this one
+    // keeps a (non-Tendata/Lusha) link and a non-manual entry method to land in "Unknown".
+    Lead::factory()->for($user, 'agent')->create(['data_source' => '', 'source' => 'csv', 'source_url' => 'https://example.com/lead']);
 
     $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('databaseReport.distributions.sources', fn ($rows) => collect($rows)->firstWhere('label', 'Tendata')['value'] === 2)

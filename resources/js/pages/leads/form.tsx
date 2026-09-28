@@ -112,6 +112,10 @@ function CompanyField({
     );
 }
 
+/** Placeholder values imports store for a blank field (Lead::isPlaceholder()). */
+const isPlaceholder = (value: string) =>
+    ['', 'n/a', 'na', 'none', 'null', '-'].includes(value.trim().toLowerCase());
+
 /** Mirrors Lead::sourceFromLink() so the form fills the source as you type. */
 const LINK_SOURCES = { tendata: 'Tendata', lusha: 'Lusha' } as const;
 const sourceFromLink = (url: string): string | undefined =>
@@ -134,8 +138,10 @@ function DataSourceSelect({
     onValueChange?: (value: string) => void;
 }) {
     // An explicit pick wins; otherwise the saved value, then the suggestion.
+    // A saved placeholder such as "N/A" counts as no source.
     const [chosen, setChosen] = useState<string | null>(null);
-    const value = chosen ?? (defaultValue || suggested || NO_DATA_SOURCE);
+    const saved = isPlaceholder(defaultValue) ? '' : defaultValue;
+    const value = chosen ?? (saved || suggested || NO_DATA_SOURCE);
 
     const handleValueChange = (next: string) => {
         setChosen(next);
@@ -250,11 +256,9 @@ export default function LeadForm({
         ),
     );
     // Mirrors Lead::fillDerivedFields(): a Tendata/Lusha link names the
-    // source, and a hand-entered lead without a link is Manual.
-    const isManualEntry = String(lead?.source ?? 'manual') === 'manual';
+    // source, and a lead without a link (blank or "N/A") is Manual.
     const suggestSource = (link: string) =>
-        sourceFromLink(link) ??
-        (isManualEntry && link.trim() === '' ? 'Manual' : undefined);
+        sourceFromLink(link) ?? (isPlaceholder(link) ? 'Manual' : undefined);
     const [suggestedSource, setSuggestedSource] = useState<string | undefined>(
         () => suggestSource(defaultFor('source_url')),
     );
