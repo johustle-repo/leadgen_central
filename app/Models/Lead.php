@@ -59,16 +59,30 @@ class Lead extends Model
     /**
      * Applied on every save, whatever created or edited the lead: a missing
      * LinkedIn stays blank instead of a placeholder, and a lead with no data
-     * source but a Tendata or Lusha link is recorded as sourced from that site.
+     * source takes it from its Tendata or Lusha link, or is Manual when a
+     * hand-entered lead has no link either.
+     *
+     * Only fields loaded on this instance are considered, so saving a lead
+     * fetched with a partial column list never blanks the columns it skipped.
      */
     private function fillDerivedFields(): void
     {
-        if ($this->isPlaceholder($this->linkedin_url)) {
+        $loaded = fn (string ...$keys): bool => ! $this->exists || array_diff($keys, array_keys($this->getAttributes())) === [];
+
+        if ($loaded('linkedin_url') && $this->linkedin_url !== null && $this->isPlaceholder($this->linkedin_url)) {
             $this->linkedin_url = null;
         }
 
-        if ($this->isPlaceholder($this->data_source)) {
-            $this->data_source = self::sourceFromLink($this->source_url) ?? $this->data_source;
+        if (! $loaded('data_source', 'source_url') || ! $this->isPlaceholder($this->data_source)) {
+            return;
+        }
+
+        $derived = self::sourceFromLink($this->source_url);
+        if ($derived === null && $this->isPlaceholder($this->source_url) && $loaded('source') && $this->source === LeadSource::Manual) {
+            $derived = 'Manual';
+        }
+        if ($derived !== null) {
+            $this->data_source = $derived;
         }
     }
 
