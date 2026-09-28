@@ -32,13 +32,13 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     return (
         <div className="flex flex-col gap-6 bg-muted/40 p-4 md:p-6">
             <header className="accent-banner flex items-center gap-4 rounded-xl px-5 py-4 shadow-xs">
-                <Avatar className="size-12 shrink-0 overflow-hidden rounded-full ring-2 ring-primary-foreground/40">
+                <Avatar className="size-12 shrink-0 overflow-hidden rounded-full ring-2 ring-white/40">
                     <AvatarImage
                         src={auth.user.avatar ?? undefined}
                         alt=""
                         className="object-cover"
                     />
-                    <AvatarFallback className="bg-primary-foreground/15 font-semibold">
+                    <AvatarFallback className="bg-white/15 font-semibold">
                         {getInitials(auth.user.name)}
                     </AvatarFallback>
                 </Avatar>

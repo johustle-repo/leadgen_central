@@ -295,7 +295,8 @@
             var(--primary) 0%,
             oklch(0.7 0.15 calc(var(--accent-h) + 35)) 100%
         );
-        color: var(--primary-foreground);
+        color: oklch(1 0 0);
+        text-shadow: 0 1px 2px oklch(0 0 0 / 0.18);
     }
 
     .accent-banner::before,
