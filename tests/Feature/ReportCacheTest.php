@@ -73,3 +73,19 @@ it('refreshes the report only when a transaction commits', function () {
     DB::transaction(fn () => Lead::factory()->create());
     expect(ReportCache::key('dashboard-report', 'test', []))->not->toBe($keyBefore);
 });
+
+it('tells an open report page when its data has changed', function () {
+    $page = $this->actingAs($this->administrator)->get(route('report.index'));
+    $rendered = $page->inertiaProps('reportVersion');
+
+    expect($this->getJson(route('report.version'))->assertOk()->json('version'))->toBe($rendered);
+
+    Lead::factory()->create();
+
+    expect($this->getJson(route('report.version'))->json('version'))->not->toBe($rendered)
+        ->and($this->get(route('dashboard'))->inertiaProps('reportVersion'))->toBe($this->getJson(route('report.version'))->json('version'));
+});
+
+it('keeps the report version behind sign-in', function () {
+    $this->getJson(route('report.version'))->assertUnauthorized();
+});

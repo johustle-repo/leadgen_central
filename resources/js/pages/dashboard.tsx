@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Building2,
     Database,
@@ -29,6 +29,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useReportRefresh } from '@/hooks/use-report-refresh';
 import { leadDrilldownUrl } from '@/lib/lead-drilldown';
 import { dashboard } from '@/routes';
 import { edit as leadEdit, index as leadsIndex } from '@/routes/leads';
@@ -48,6 +49,7 @@ type Props = {
         created_at: string;
         agent: { name: string } | null;
     }>;
+    reportVersion: string;
 };
 
 const PERIODS = {
@@ -72,6 +74,7 @@ export default function Dashboard({
     filters,
     databaseAnalytics: data,
     recentLeads,
+    reportVersion,
 }: Props) {
     const { auth, errors } = usePage<{
         auth: Auth;
@@ -80,10 +83,7 @@ export default function Dashboard({
     const [selectedPeriod, setSelectedPeriod] = useState(period);
     const [granularity, setGranularity] = useState(data.growth.granularity);
     const [processing, setProcessing] = useState(false);
-    // Reports rebuild as soon as leads or uploads change (see ReportCache), so
-    // an open report picks up edits made elsewhere; unchanged data is served
-    // from cache.
-    usePoll(30000);
+    useReportRefresh(reportVersion);
     const isCustom = selectedPeriod === 'custom';
     const selectedLabel = `${filters.date_from} – ${filters.date_to}`;
     const previousLabel = `${data.previous_period.from} – ${data.previous_period.to}`;

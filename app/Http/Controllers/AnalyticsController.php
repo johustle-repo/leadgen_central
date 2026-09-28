@@ -9,8 +9,10 @@ use App\Services\AnalyticsPdfReport;
 use App\Services\AnalyticsReport;
 use App\Services\CsvCellSanitizer;
 use App\Services\DatabaseIntelligenceReport;
+use App\Support\ReportCache;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as PdfDocument;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,7 +25,18 @@ class AnalyticsController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
-        return Inertia::render('analytics/index', $analytics->for($user, $request->validated()));
+        $version = ReportCache::version();
+
+        return Inertia::render('analytics/index', [...$analytics->for($user, $request->validated()), 'reportVersion' => $version]);
+    }
+
+    /**
+     * The current report data version, polled by open report pages so they
+     * reload as soon as leads or uploads change.
+     */
+    public function version(): JsonResponse
+    {
+        return response()->json(['version' => ReportCache::version()]);
     }
 
     public function export(AnalyticsRequest $request, AnalyticsReport $analytics, CsvCellSanitizer $csv): StreamedResponse

@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Building2,
@@ -45,6 +45,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useReportRefresh } from '@/hooks/use-report-refresh';
 import { leadDrilldownUrl, uploadDrilldownUrl } from '@/lib/lead-drilldown';
 import {
     exportMethod as reportExport,
@@ -59,6 +60,7 @@ type Props = {
     filters: { date_from: string; date_to: string };
     databaseReport: DatabaseReport;
     uploadTimingHeatmap: { day: string; hours: number[] }[];
+    reportVersion: string;
 };
 type Tab = 'overview' | 'demographics' | 'quality' | 'agents';
 
@@ -172,6 +174,7 @@ export default function Analytics({
     filters,
     databaseReport: data,
     uploadTimingHeatmap,
+    reportVersion,
 }: Props) {
     const { auth, errors } = usePage<{
         auth: Auth;
@@ -181,10 +184,7 @@ export default function Analytics({
     const [granularity, setGranularity] = useState(data.growth.granularity);
     const [mode, setMode] = useState<'count' | 'rate'>('count');
     const [processing, setProcessing] = useState(false);
-    // Reports rebuild as soon as leads or uploads change (see ReportCache), so
-    // an open report picks up edits made elsewhere; unchanged data is served
-    // from cache.
-    usePoll(30000);
+    useReportRefresh(reportVersion);
     const [tab, setTab] = useState<Tab>(initialTab);
     const selected = `${filters.date_from} – ${filters.date_to}`;
     const quality = data.quality;

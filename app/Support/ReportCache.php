@@ -27,9 +27,17 @@ class ReportCache
     public static function key(string $report, string $scope, array $filters): string
     {
         ksort($filters);
-        $version = Cache::rememberForever(self::VERSION_KEY, fn (): string => (string) Str::uuid());
 
-        return "{$report}:{$version}:{$scope}:".md5(serialize($filters));
+        return "{$report}:".self::version().":{$scope}:".md5(serialize($filters));
+    }
+
+    /**
+     * The current report data version; open report pages compare it with the
+     * one they were rendered with to know when to reload.
+     */
+    public static function version(): string
+    {
+        return Cache::rememberForever(self::VERSION_KEY, fn (): string => (string) Str::uuid());
     }
 
     /**
