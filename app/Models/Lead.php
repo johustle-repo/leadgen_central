@@ -29,11 +29,42 @@ class Lead extends Model
 
     protected static function booted(): void
     {
+        static::saving(fn (Lead $lead) => $lead->fillDerivedFields());
+
         static::created(function (Lead $lead): void {
             if ($lead->lead_code === null) {
                 $lead->forceFill(['lead_code' => sprintf('LD-%s-%06d', $lead->created_at->format('Y'), $lead->id)])->saveQuietly();
             }
         });
+    }
+
+    /**
+     * Whether a link points at Tendata (e.g. bizr.tendata.cn).
+     */
+    public static function isTendataLink(?string $url): bool
+    {
+        return $url !== null && preg_match('~(^|[/.@])tendata\.[a-z]{2,}~i', trim($url)) === 1;
+    }
+
+    /**
+     * Applied on every save, whatever created or edited the lead: a missing
+     * LinkedIn stays blank instead of a placeholder, and a lead with no data
+     * source but a Tendata link is recorded as sourced from Tendata.
+     */
+    private function fillDerivedFields(): void
+    {
+        if ($this->isPlaceholder($this->linkedin_url)) {
+            $this->linkedin_url = null;
+        }
+
+        if ($this->isPlaceholder($this->data_source) && self::isTendataLink($this->source_url)) {
+            $this->data_source = 'Tendata';
+        }
+    }
+
+    private function isPlaceholder(?string $value): bool
+    {
+        return $value === null || in_array(mb_strtolower(trim($value)), ['', 'n/a', 'na', 'none', 'null', '-'], true);
     }
 
     protected function casts(): array

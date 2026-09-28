@@ -112,21 +112,30 @@ function CompanyField({
     );
 }
 
+/** Mirrors Lead::isTendataLink() so the form fills the source as you type. */
+const isTendataLink = (url: string) =>
+    /(^|[/.@])tendata\.[a-z]{2,}/i.test(url.trim());
+
 function DataSourceSelect({
     id,
     name,
     defaultValue,
+    suggested,
     onValueChange,
 }: {
     id: string;
     name: string;
     defaultValue: string;
+    /** Source implied by the Link field, applied only while none is chosen. */
+    suggested?: string;
     onValueChange?: (value: string) => void;
 }) {
-    const [value, setValue] = useState(defaultValue || NO_DATA_SOURCE);
+    // An explicit pick wins; otherwise the saved value, then the suggestion.
+    const [chosen, setChosen] = useState<string | null>(null);
+    const value = chosen ?? (defaultValue || suggested || NO_DATA_SOURCE);
 
     const handleValueChange = (next: string) => {
-        setValue(next);
+        setChosen(next);
         onValueChange?.(next === NO_DATA_SOURCE ? '' : next);
     };
 
@@ -236,6 +245,9 @@ export default function LeadForm({
                 agents[0]?.id ??
                 '',
         ),
+    );
+    const [suggestedSource, setSuggestedSource] = useState<string | undefined>(
+        () => (isTendataLink(defaultFor('source_url')) ? 'Tendata' : undefined),
     );
     const autosaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
         undefined,
@@ -426,6 +438,9 @@ export default function LeadForm({
                                                             id={field.name}
                                                             name={field.name}
                                                             defaultValue={value}
+                                                            suggested={
+                                                                suggestedSource
+                                                            }
                                                             onValueChange={(
                                                                 next,
                                                             ) =>
@@ -471,6 +486,21 @@ export default function LeadForm({
                                                                                       .value,
                                                                               );
                                                                       }
+                                                                    : undefined
+                                                            }
+                                                            onChange={
+                                                                field.name ===
+                                                                'source_url'
+                                                                    ? (event) =>
+                                                                          setSuggestedSource(
+                                                                              isTendataLink(
+                                                                                  event
+                                                                                      .target
+                                                                                      .value,
+                                                                              )
+                                                                                  ? 'Tendata'
+                                                                                  : undefined,
+                                                                          )
                                                                     : undefined
                                                             }
                                                             className="mt-2"

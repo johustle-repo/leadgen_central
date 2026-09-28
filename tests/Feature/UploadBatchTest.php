@@ -280,7 +280,7 @@ it('accepts a lead when the CSV is missing some of the default template columns'
     // The recognized standard columns are Date, Company, Website, First Name, Email,
     // Country, City, Import Trades, LinkedIn, Sources of Data, and Source Link - but a
     // CSV missing some of those entirely must still process: the missing fields are
-    // filled with "N/A" (or "0" for Import Trades) rather than rejecting the row.
+    // filled with "N/A" ("0" for Import Trades, blank for LinkedIn) rather than rejecting the row.
     Storage::fake('local');
     $agent = User::factory()->create();
     $file = UploadedFile::fake()->createWithContent('minimal.csv', "Company,Email\nAcme,ada@acme.test\n");
@@ -300,10 +300,32 @@ it('accepts a lead when the CSV is missing some of the default template columns'
         'website' => 'N/A',
         'country' => 'N/A',
         'city' => 'N/A',
-        'linkedin_url' => 'N/A',
+        'linkedin_url' => null,
         'source_url' => 'N/A',
         'import_trades' => '0',
     ]);
+});
+
+it('records an imported lead with a Tendata link but no data source as Tendata', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent(
+        'tendata.csv',
+        'Company,Email,Sources of Data,Link
+Acme,ada@acme.test,,https://bizr.tendata.cn/enterprise#/base-info?name=ACME
+Lusha Co,lusha@acme.test,Lusha,https://bizr.tendata.cn/enterprise
+Plain Co,plain@acme.test,,https://example.com
+',
+    );
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'data_source', 3 => 'source_url',
+    ]]);
+
+    expect(Lead::query()->pluck('data_source', 'company_name')->all())
+        ->toBe(['Acme' => 'Tendata', 'Lusha Co' => 'Lusha', 'Plain Co' => 'N/A']);
 });
 
 it('uploads and processes multiple compatible raw files together', function () {
@@ -461,7 +483,7 @@ it('retains a lead whose LinkedIn value is empty or badly formatted', function (
     ]]);
 
     $this->assertDatabaseHas('leads', ['company_name' => 'Acme', 'email' => 'ada@acme.test', 'linkedin_url' => 'not-a-valid-url']);
-    $this->assertDatabaseHas('leads', ['company_name' => 'Other Co', 'email' => 'other@acme.test', 'linkedin_url' => 'N/A']);
+    $this->assertDatabaseHas('leads', ['company_name' => 'Other Co', 'email' => 'other@acme.test', 'linkedin_url' => null]);
     $this->assertDatabaseMissing('upload_rows', ['upload_batch_id' => $batch->id, 'error_category' => 'validation']);
 });
 

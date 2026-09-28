@@ -238,7 +238,9 @@ class UploadBatchProcessor
      */
     private function applyFieldDefaults(array $processed): array
     {
-        foreach (['website', 'contact_person', 'city', 'linkedin_url', 'data_source', 'source_url'] as $field) {
+        // LinkedIn is left blank and data_source may be filled from a Tendata
+        // link; the Lead model handles both when the lead is saved.
+        foreach (['website', 'contact_person', 'city', 'data_source', 'source_url'] as $field) {
             if (blank($processed[$field] ?? null)) {
                 $processed[$field] = 'N/A';
             }
