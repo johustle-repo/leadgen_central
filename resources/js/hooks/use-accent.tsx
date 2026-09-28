@@ -17,7 +17,7 @@ export const ACCENTS = [
 
 export type Accent = (typeof ACCENTS)[number]['value'];
 
-const DEFAULT_ACCENT: Accent = 'ocean';
+const DEFAULT_ACCENT: Accent = 'midnight';
 const listeners = new Set<() => void>();
 let currentAccent: Accent = DEFAULT_ACCENT;
 

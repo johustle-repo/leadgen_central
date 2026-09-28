@@ -21,7 +21,7 @@ class HandleAppearance
     {
         View::share('appearance', $request->cookie('appearance') ?? 'system');
         $accent = $request->cookie('accent');
-        View::share('accent', in_array($accent, self::ACCENTS, true) ? $accent : 'ocean');
+        View::share('accent', in_array($accent, self::ACCENTS, true) ? $accent : 'midnight');
 
         return $next($request);
     }

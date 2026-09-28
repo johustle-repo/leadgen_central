@@ -7,7 +7,7 @@ it('renders the saved accent colour on the page so it applies before scripts loa
 
     $this->actingAs($user)->withUnencryptedCookie('accent', $accent)->get(route('dashboard'))
         ->assertOk()->assertSee('data-accent="'.$accent.'"', false);
-})->with(['violet', 'midnight']);
+})->with(['violet', 'ocean']);
 
 it('falls back to the default accent for a missing or unknown cookie', function (?string $cookie) {
     $user = User::factory()->create();
@@ -16,5 +16,5 @@ it('falls back to the default accent for a missing or unknown cookie', function 
         $request = $request->withUnencryptedCookie('accent', $cookie);
     }
 
-    $request->get(route('dashboard'))->assertOk()->assertSee('data-accent="ocean"', false);
+    $request->get(route('dashboard'))->assertOk()->assertSee('data-accent="midnight"', false);
 })->with(['missing' => [null], 'unknown' => ['"><script>']]);
