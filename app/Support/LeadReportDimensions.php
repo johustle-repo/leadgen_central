@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 class LeadReportDimensions
 {
     /** Canonical data source groups, in report order. */
-    public const SOURCE_GROUPS = ['Tendata', 'Lusha', 'Manual', 'Email', 'Other', 'Unknown'];
+    public const SOURCE_GROUPS = ['Tendata', 'Lusha', 'Tendata & Lusha', 'Manual', 'Email', 'Other', 'Unknown'];
 
     /** Drill-down query keys the lead list accepts from a report, beyond its own status and agent filters. */
     public const DRILLDOWN_KEYS = ['created_from', 'created_to', 'source_group', 'data_source', 'country_group', 'company', 'industry', 'region', 'city', 'agent'];
@@ -53,6 +53,8 @@ class LeadReportDimensions
 
     /**
      * SQL that folds a free-text source column into one of SOURCE_GROUPS.
+     * Combined values naming both providers ("Tendata/Lusha", the lead form's
+     * option, or "Lusha/Tendata" from imports) group as Tendata & Lusha.
      *
      * @param  literal-string  $column
      * @param  literal-string|null  $entryMethod
@@ -64,6 +66,7 @@ class LeadReportDimensions
 
         return "CASE WHEN LOWER(TRIM({$column})) = 'tendata' THEN 'Tendata'
             WHEN LOWER(TRIM({$column})) = 'lusha' THEN 'Lusha'
+            WHEN LOWER({$column}) LIKE '%tendata%' AND LOWER({$column}) LIKE '%lusha%' THEN 'Tendata & Lusha'
             WHEN LOWER(TRIM({$column})) IN ('manual', 'manual entry') THEN 'Manual'
             WHEN LOWER(TRIM({$column})) IN ('email', 'email reply', 'email outreach') THEN 'Email'
             {$manual} WHEN NULLIF(TRIM({$column}), '') IS NULL OR LOWER(TRIM({$column})) IN ('unknown', 'n/a') THEN 'Unknown' ELSE 'Other' END";

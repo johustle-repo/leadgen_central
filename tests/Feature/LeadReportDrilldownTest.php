@@ -44,12 +44,15 @@ it('lists the leads behind a data source bar, limited to the report period', fun
     Lead::factory()->create(['company_name' => 'Blank Source', 'data_source' => null, 'source' => 'csv']);
     Lead::factory()->create(['company_name' => 'Unknown Source', 'data_source' => 'n/a', 'source' => 'csv']);
     Lead::factory()->create(['company_name' => 'Tendata Source', 'data_source' => 'Tendata']);
+    Lead::factory()->create(['company_name' => 'Combined Source', 'data_source' => 'Tendata/Lusha']);
     Lead::factory()->create(['company_name' => 'Old Blank Source', 'data_source' => null, 'source' => 'csv', 'created_at' => '2026-07-01 10:00:00']);
 
     expect(drilldownCompanies($administrator, ['created_from' => '2026-09-01', 'created_to' => '2026-09-28', 'source_group' => 'Unknown']))
         ->toBe(['Blank Source', 'Unknown Source'])
         ->and(drilldownCompanies($administrator, ['created_from' => '2026-09-01', 'created_to' => '2026-09-28', 'source_group' => 'Tendata']))
-        ->toBe(['Tendata Source']);
+        ->toBe(['Tendata Source'])
+        ->and(drilldownCompanies($administrator, ['created_from' => '2026-09-01', 'created_to' => '2026-09-28', 'source_group' => 'Tendata & Lusha']))
+        ->toBe(['Combined Source']);
 });
 
 it('lists every spelling of a country and the leads with no country', function () {

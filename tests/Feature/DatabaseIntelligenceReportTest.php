@@ -44,12 +44,15 @@ test('lead-level source distribution buckets known vendors case-insensitively an
     Lead::factory()->for($user, 'agent')->create(['data_source' => 'Tendata']);
     Lead::factory()->for($user, 'agent')->create(['data_source' => 'tendata']);
     Lead::factory()->for($user, 'agent')->create(['data_source' => 'Apollo']);
+    Lead::factory()->for($user, 'agent')->create(['data_source' => 'Tendata/Lusha']);
+    Lead::factory()->for($user, 'agent')->create(['data_source' => 'lusha/tendata']);
     // A blank data_source on a *manually entered* lead is bucketed as "Manual" (the entry
     // method itself), so this one must come from a non-manual source to land in "Unknown".
     Lead::factory()->for($user, 'agent')->create(['data_source' => '', 'source' => 'csv']);
 
     $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('databaseReport.distributions.sources', fn ($rows) => collect($rows)->firstWhere('label', 'Tendata')['value'] === 2)
+        ->where('databaseReport.distributions.sources', fn ($rows) => collect($rows)->firstWhere('label', 'Tendata & Lusha')['value'] === 2)
         ->where('databaseReport.distributions.sources', fn ($rows) => collect($rows)->firstWhere('label', 'Other')['value'] === 1)
         ->where('databaseReport.distributions.sources', fn ($rows) => collect($rows)->firstWhere('label', 'Unknown')['value'] === 1)
         // Lusha never appears among this agent's leads, so the distribution (unlike the
@@ -62,9 +65,10 @@ test('source quality always lists every known category as a reference row even w
     Lead::factory()->for($user, 'agent')->create(['data_source' => 'Tendata']);
 
     $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->has('databaseReport.source_quality', 6)
+        ->has('databaseReport.source_quality', 7)
         ->where('databaseReport.source_quality', fn ($rows) => collect($rows)->firstWhere('label', 'Tendata')['records'] === 1)
-        ->where('databaseReport.source_quality', fn ($rows) => collect($rows)->firstWhere('label', 'Lusha')['records'] === 0));
+        ->where('databaseReport.source_quality', fn ($rows) => collect($rows)->firstWhere('label', 'Lusha')['records'] === 0)
+        ->where('databaseReport.source_quality', fn ($rows) => collect($rows)->firstWhere('label', 'Tendata & Lusha')['records'] === 0));
 });
 
 test('source quality buckets upload row outcomes from the processed-data snapshot, separate from the current lead source', function () {
