@@ -52,7 +52,7 @@ class DatabaseIntelligenceReport
             ->where('leads.created_at', '>=', $from)->where('leads.created_at', '<', $until);
         $batches = UploadBatch::query()->when(! $user->canViewAllLeads(), fn (Builder $query) => $query->whereBelongsTo($user))
             ->where('created_at', '>=', $from)->where('created_at', '<', $until);
-        $rows = UploadRow::query()->whereIn('upload_batch_id', (clone $batches)->select('id'))->toBase();
+        $rows = UploadRow::query()->whereIn('upload_rows.upload_batch_id', (clone $batches)->select('id'))->toBase();
         $companyGroups = (clone $leads)->whereRaw(self::COMPANY.' IS NOT NULL')
             ->selectRaw(self::COMPANY.' as company, COUNT(*) as contacts')->groupBy('company')->toBase();
         $companySummary = DB::query()->fromSub($companyGroups, 'companies')->selectRaw('COUNT(*) as companies, COALESCE(SUM(contacts), 0) as contacts, COUNT(CASE WHEN contacts = 1 THEN 1 END) as single_contact, COUNT(CASE WHEN contacts > 1 THEN 1 END) as multiple_contacts')->first();
@@ -65,9 +65,19 @@ class DatabaseIntelligenceReport
         $source = LeadReportDimensions::sourceExpression('data_source', 'source');
         $sourceCounts = (clone $leads)->selectRaw("{$source} as label, COUNT(*) as records")->groupBy('label')->toBase()->get()->keyBy('label');
         $sqlite = DB::connection()->getDriverName() === 'sqlite';
-        $snapshot = $sqlite ? "json_extract(processed_data, '$.data_source')" : "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(processed_data, '$.data_source')), 'null')";
-        $rowSource = LeadReportDimensions::sourceExpression($snapshot);
-        $sourceQuality = $this->rowMetrics($rows)->selectRaw("{$rowSource} as label")->groupBy('label')->get()->keyBy('label');
+        $snapshotSource = $sqlite ? "json_extract(upload_rows.processed_data, '$.data_source')" : "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(upload_rows.processed_data, '$.data_source')), 'null')";
+        $snapshotLink = $sqlite ? "json_extract(upload_rows.processed_data, '$.source_url')" : "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(upload_rows.processed_data, '$.source_url')), 'null')";
+        // An import row's source is what its CSV row said, else its link's
+        // provider, else the current source of the lead it created or matched,
+        // so rows from files without a source column count under the same
+        // source as their leads instead of all landing in Unknown.
+        $rowSource = LeadReportDimensions::sourceExpression("(CASE
+            WHEN LOWER(TRIM(COALESCE({$snapshotSource}, ''))) NOT IN ('', 'n/a', 'na', 'none', 'null', '-', 'unknown') THEN {$snapshotSource}
+            WHEN LOWER({$snapshotLink}) LIKE '%tendata.%' THEN 'Tendata'
+            WHEN LOWER({$snapshotLink}) LIKE '%lusha.%' THEN 'Lusha'
+            ELSE row_leads.data_source END)");
+        $sourceQuality = $this->rowMetrics((clone $rows)->leftJoin('leads as row_leads', 'row_leads.id', '=', 'upload_rows.lead_id'))
+            ->selectRaw("{$rowSource} as label")->groupBy('label')->get()->keyBy('label');
         $data['source_quality'] = [];
         $data['distributions']['sources'] = [];
         foreach (LeadReportDimensions::SOURCE_GROUPS as $label) {
@@ -109,7 +119,7 @@ class DatabaseIntelligenceReport
             'Upload quality - selected-period batches' => [['Metric', 'Value'], ['Submitted rows (batch totals)', $quality['submitted_rows']], ['Observed rows', $quality['observed_rows']], ['Processed rows', $quality['processed']], ['Accepted including review', $quality['accepted']], ['Needs review', $quality['needs_review']], ['Duplicates', $quality['duplicates']], ['Rejected', $quality['rejected']], ['Processing errors', $quality['errors']], ['Location issues', $quality['location_issues']], ['Average batch size', $quality['average_batch_size'] ?? 'N/A'], ['Acceptance rate', $rate($quality['accepted_rate'])], ['Duplicate rate', $rate($quality['duplicates_rate'])], ['Rejection rate', $rate($quality['rejected_rate'])], ['Error rate', $rate($quality['errors_rate'])]],
             'Source quality - selected period' => [['Source', 'Records', 'Processed rows', 'Accepted rows', 'Duplicate rate', 'Rejection rate', 'Error rate'], ...array_map(fn (array $row): array => [$row['label'], $row['records'], $row['processed'], $row['accepted'], $rate($row['duplicates_rate']), $rate($row['rejected_rate']), $rate($row['errors_rate'])], $data['source_quality'])],
             'Geographic analysis - selected period' => [['Country code or label', 'Records'], ...array_map(fn (array $row): array => [$row['country'], $row['records']], $data['geographic_detail']['rows'])],
-            'Metric definitions' => [['Definition'], ['Period metrics exclude soft-deleted leads. Emails are addresses, not verified people. Repeated company names are not automatically duplicates.'], ['Quality categories overlap. Rates exclude pending rows. Source outcomes use import snapshots; missing snapshots are Unknown. Current lead sources and import outcomes are distinct populations.'], ['Data quality rate is accepted rows without recorded issues divided by processed rows. Location flags may be incomplete. Geography preserves historical labels.']],
+            'Metric definitions' => [['Definition'], ['Period metrics exclude soft-deleted leads. Emails are addresses, not verified people. Repeated company names are not automatically duplicates.'], ['Quality categories overlap. Rates exclude pending rows. Import outcomes use the source recorded on each import row, else its link, else the current source of the lead it created or matched; rows with none are Unknown.'], ['Data quality rate is accepted rows without recorded issues divided by processed rows. Location flags may be incomplete. Geography preserves historical labels.']],
         ];
         if ($data['can_compare_agents']) {
             $sections['Database contribution by agent - selected period'] = [['Agent', 'Records', 'Companies', 'Uploads', 'Avg batch', 'Duplicate rate', 'Rejection rate', 'Error rate', 'Quality rate'], ...array_map(fn (array $row): array => [$row['name'], $row['records'], $row['companies'], $row['uploads'], $row['average_batch_size'] ?? 'N/A', $rate($row['duplicates_rate']), $rate($row['rejected_rate']), $rate($row['errors_rate']), $rate($row['clean_rate'])], $data['contribution'])];
