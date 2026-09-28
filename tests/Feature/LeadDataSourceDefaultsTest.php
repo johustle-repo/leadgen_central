@@ -17,7 +17,7 @@ it('records a lead saved from the form with a Tendata link and no data source as
 });
 
 it('fills the data source from a Tendata or Lusha link only when none is recorded', function (?string $source, ?string $link, ?string $expected) {
-    $lead = Lead::factory()->create(['data_source' => $source, 'source_url' => $link]);
+    $lead = Lead::factory()->create(['source' => 'csv', 'data_source' => $source, 'source_url' => $link]);
 
     expect($lead->refresh()->data_source)->toBe($expected);
 })->with([
@@ -29,7 +29,6 @@ it('fills the data source from a Tendata or Lusha link only when none is recorde
     'chosen source kept over lusha link' => ['Tendata', 'https://dashboard.lusha.com/contacts/123', 'Tendata'],
     'other link' => [null, 'https://example.com/tendata-review', null],
     'lusha only in the path' => [null, 'https://example.com/lusha-export', null],
-    'no link' => [null, null, null],
 ]);
 
 it('leaves a missing LinkedIn blank instead of a placeholder', function (?string $linkedin, ?string $expected) {
@@ -66,6 +65,42 @@ it('backfills existing leads with a Lusha link as Lusha', function () {
 
     expect($lusha->refresh()->data_source)->toBe('Lusha')
         ->and($chosen->refresh()->data_source)->toBe('Tendata');
+});
+
+it('records a hand-entered lead with neither a data source nor a link as Manual', function () {
+    $agent = User::factory()->create();
+
+    $this->actingAs($agent)->post(route('leads.store'), [
+        'company_name' => 'Acme Ventures',
+        'contact_person' => 'Ada',
+        'email' => 'hello@acme.test',
+        'data_source' => '',
+        'source_url' => '',
+    ])->assertSessionHasNoErrors();
+
+    expect(Lead::firstOrFail()->data_source)->toBe('Manual');
+});
+
+it('marks only hand-entered leads without a source or link as Manual', function (string $entry, ?string $link, ?string $expected) {
+    $lead = Lead::factory()->create(['source' => $entry, 'data_source' => null, 'source_url' => $link]);
+
+    expect($lead->refresh()->data_source)->toBe($expected);
+})->with([
+    'hand-entered, no link' => ['manual', null, 'Manual'],
+    'hand-entered, placeholder link' => ['manual', 'N/A', 'Manual'],
+    'hand-entered, other link' => ['manual', 'https://example.com', null],
+    'imported, no link' => ['csv', null, null],
+]);
+
+it('backfills hand-entered leads without a source or link as Manual', function () {
+    $manual = Lead::factory()->create();
+    $imported = Lead::factory()->create(['source' => 'csv']);
+    Lead::query()->whereKey([$manual->id, $imported->id])->update(['data_source' => 'N/A', 'source_url' => null]);
+
+    (require database_path('migrations/2026_09_28_054020_backfill_manual_data_source_for_hand_entered_leads.php'))->up();
+
+    expect($manual->refresh()->data_source)->toBe('Manual')
+        ->and($imported->refresh()->data_source)->toBe('N/A');
 });
 
 it('backfills existing leads saved before the rules applied', function () {

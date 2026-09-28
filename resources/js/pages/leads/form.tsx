@@ -249,8 +249,14 @@ export default function LeadForm({
                 '',
         ),
     );
+    // Mirrors Lead::fillDerivedFields(): a Tendata/Lusha link names the
+    // source, and a hand-entered lead without a link is Manual.
+    const isManualEntry = String(lead?.source ?? 'manual') === 'manual';
+    const suggestSource = (link: string) =>
+        sourceFromLink(link) ??
+        (isManualEntry && link.trim() === '' ? 'Manual' : undefined);
     const [suggestedSource, setSuggestedSource] = useState<string | undefined>(
-        () => sourceFromLink(defaultFor('source_url')),
+        () => suggestSource(defaultFor('source_url')),
     );
     const autosaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
         undefined,
@@ -496,7 +502,7 @@ export default function LeadForm({
                                                                 'source_url'
                                                                     ? (event) =>
                                                                           setSuggestedSource(
-                                                                              sourceFromLink(
+                                                                              suggestSource(
                                                                                   event
                                                                                       .target
                                                                                       .value,

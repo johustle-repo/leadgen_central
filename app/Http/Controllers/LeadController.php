@@ -329,7 +329,8 @@ class LeadController extends Controller
     }
 
     /**
-     * Import trades, sources of data, and the link are attributes of the
+     * Import trades, sources of data, the link and the company's location
+     * (address, city, state/province, country) are attributes of the
      * company, not the individual contact, so editing one contact's value
      * keeps every other contact at the same company (for the same agent) in
      * sync instead of requiring the agent to repeat the edit on each one.
@@ -338,7 +339,7 @@ class LeadController extends Controller
      */
     private function syncCompanyWideFields(Request $request, Lead $lead, array $changes): void
     {
-        $syncFields = ['import_trades', 'data_source', 'source_url'];
+        $syncFields = ['import_trades', 'data_source', 'source_url', 'address', 'city', 'state_province', 'country', 'country_code'];
         $syncChanges = array_intersect_key($changes, array_flip($syncFields));
         if ($syncChanges === [] || $lead->normalized_company_name === '') {
             return;

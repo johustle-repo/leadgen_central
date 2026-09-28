@@ -570,8 +570,8 @@ it('propagates import trades, data source, and link to every other contact at th
         'source_url' => 'https://new.example.com',
         'email' => 'sibling@acme.test',
     ]);
-    $this->assertDatabaseHas('leads', ['id' => $otherCompany->id, 'import_trades' => null, 'data_source' => null, 'source_url' => null]);
-    $this->assertDatabaseHas('leads', ['id' => $otherAgentSameCompany->id, 'import_trades' => null, 'data_source' => null, 'source_url' => null]);
+    $this->assertDatabaseHas('leads', ['id' => $otherCompany->id, 'import_trades' => null, 'data_source' => 'Manual', 'source_url' => null]);
+    $this->assertDatabaseHas('leads', ['id' => $otherAgentSameCompany->id, 'import_trades' => null, 'data_source' => 'Manual', 'source_url' => null]);
     $this->assertDatabaseHas('audit_logs', [
         'auditable_type' => 'lead',
         'auditable_id' => $sibling->id,
@@ -579,7 +579,47 @@ it('propagates import trades, data source, and link to every other contact at th
     ]);
 });
 
-it('does not propagate fields other than import trades, data source, and link', function () {
+it('propagates the company location to every other contact at the same company without touching their own details', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create([
+        'company_name' => 'Acme Ventures', 'normalized_company_name' => 'acme ventures',
+        'address' => '1 Old Road', 'city' => 'Austin', 'country_code' => 'US',
+    ]);
+    $sibling = Lead::factory()->for($agent, 'agent')->create([
+        'normalized_company_name' => 'acme ventures', 'email' => 'sibling@acme.test',
+        'address' => '1 Old Road', 'city' => 'Austin', 'country_code' => 'US',
+        'linkedin_url' => 'https://www.linkedin.com/in/sibling', 'import_trades' => 'Scaffolding',
+    ]);
+    $otherCompany = Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'other company', 'city' => 'Austin', 'country_code' => 'US']);
+
+    $this->actingAs($agent)->put(route('leads.update', $lead), [
+        'company_name' => 'Acme Ventures',
+        'address' => '9 New Street',
+        'city' => 'Toronto',
+        'country_code' => 'CA',
+    ])->assertSessionHasNoErrors();
+
+    expect($sibling->refresh()->only(['address', 'city', 'country_code', 'linkedin_url', 'import_trades', 'email']))->toBe([
+        'address' => '9 New Street',
+        'city' => 'Toronto',
+        'country_code' => 'CA',
+        'linkedin_url' => 'https://www.linkedin.com/in/sibling',
+        'import_trades' => 'Scaffolding',
+        'email' => 'sibling@acme.test',
+    ])->and($otherCompany->refresh()->only(['city', 'country_code']))->toBe(['city' => 'Austin', 'country_code' => 'US']);
+});
+
+it('keeps a contact\'s LinkedIn when a company-wide field is synced to it', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Acme Ventures', 'normalized_company_name' => 'acme ventures', 'import_trades' => 'Old']);
+    $sibling = Lead::factory()->for($agent, 'agent')->create(['normalized_company_name' => 'acme ventures', 'linkedin_url' => 'https://www.linkedin.com/in/sibling']);
+
+    $this->actingAs($agent)->put(route('leads.update', $lead), ['company_name' => 'Acme Ventures', 'import_trades' => 'New']);
+
+    expect($sibling->refresh()->only(['import_trades', 'linkedin_url']))->toBe(['import_trades' => 'New', 'linkedin_url' => 'https://www.linkedin.com/in/sibling']);
+});
+
+it('does not propagate contact-level fields such as the website', function () {
     $agent = User::factory()->create();
     $lead = Lead::factory()->for($agent, 'agent')->create([
         'company_name' => 'Acme Ventures', 'normalized_company_name' => 'acme ventures', 'website' => 'https://old.example.com',
