@@ -114,18 +114,23 @@ class DatabaseIntelligenceReport
             $sections['Database contribution by agent - selected period'] = [['Agent', 'Records', 'Companies', 'Uploads', 'Avg batch', 'Duplicate rate', 'Rejection rate', 'Error rate', 'Quality rate'], ...array_map(fn (array $row): array => [$row['name'], $row['records'], $row['companies'], $row['uploads'], $row['average_batch_size'] ?? 'N/A', $rate($row['duplicates_rate']), $rate($row['rejected_rate']), $rate($row['errors_rate']), $rate($row['clean_rate'])], $data['contribution'])];
         }
 
-        $breakdown = fn (string $heading, string $dimension, ?int $limit = null): array => [
-            [$heading, 'Leads', 'Possible leads', 'Qualified leads', 'Forwarded', 'Possible lead rate'],
-            ...array_map(
-                fn (array $total): array => [$total['label'], $total['records'], $total['possible'], $total['qualified'], $total['forwarded'], $rate($total['possible_rate'])],
-                $this->demographicBreakdown($data, $dimension, $limit),
-            ),
+        $breakdowns = [
+            'region' => ['Leads by region - selected period', 'Region', null],
+            'country' => ['Leads by country - selected period', 'Country', null],
+            'city' => ['Leads by city or capital - selected period (top 50)', 'City', 50],
+            'agent' => ['Leads by agent - selected period', 'Agent', null],
         ];
-        $sections['Leads by region - selected period'] = $breakdown('Region', 'region');
-        $sections['Leads by country - selected period'] = $breakdown('Country', 'country');
-        $sections['Leads by city or capital - selected period (top 50)'] = $breakdown('City', 'city', 50);
-        if ($data['can_compare_agents']) {
-            $sections['Leads by agent - selected period'] = $breakdown('Agent', 'agent');
+        foreach ($breakdowns as $dimension => [$title, $heading, $limit]) {
+            if ($dimension === 'agent' && ! $data['can_compare_agents']) {
+                continue;
+            }
+            $sections[$title] = [
+                [$heading, 'Leads', 'Possible leads', 'Qualified leads', 'Forwarded', 'Possible lead rate'],
+                ...array_map(
+                    fn (array $total): array => [$total['label'], $total['records'], $total['possible'], $total['qualified'], $total['forwarded'], $rate($total['possible_rate'])],
+                    $this->demographicBreakdown($data, $dimension, $limit),
+                ),
+            ];
         }
 
         return $sections;

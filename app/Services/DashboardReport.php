@@ -181,9 +181,9 @@ class DashboardReport
             $query->selectRaw("COUNT(DISTINCT {$expression}) as {$key}");
         }
         $overview = $this->numericRow($query->toBase()->first());
-        $countries = array_unique(LeadReportDimensions::resolveCountries(
-            (clone $leads)->selectRaw(self::COUNTRY.' as resolved_country')->distinct()->toBase()->pluck('resolved_country')->all(),
-        ));
+        $countries = array_unique(LeadReportDimensions::resolveCountries(array_values(
+            (clone $leads)->selectRaw(self::COUNTRY.' as resolved_country')->distinct()->toBase()->pluck('resolved_country')->map(fn (mixed $value): ?string => is_string($value) ? $value : null)->all(),
+        )));
         $overview['countries'] = count(array_diff($countries, ['Unknown']));
 
         return $overview;
@@ -200,7 +200,7 @@ class DashboardReport
     private function countryDistribution(Builder $leads, int $total, int $limit = 10): array
     {
         $groups = (clone $leads)->selectRaw(self::COUNTRY.' as resolved_country, COUNT(*) as aggregate')->groupBy('resolved_country')->toBase()->get();
-        $resolved = LeadReportDimensions::resolveCountries($groups->pluck('resolved_country')->all());
+        $resolved = LeadReportDimensions::resolveCountries(array_values($groups->pluck('resolved_country')->map(fn (mixed $value): ?string => is_string($value) ? $value : null)->all()));
         $totals = [];
         foreach ($groups as $group) {
             $country = $resolved[trim((string) $group->resolved_country)];

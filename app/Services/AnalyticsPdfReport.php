@@ -29,10 +29,10 @@ class AnalyticsPdfReport
         $quality = $report['quality'];
         $records = (int) $report['overview']['records'];
 
-        $classification = $this->segments(array_map(
-            fn (array $row): array => ['label' => $this->labelOf($row['label']), 'value' => (int) $row['value']],
+        $classification = $this->segments(array_values(array_map(
+            fn (array $row): array => ['label' => $this->labelOf((string) $row['label']), 'value' => (int) $row['value']],
             $report['distributions']['statuses'],
-        ));
+        )));
         $outcomes = $this->segments([
             ['label' => 'Accepted', 'value' => (int) $quality['accepted'] - (int) $quality['needs_review'], 'color' => '#10b981'],
             ['label' => 'Needs review', 'value' => (int) $quality['needs_review'], 'color' => '#0ea5e9'],
@@ -56,19 +56,19 @@ class AnalyticsPdfReport
             fn (array $row): array => ['label' => $row['label'], 'value' => $row['records']],
             $this->intelligence->demographicBreakdown($report, 'city', 15),
         ), $records);
-        $companies = $this->bars(array_map(
-            fn (array $row): array => ['label' => $row['label'], 'value' => (int) $row['contacts']],
+        $companies = $this->bars(array_values(array_map(
+            fn (array $row): array => ['label' => (string) $row['label'], 'value' => (int) $row['contacts']],
             $report['companies'],
-        ), $records);
-        $agents = $this->bars(array_map(
-            fn (array $row): array => ['label' => $row['name'], 'value' => (int) $row['records']],
+        )), $records);
+        $agents = $this->bars(array_values(array_map(
+            fn (array $row): array => ['label' => (string) $row['name'], 'value' => (int) $row['records']],
             $report['contribution'],
-        ), $records);
+        )), $records);
         $granularity = $report['growth']['granularity'] ?? 'day';
-        $growth = $this->columns(array_map(
-            fn (array $point): array => ['date' => $point['date'], 'value' => (int) $point['records']],
+        $growth = $this->columns(array_values(array_map(
+            fn (array $point): array => ['date' => (string) $point['date'], 'value' => (int) $point['records']],
             $report['growth']['points'],
-        ), $granularity);
+        )), $granularity);
 
         return [
             'kpis' => $this->kpis($report),
@@ -227,7 +227,7 @@ class AnalyticsPdfReport
      */
     private function columns(array $points, string $granularity): array
     {
-        $size = (int) max(1, ceil(count($points) / self::MAX_COLUMNS));
+        $size = max(1, (int) ceil(count($points) / self::MAX_COLUMNS));
         $buckets = array_map(fn (array $chunk): array => [
             'label' => $this->dateLabel($chunk[0]['date'], $granularity),
             'value' => array_sum(array_column($chunk, 'value')),
@@ -265,7 +265,7 @@ class AnalyticsPdfReport
      */
     private function qualityColumns(array $points, string $granularity): array
     {
-        $size = (int) max(1, ceil(count($points) / self::MAX_COLUMNS));
+        $size = max(1, (int) ceil(count($points) / self::MAX_COLUMNS));
         $keys = ['errors' => '#64748b', 'rejected' => '#f43f5e', 'skipped' => '#f59e0b', 'accepted' => '#10b981'];
         $buckets = array_map(function (array $chunk) use ($granularity): array {
             $bucket = ['label' => $this->dateLabel($chunk[0]['date'], $granularity)];
