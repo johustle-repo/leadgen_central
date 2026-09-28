@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\EmailReplyClassification;
+use App\Models\Concerns\FlushesReportCache;
 use Database\Factories\EmailReplyFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,7 @@ use Illuminate\Support\Carbon;
 class EmailReply extends Model
 {
     /** @use HasFactory<EmailReplyFactory> */
-    use HasFactory;
+    use FlushesReportCache, HasFactory;
 
     protected $fillable = ['gmail_connection_id', 'agent_id', 'lead_id', 'gmail_message_id', 'gmail_thread_id', 'sender_name', 'sender_email', 'subject', 'body_preview', 'body_text', 'classification', 'classification_reason', 'is_read', 'received_at'];
 

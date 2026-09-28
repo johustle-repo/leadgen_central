@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\FlushesReportCache;
 use App\UploadBatchStatus;
 use Database\Factories\UploadBatchFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class UploadBatch extends Model
 {
     /** @use HasFactory<UploadBatchFactory> */
-    use HasFactory;
+    use FlushesReportCache, HasFactory;
 
     protected $fillable = ['batch_code', 'user_id', 'original_filename', 'stored_filename', 'file_size', 'total_rows', 'new_leads', 'valid_leads', 'accepted_rows', 'rejected_rows', 'invalid_rows', 'location_error_rows', 'duplicate_rows', 'exact_duplicate_rows', 'possible_duplicate_rows', 'error_rows', 'processing_status', 'headers', 'column_mapping', 'duplicate_handling', 'failure_message', 'started_at', 'completed_at'];
 

@@ -8,6 +8,7 @@ use App\Models\UploadBatch;
 use App\Models\UploadRow;
 use App\Models\User;
 use App\Support\LeadReportDimensions;
+use App\Support\ReportCache;
 use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -39,7 +40,7 @@ class DashboardReport
     {
         ksort($filters);
         $scope = $user->canViewAllLeads() ? "role:{$user->role->value}" : "agent:{$user->id}";
-        $cacheKey = 'dashboard-report:'.$scope.':'.md5(serialize($filters));
+        $cacheKey = ReportCache::key('dashboard-report', $scope, $filters);
 
         return Cache::remember($cacheKey, now()->addMinutes(5), fn (): array => $this->build($user, $filters));
     }

@@ -9,6 +9,7 @@ use App\Models\UploadRow;
 use App\Models\User;
 use App\Support\CountryRegions;
 use App\Support\LeadReportDimensions;
+use App\Support\ReportCache;
 use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,7 +34,7 @@ class DatabaseIntelligenceReport
     {
         ksort($filters);
         $scope = $user->canViewAllLeads() ? "role:{$user->role->value}" : "agent:{$user->id}";
-        $cacheKey = 'report-intelligence:'.$scope.':'.md5(serialize($filters));
+        $cacheKey = ReportCache::key('report-intelligence', $scope, $filters);
 
         return Cache::remember($cacheKey, now()->addMinutes(5), fn (): array => $this->build($user, $filters));
     }

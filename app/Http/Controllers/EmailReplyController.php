@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\EmailReply;
 use App\Models\User;
 use App\Services\EmailReplyTextExtractor;
+use App\Support\ReportCache;
 use App\UserRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -106,6 +107,7 @@ class EmailReplyController extends Controller
             ->when(! $user->canViewAllLeads(), fn ($query) => $query->whereBelongsTo($user, 'agent'))
             ->where('is_read', false)
             ->update(['is_read' => true]);
+        ReportCache::flush();
 
         AuditLog::query()->create([
             'user_id' => $user->id,

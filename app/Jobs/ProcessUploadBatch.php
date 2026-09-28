@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\UploadBatch;
 use App\Services\UploadBatchProcessor;
+use App\Support\ReportCache;
 use App\UploadBatchStatus;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -67,6 +68,7 @@ class ProcessUploadBatch implements ShouldBeUniqueUntilProcessing, ShouldQueue
     public function failed(?Throwable $exception): void
     {
         UploadBatch::query()->whereKey($this->uploadBatchId)->update(['processing_status' => UploadBatchStatus::Failed, 'failure_message' => $exception?->getMessage() ?? 'Unknown processing error.', 'completed_at' => now()]);
+        ReportCache::flush();
         Log::error('Lead upload batch failed.', ['upload_batch_id' => $this->uploadBatchId, 'error' => $exception?->getMessage()]);
     }
 }

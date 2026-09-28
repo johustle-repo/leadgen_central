@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import {
     Building2,
     Database,
@@ -80,6 +80,10 @@ export default function Dashboard({
     const [selectedPeriod, setSelectedPeriod] = useState(period);
     const [granularity, setGranularity] = useState(data.growth.granularity);
     const [processing, setProcessing] = useState(false);
+    // Reports rebuild as soon as leads or uploads change (see ReportCache), so
+    // an open report picks up edits made elsewhere; unchanged data is served
+    // from cache.
+    usePoll(30000);
     const isCustom = selectedPeriod === 'custom';
     const selectedLabel = `${filters.date_from} – ${filters.date_to}`;
     const previousLabel = `${data.previous_period.from} – ${data.previous_period.to}`;

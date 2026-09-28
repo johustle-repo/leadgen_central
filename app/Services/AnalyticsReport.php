@@ -6,6 +6,7 @@ use App\LeadStatus;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\User;
+use App\Support\ReportCache;
 use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,7 +31,7 @@ class AnalyticsReport
     {
         ksort($filters);
         $scope = $user->canViewAllLeads() ? "role:{$user->role->value}" : "agent:{$user->id}";
-        $cacheKey = 'analytics-report:'.$scope.':'.md5(serialize($filters));
+        $cacheKey = ReportCache::key('analytics-report', $scope, $filters);
 
         return Cache::remember($cacheKey, now()->addMinutes(5), fn (): array => $this->build($user, $filters));
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\FlushesReportCache;
 use App\UploadRowStatus;
 use Database\Factories\UploadRowFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class UploadRow extends Model
 {
     /** @use HasFactory<UploadRowFactory> */
-    use HasFactory;
+    use FlushesReportCache, HasFactory;
 
     protected $fillable = ['upload_batch_id', 'row_number', 'raw_data', 'processed_data', 'processing_status', 'error_category', 'error_message', 'lead_id', 'duplicate_match_id'];
 

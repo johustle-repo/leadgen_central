@@ -9,6 +9,7 @@ use App\Models\DuplicateMatch;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\UploadRow;
+use App\Support\ReportCache;
 use App\UploadBatchStatus;
 use App\UploadRowStatus;
 use Illuminate\Support\Facades\Date;
@@ -29,7 +30,16 @@ class UploadBatchProcessor
         private CsvEncodingSanitizer $encoding,
     ) {}
 
+    /**
+     * Imports the batch's rows; the lead reports are refreshed once when it
+     * finishes rather than once per imported row.
+     */
     public function process(UploadBatch $batch): void
+    {
+        ReportCache::deferWhile(fn () => $this->processRows($batch));
+    }
+
+    private function processRows(UploadBatch $batch): void
     {
         $batch->loadMissing('user');
         $batch->update(['processing_status' => UploadBatchStatus::Processing, 'started_at' => now(), 'failure_message' => null]);
