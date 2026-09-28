@@ -1,4 +1,5 @@
 import { index as leadsIndex } from '@/routes/leads';
+import { index as uploadsIndex } from '@/routes/uploads';
 
 /** Report dimensions the lead list can filter by (see LeadReportDimensions). */
 export type LeadDrilldown = {
@@ -9,6 +10,10 @@ export type LeadDrilldown = {
     company?: string;
     industry?: string;
     agent_id?: string;
+    region?: string;
+    city?: string;
+    /** Owner id, or 'none' for unassigned leads. */
+    agent?: string;
 };
 
 /** Labels the lead list shows for an active report filter. */
@@ -20,6 +25,9 @@ export const DRILLDOWN_LABELS: Record<string, string> = {
     company: 'Company',
     industry: 'Industry',
     agent_id: 'Owner',
+    region: 'Region',
+    city: 'City',
+    agent: 'Owner',
 };
 
 /**
@@ -41,6 +49,32 @@ export function leadDrilldownUrl(
             created_to: period.date_to,
             per_page: '50',
             ...criteria,
+        },
+    });
+}
+
+/** Import-row outcomes the Upload History list can filter batches by. */
+export type RowOutcome =
+    | 'accepted'
+    | 'needs_review'
+    | 'duplicates'
+    | 'rejected'
+    | 'errors'
+    | 'location_issues';
+
+/**
+ * Link to the upload batches behind a data quality figure: batches uploaded in
+ * the report period, optionally only those with rows of one outcome.
+ */
+export function uploadDrilldownUrl(
+    period: { date_from: string; date_to: string },
+    rowOutcome?: RowOutcome,
+): string {
+    return uploadsIndex.url({
+        query: {
+            created_from: period.date_from,
+            created_to: period.date_to,
+            row_outcome: rowOutcome,
         },
     });
 }

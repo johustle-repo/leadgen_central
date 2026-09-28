@@ -17,7 +17,7 @@ class LeadReportDimensions
     public const SOURCE_GROUPS = ['Tendata', 'Lusha', 'Manual', 'Email', 'Other', 'Unknown'];
 
     /** Drill-down query keys the lead list accepts from a report, beyond its own status and agent filters. */
-    public const DRILLDOWN_KEYS = ['created_from', 'created_to', 'source_group', 'data_source', 'country_group', 'company', 'industry'];
+    public const DRILLDOWN_KEYS = ['created_from', 'created_to', 'source_group', 'data_source', 'country_group', 'company', 'industry', 'region', 'city', 'agent'];
 
     public const COMPANY = "COALESCE(NULLIF(LOWER(TRIM(leads.normalized_company_name)), ''), NULLIF(LOWER(TRIM(leads.company_name)), ''))";
 
@@ -140,7 +140,15 @@ class LeadReportDimensions
         if (isset($criteria['country_group'])) {
             self::whereCountry($leads, $criteria['country_group']);
         }
-
+        if (isset($criteria['region'])) {
+            self::whereRegion($leads, $criteria['region']);
+        }
+        if (isset($criteria['city'])) {
+            self::whereText($leads, 'leads.city', $criteria['city']);
+        }
+        if (isset($criteria['agent'])) {
+            $criteria['agent'] === 'none' ? $leads->whereNull('leads.agent_id') : $leads->where('leads.agent_id', $criteria['agent']);
+        }
     }
 
     /**
@@ -181,20 +189,61 @@ class LeadReportDimensions
             return;
         }
 
-        $names = [
-            ...array_keys(self::COUNTRY_NAME_ALIASES, $country, true),
-            ...(isset(CountryRegions::COUNTRIES[$country]) ? [mb_strtolower(CountryRegions::COUNTRIES[$country]['name'])] : []),
-            ...Country::query()->where('iso2', $country)->pluck('normalized_name')->map(fn (string $name): string => mb_strtolower($name))->all(),
-        ];
+        [$sql, $bindings] = self::countriesCondition([$country]);
+        $leads->whereRaw($sql, $bindings);
+    }
+
+    /**
+     * Matches the countries of one reference region; Unassigned is every lead
+     * whose country is outside the reference, including leads with none.
+     *
+     * @param  Builder<Lead>  $leads
+     */
+    private static function whereRegion(Builder $leads, string $region): void
+    {
+        $inRegion = fn (array $country): bool => $region === CountryRegions::UNASSIGNED || $country['region'] === $region;
+        [$sql, $bindings] = self::countriesCondition(array_keys(array_filter(CountryRegions::COUNTRIES, $inRegion)));
+
+        $leads->whereRaw($region === CountryRegions::UNASSIGNED ? "NOT {$sql}" : $sql, $bindings);
+    }
+
+    /**
+     * Null-safe SQL matching leads stored under any of the given ISO2 codes,
+     * by code or by any known name (alias, reference or countries table).
+     *
+     * @param  list<string>  $codes
+     * @return array{0: literal-string, 1: list<string>}
+     */
+    private static function countriesCondition(array $codes): array
+    {
+        if ($codes === []) {
+            return ['1 = 0', []];
+        }
+
+        $names = Country::query()->whereIn('iso2', $codes)->pluck('normalized_name')->map(fn (string $name): string => mb_strtolower($name))->all();
+        foreach ($codes as $code) {
+            array_push($names, ...array_keys(self::COUNTRY_NAME_ALIASES, $code, true));
+            if (isset(CountryRegions::COUNTRIES[$code])) {
+                $names[] = mb_strtolower(CountryRegions::COUNTRIES[$code]['name']);
+            }
+        }
         $names = array_values(array_unique($names));
 
-        $leads->where(function (Builder $query) use ($country, $names, $noCode): void {
-            $query->whereRaw('UPPER(TRIM(leads.country_code)) = ?', [$country]);
-            if ($names !== []) {
-                $placeholders = implode(', ', array_fill(0, count($names), '?'));
-                $query->orWhereRaw("LOWER(TRIM(leads.country_code)) IN ({$placeholders})", $names)
-                    ->orWhere(fn (Builder $byName) => $byName->whereRaw($noCode)->whereRaw("LOWER(TRIM(leads.country)) IN ({$placeholders})", $names));
-            }
-        });
+        $sql = "COALESCE(UPPER(TRIM(leads.country_code)), '') IN (".self::placeholders($codes).')';
+        if ($names !== []) {
+            $sql .= " OR COALESCE(LOWER(TRIM(leads.country_code)), '') IN (".self::placeholders($names).')'
+                ." OR (COALESCE(TRIM(leads.country_code), '') = '' AND COALESCE(LOWER(TRIM(leads.country)), '') IN (".self::placeholders($names).'))';
+        }
+
+        return ["({$sql})", [...$codes, ...$names, ...$names]];
+    }
+
+    /**
+     * @param  list<string>  $values
+     * @return literal-string
+     */
+    private static function placeholders(array $values): string
+    {
+        return implode(', ', array_fill(0, count($values), '?'));
     }
 }

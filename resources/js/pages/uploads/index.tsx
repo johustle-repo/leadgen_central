@@ -10,6 +10,7 @@ import {
     SlidersHorizontal,
     Trash2,
     Upload,
+    X,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -100,6 +101,17 @@ const formatUploadedDate = (value: string) =>
         day: '2-digit',
     }).format(new Date(value));
 
+/** Lead Reports quality outcomes (UploadBatchController::ROW_OUTCOMES). */
+const ROW_OUTCOMES = {
+    accepted: { label: 'accepted', rowStatus: undefined },
+    needs_review: { label: 'needs review', rowStatus: 'needs_review' },
+    duplicates: { label: 'duplicate', rowStatus: 'duplicate' },
+    rejected: { label: 'rejected', rowStatus: 'rejected' },
+    errors: { label: 'error', rowStatus: 'error' },
+    location_issues: { label: 'location issue', rowStatus: undefined },
+} as const;
+type RowOutcome = keyof typeof ROW_OUTCOMES;
+
 export default function UploadIndex({
     batches,
     sort,
@@ -119,6 +131,9 @@ export default function UploadIndex({
         per_page: string;
         status: StatusTab;
         search: string;
+        created_from?: string;
+        created_to?: string;
+        row_outcome?: RowOutcome;
     };
     deletableTotal: number;
     agents: Agent[];
@@ -184,6 +199,9 @@ export default function UploadIndex({
                 per_page: filters.per_page,
                 status: filters.status === 'all' ? undefined : filters.status,
                 search: filters.search || undefined,
+                created_from: filters.created_from,
+                created_to: filters.created_to,
+                row_outcome: filters.row_outcome,
                 ...changes,
             },
             { preserveState: true, replace: true },
@@ -290,6 +308,33 @@ export default function UploadIndex({
                         icon={AlertTriangle}
                     />
                 </div>
+                {(filters.created_from || filters.row_outcome) && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                        <span className="font-medium">From report</span>
+                        {filters.row_outcome && (
+                            <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium">
+                                Batches with{' '}
+                                {ROW_OUTCOMES[filters.row_outcome].label} rows
+                            </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                            Uploaded {filters.created_from || '…'} to{' '}
+                            {filters.created_to || '…'}. Open a batch to see
+                            those rows.
+                        </span>
+                        <Button
+                            asChild
+                            size="sm"
+                            variant="ghost"
+                            className="ml-auto"
+                        >
+                            <Link href={index()}>
+                                <X />
+                                Clear report filter
+                            </Link>
+                        </Button>
+                    </div>
+                )}
                 <nav
                     aria-label="Upload status"
                     className="flex gap-1 overflow-x-auto border-b"
@@ -549,7 +594,16 @@ export default function UploadIndex({
                                     )}
                                     <TableCell>
                                         <Link
-                                            href={show(batch.id)}
+                                            href={show(batch.id, {
+                                                query: {
+                                                    status: filters.row_outcome
+                                                        ? ROW_OUTCOMES[
+                                                              filters
+                                                                  .row_outcome
+                                                          ].rowStatus
+                                                        : undefined,
+                                                },
+                                            })}
                                             className="font-medium hover:underline"
                                         >
                                             {batch.original_filename}

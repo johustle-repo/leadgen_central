@@ -120,6 +120,35 @@ it('lets an administrator filter upload history by agent', function () {
             ->where('batches.data.0.id', $wanted->id));
 });
 
+it('lists the batches behind a lead report quality figure', function (string $outcome, array $rows, bool $listed) {
+    $this->travelTo('2026-09-28 12:00:00');
+    $administrator = User::factory()->administrator()->create();
+    $batch = UploadBatch::factory()->create(['original_filename' => 'in-period.csv', 'created_at' => '2026-09-10 09:00:00']);
+    foreach ($rows as $index => [$status, $category]) {
+        UploadRow::factory()->for($batch)->create(['row_number' => $index + 2, 'processing_status' => $status, 'error_category' => $category]);
+    }
+    $outside = UploadBatch::factory()->create(['original_filename' => 'before-period.csv', 'created_at' => '2026-08-01 09:00:00']);
+    UploadRow::factory()->for($outside)->create(['processing_status' => 'rejected']);
+
+    $this->actingAs($administrator)->get(route('uploads.index', ['created_from' => '2026-09-01', 'created_to' => '2026-09-28', 'row_outcome' => $outcome]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.row_outcome', $outcome)
+            ->has('batches.data', $listed ? 1 : 0)
+            ->where('summary.uploads', $listed ? 1 : 0));
+})->with([
+    'rejected rows' => ['rejected', [['rejected', null]], true],
+    'accepted includes review' => ['accepted', [['needs_review', null]], true],
+    'duplicates include flagged accepted rows' => ['duplicates', [['accepted', 'possible_duplicate']], true],
+    'location issues' => ['location_issues', [['rejected', 'location']], true],
+    'no matching rows' => ['errors', [['accepted', null]], false],
+]);
+
+it('rejects an unknown report row outcome for upload history', function () {
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('uploads.index', ['row_outcome' => 'everything']))
+        ->assertSessionHasErrors('row_outcome');
+});
+
 it('ignores an agent filter submitted by a non-privileged agent', function () {
     $agent = User::factory()->create();
     $otherAgent = User::factory()->create();

@@ -138,9 +138,11 @@ export default function LeadsIndex({
             const shown =
                 key === 'country_group'
                     ? countryLabel(value)
-                    : key === 'agent_id'
-                      ? (agents.find((agent) => String(agent.id) === value)
-                            ?.name ?? value)
+                    : key === 'agent_id' || key === 'agent'
+                      ? value === 'none'
+                          ? 'Unassigned'
+                          : (agents.find((agent) => String(agent.id) === value)
+                                ?.name ?? value)
                       : value;
 
             return `${DRILLDOWN_LABELS[key]}: ${shown}`;

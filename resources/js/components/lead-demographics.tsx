@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import {
     ArrowDown,
     ArrowUp,
@@ -5,6 +6,7 @@ import {
     ChevronDown,
     ChevronRight,
     Globe2,
+    List,
     MapPin,
     Sparkles,
     Target,
@@ -38,6 +40,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { COUNTRY_CAPITALS } from '@/lib/country-capitals';
+import { leadDrilldownUrl } from '@/lib/lead-drilldown';
+import type { LeadDrilldown } from '@/lib/lead-drilldown';
 import type {
     DemographicMetrics,
     DemographicRow,
@@ -275,7 +279,11 @@ function ClusteredBars({
     );
 }
 
-type MatrixNode = Group & { children: MatrixNode[] };
+type MatrixNode = Group & {
+    children: MatrixNode[];
+    /** Lead list filters for the leads in this row. */
+    drilldown: LeadDrilldown;
+};
 
 function buildTree(rows: DemographicRow[]): MatrixNode[] {
     const regions = new Map<string, MatrixNode>();
@@ -285,6 +293,7 @@ function buildTree(rows: DemographicRow[]): MatrixNode[] {
             key: row.region,
             label: row.region,
             children: [],
+            drilldown: { region: row.region },
             ...emptyMetrics(),
         };
         regions.set(row.region, region);
@@ -297,6 +306,7 @@ function buildTree(rows: DemographicRow[]): MatrixNode[] {
                 key: `${row.region}|${row.country}`,
                 label: countryLabel(row.country),
                 children: [],
+                drilldown: { country_group: row.country },
                 ...emptyMetrics(),
             };
             region.children.push(country);
@@ -312,6 +322,7 @@ function buildTree(rows: DemographicRow[]): MatrixNode[] {
                     ? `${row.city} ★`
                     : row.city,
                 children: [],
+                drilldown: { country_group: row.country, city: row.city },
                 ...emptyMetrics(),
             };
             country.children.push(city);
@@ -325,7 +336,14 @@ function buildTree(rows: DemographicRow[]): MatrixNode[] {
     return [...regions.values()];
 }
 
-function DemographicMatrix({ rows }: { rows: DemographicRow[] }) {
+function DemographicMatrix({
+    rows,
+    linkFor,
+}: {
+    rows: DemographicRow[];
+    /** Lead list link for a row's leads within the current selection. */
+    linkFor: (drilldown: LeadDrilldown) => string | undefined;
+}) {
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({
         key: 'records',
@@ -413,6 +431,14 @@ function DemographicMatrix({ rows }: { rows: DemographicRow[] }) {
                                 <span className="w-4.5" />
                             )}
                             <span className="truncate">{node.label}</span>
+                            <Link
+                                href={linkFor(node.drilldown) ?? '#'}
+                                className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-60 hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:opacity-100"
+                                aria-label={`View the ${node.records.toLocaleString()} leads in ${node.label}`}
+                                title="View these leads"
+                            >
+                                <List className="size-3.5" />
+                            </Link>
                         </div>
                     </td>
                     <td className="py-1.5 pr-3 text-right">
@@ -598,9 +624,12 @@ function Slicer({
 export function LeadDemographics({
     demographics,
     showAgents,
+    period,
 }: {
     demographics: Demographics;
     showAgents: boolean;
+    /** Report period, so lead list links cover the same leads. */
+    period: { date_from: string; date_to: string };
 }) {
     const [filters, setFilters] = useState<Filters>({});
     const [measure, setMeasure] = useState<Measure>('records');
@@ -654,6 +683,19 @@ export function LeadDemographics({
         city: (key) => key.split('|')[1] ?? key,
     };
     const active = Object.entries(filters) as Array<[Dimension, string]>;
+    const selectedCity = filters.city
+        ? rows.find((row) => KEY_OF.city(row) === filters.city)
+        : undefined;
+    const selection: LeadDrilldown = {
+        ...(filters.region ? { region: filters.region } : {}),
+        ...(filters.country ? { country_group: filters.country } : {}),
+        ...(selectedCity
+            ? { country_group: selectedCity.country, city: selectedCity.city }
+            : {}),
+        ...(filters.agent ? { agent: filters.agent } : {}),
+    };
+    const linkFor = (drilldown: LeadDrilldown = {}) =>
+        leadDrilldownUrl(period, '', { ...selection, ...drilldown });
     const bySize = (a: Group, b: Group) =>
         b.records - a.records || a.label.localeCompare(b.label);
 
@@ -712,6 +754,17 @@ export function LeadDemographics({
                         ))}
                     </div>
                 </div>
+                <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs lg:order-last"
+                >
+                    <Link href={linkFor() ?? '#'}>
+                        <List />
+                        View {totals.records.toLocaleString()} leads
+                    </Link>
+                </Button>
                 {active.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
                         {active.map(([dimension, key]) => (
@@ -831,9 +884,9 @@ export function LeadDemographics({
 
             <Visual
                 title="Region, country and city breakdown"
-                subtitle="Expand a region or country to drill down · click a column to sort"
+                subtitle="Expand a region or country to drill down · click a column to sort · the list icon opens those leads"
             >
-                <DemographicMatrix rows={filtered} />
+                <DemographicMatrix rows={filtered} linkFor={linkFor} />
             </Visual>
             <p className="text-xs text-muted-foreground">
                 Possible, qualified and forwarded use each lead&apos;s current

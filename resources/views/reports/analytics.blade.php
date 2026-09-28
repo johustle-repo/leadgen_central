@@ -332,9 +332,6 @@
             <table class="data">
                 <thead><tr>
                     <th>Agent</th><th class="num">Leads</th><th class="num">Qualified</th><th class="num">Qual. rate</th>
-                    @if ($canViewReplies)
-                        <th class="num">Replies</th><th class="num">Interested</th>
-                    @endif
                     <th class="num">Uploads</th><th class="num">Avg batch</th><th class="num">Dup. rate</th><th class="num">Error rate</th>
                 </tr></thead>
                 <tbody>
@@ -344,10 +341,6 @@
                             <td class="num">{{ number_format($agent['leads']) }}</td>
                             <td class="num">{{ number_format($agent['qualified']) }}</td>
                             <td class="num">{{ $agent['qualification_rate'] }}%</td>
-                            @if ($canViewReplies)
-                                <td class="num">{{ number_format($agent['replies']) }}</td>
-                                <td class="num">{{ number_format($agent['interested']) }}</td>
-                            @endif
                             <td class="num">{{ number_format($agent['uploads']) }}</td>
                             <td class="num">{{ $agent['avg_batch_size'] }}</td>
                             <td class="num">{{ $agent['duplicate_rate'] }}%</td>
@@ -386,11 +379,6 @@
                     <tr><td>Leads created</td><td class="num">{{ number_format($data['summary']['total_leads']) }}</td></tr>
                     <tr><td>Qualified leads</td><td class="num">{{ number_format($data['summary']['qualified_leads']) }}</td></tr>
                     <tr><td>Qualification rate</td><td class="num">{{ $data['summary']['qualification_rate'] }}%</td></tr>
-                    @if ($canViewReplies)
-                        <tr><td>Email replies</td><td class="num">{{ number_format($data['summary']['replies']) }}</td></tr>
-                        <tr><td>Reply rate</td><td class="num">{{ $data['summary']['reply_rate'] }}%</td></tr>
-                        <tr><td>Interested replies</td><td class="num">{{ number_format($data['summary']['interested_replies']) }}</td></tr>
-                    @endif
                     <tr><td>Duplicates flagged</td><td class="num">{{ number_format($data['summary']['duplicates']) }}</td></tr>
                 </tbody>
             </table>
@@ -408,18 +396,6 @@
             </table>
         </td>
     </tr></table>
-
-    @if ($canViewReplies && count($data['replyClassifications']))
-        <h3>Reply classification</h3>
-        <table class="data">
-            <thead><tr><th>Classification</th><th class="num">Replies</th></tr></thead>
-            <tbody>
-                @foreach ($data['replyClassifications'] as $item)
-                    <tr><td>{{ $item['label'] }}</td><td class="num">{{ number_format($item['value']) }}</td></tr>
-                @endforeach
-            </tbody>
-        </table>
-    @endif
 
     <h3>Metric definitions</h3>
     @include('reports.partials.table', ['rows' => $sections['Metric definitions']])

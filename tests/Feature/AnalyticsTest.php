@@ -126,7 +126,7 @@ it('rejects a report export when the custom end date precedes the start date', f
         ->assertSessionHasErrors('date_to');
 });
 
-it('shows an agent analytics only for their owned leads and replies', function () {
+it('shows an agent analytics only for their owned leads', function () {
     $this->travelTo('2026-09-01 12:00:00');
     $agent = User::factory()->create();
     $otherAgent = User::factory()->create();
@@ -170,13 +170,8 @@ it('shows an agent analytics only for their owned leads and replies', function (
         ->where('summary.total_leads', 2)
         ->where('summary.qualified_leads', 1)
         ->where('summary.qualification_rate', 50)
-        // Reply data is a Super Administrator-only feature: an agent gets
-        // zeroed-out figures here, not their real (owned-only) counts.
-        ->where('summary.replies', 0)
-        ->where('summary.interested_replies', 0)
         ->where('summary.duplicates', 3)
         ->has('dailyActivity', 7)
-        ->where('replyClassifications', [])
         ->where('agentPerformance', [])
         ->where('funnel', [])
         ->where('funnelExcluded', [])
@@ -185,7 +180,7 @@ it('shows an agent analytics only for their owned leads and replies', function (
         ->where('industries', []));
 });
 
-it('only shows real reply figures in analytics to a super administrator', function () {
+it('leaves email replies out of the lead report and its exports', function () {
     $this->travelTo('2026-09-01 12:00:00');
     $superAdministrator = User::factory()->superAdministrator()->create();
     $agent = User::factory()->create();
@@ -205,10 +200,14 @@ it('only shows real reply figures in analytics to a super administrator', functi
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('analytics/index')
-        ->where('summary.replies', 1)
-        ->where('summary.interested_replies', 1)
-        ->has('replyClassifications', 1)
+        ->missing('replyClassifications')
+        ->missing('summary.replies')
+        ->missing('summary.interested_replies')
+        ->missing('dailyActivity.0.replies')
         ->etc());
+    expect($this->actingAs($superAdministrator)->get(route('report.export', ['period' => '7_days']))->streamedContent())
+        ->not->toContain('Email replies')
+        ->not->toContain('Reply classification');
 });
 
 it('shows administrator agent performance without leaking records outside the selected period', function () {

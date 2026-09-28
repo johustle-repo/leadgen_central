@@ -1,11 +1,10 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Building2,
     CheckCircle2,
     Copy,
     Database,
-    FileWarning,
     Globe2,
     Layers,
     Mail,
@@ -46,7 +45,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { leadDrilldownUrl } from '@/lib/lead-drilldown';
+import { leadDrilldownUrl, uploadDrilldownUrl } from '@/lib/lead-drilldown';
 import {
     exportMethod as reportExport,
     exportPdf as reportExportPdf,
@@ -60,14 +59,8 @@ type Props = {
     filters: { date_from: string; date_to: string };
     databaseReport: DatabaseReport;
     uploadTimingHeatmap: { day: string; hours: number[] }[];
-    summary: {
-        replies: number;
-        interested_replies: number;
-        reply_rate: number;
-    };
-    replyClassifications: { label: string; value: number }[];
 };
-type Tab = 'overview' | 'demographics' | 'quality' | 'agents' | 'replies';
+type Tab = 'overview' | 'demographics' | 'quality' | 'agents';
 
 const periods: Record<string, string> = {
     today: 'Today',
@@ -169,13 +162,7 @@ function initialTab(): Tab {
 
     const hash = window.location.hash.slice(1);
 
-    return [
-        'overview',
-        'demographics',
-        'quality',
-        'agents',
-        'replies',
-    ].includes(hash)
+    return ['overview', 'demographics', 'quality', 'agents'].includes(hash)
         ? (hash as Tab)
         : 'overview';
 }
@@ -185,8 +172,6 @@ export default function Analytics({
     filters,
     databaseReport: data,
     uploadTimingHeatmap,
-    summary,
-    replyClassifications,
 }: Props) {
     const { auth, errors } = usePage<{
         auth: Auth;
@@ -199,7 +184,6 @@ export default function Analytics({
     const [tab, setTab] = useState<Tab>(initialTab);
     const selected = `${filters.date_from} – ${filters.date_to}`;
     const quality = data.quality;
-    const isSuperAdministrator = auth.user.role === 'super_administrator';
     const appliedQuery = {
         period,
         ...filters,
@@ -224,9 +208,6 @@ export default function Analytics({
         { key: 'quality', label: 'Data quality' },
         ...(data.can_compare_agents
             ? [{ key: 'agents' as const, label: 'Agents' }]
-            : []),
-        ...(isSuperAdministrator
-            ? [{ key: 'replies' as const, label: 'Replies' }]
             : []),
     ];
     const activeTab = tabs.some((item) => item.key === tab) ? tab : 'overview';
@@ -441,6 +422,7 @@ export default function Analytics({
                                         value: point.records,
                                     }))}
                                     trendLabel="Records added"
+                                    href={leadDrilldownUrl(filters, '', {})}
                                 />
                                 <KpiCard
                                     label="Unique companies"
@@ -469,6 +451,9 @@ export default function Analytics({
                                 <KpiCard
                                     label="Possible leads"
                                     value={possibleLeads}
+                                    href={leadDrilldownUrl(filters, '', {
+                                        status: 'possible_lead',
+                                    })}
                                     footnote={`${percent(sharePercent(possibleLeads, data.overview.records))} of records`}
                                     icon={Sparkles}
                                 />
@@ -488,12 +473,17 @@ export default function Analytics({
                                     value={data.overview.uploads}
                                     change={data.changes.uploads}
                                     icon={Upload}
+                                    href={uploadDrilldownUrl(filters)}
                                 />
                                 <KpiCard
                                     label="Duplicates detected"
                                     value={quality.duplicates}
                                     footnote="Exact and possible duplicate rows"
                                     icon={Copy}
+                                    href={uploadDrilldownUrl(
+                                        filters,
+                                        'duplicates',
+                                    )}
                                 />
                             </div>
                             <div className="grid gap-4 lg:grid-cols-12">
@@ -632,6 +622,7 @@ export default function Analytics({
                         <LeadDemographics
                             demographics={data.demographics}
                             showAgents={data.can_compare_agents}
+                            period={filters}
                         />
                     )}
 
@@ -643,30 +634,47 @@ export default function Analytics({
                                     value={quality.accepted}
                                     footnote={`${percent(quality.accepted_rate)} · includes review`}
                                     icon={CheckCircle2}
+                                    href={uploadDrilldownUrl(
+                                        filters,
+                                        'accepted',
+                                    )}
                                 />
                                 <KpiCard
                                     label="Needs review"
                                     value={quality.needs_review}
                                     footnote="Included in accepted"
                                     icon={SearchCheck}
+                                    href={uploadDrilldownUrl(
+                                        filters,
+                                        'needs_review',
+                                    )}
                                 />
                                 <KpiCard
                                     label="Duplicates"
                                     value={quality.duplicates}
                                     footnote={percent(quality.duplicates_rate)}
                                     icon={Copy}
+                                    href={uploadDrilldownUrl(
+                                        filters,
+                                        'duplicates',
+                                    )}
                                 />
                                 <KpiCard
                                     label="Rejected"
                                     value={quality.rejected}
                                     footnote={percent(quality.rejected_rate)}
                                     icon={XCircle}
+                                    href={uploadDrilldownUrl(
+                                        filters,
+                                        'rejected',
+                                    )}
                                 />
                                 <KpiCard
                                     label="Errors"
                                     value={quality.errors}
                                     footnote={percent(quality.errors_rate)}
                                     icon={AlertTriangle}
+                                    href={uploadDrilldownUrl(filters, 'errors')}
                                 />
                                 <KpiCard
                                     label="Location issues"
@@ -675,6 +683,10 @@ export default function Analytics({
                                         quality.location_issues_rate,
                                     )}
                                     icon={MapPinOff}
+                                    href={uploadDrilldownUrl(
+                                        filters,
+                                        'location_issues',
+                                    )}
                                 />
                             </div>
                             <Visual
@@ -819,6 +831,14 @@ export default function Analytics({
                                     title="Upload volume"
                                     subtitle="Selected-period uploads"
                                     className="lg:col-span-4"
+                                    action={
+                                        <Link
+                                            href={uploadDrilldownUrl(filters)}
+                                            className="shrink-0 text-xs text-primary hover:underline"
+                                        >
+                                            View uploads
+                                        </Link>
+                                    }
                                 >
                                     <dl className="grid grid-cols-2 gap-4 text-xs">
                                         {[
@@ -873,24 +893,40 @@ export default function Analytics({
                                                           value:
                                                               quality.accepted_rate ??
                                                               0,
+                                                          href: uploadDrilldownUrl(
+                                                              filters,
+                                                              'accepted',
+                                                          ),
                                                       },
                                                       {
                                                           label: 'duplicates',
                                                           value:
                                                               quality.duplicates_rate ??
                                                               0,
+                                                          href: uploadDrilldownUrl(
+                                                              filters,
+                                                              'duplicates',
+                                                          ),
                                                       },
                                                       {
                                                           label: 'rejected',
                                                           value:
                                                               quality.rejected_rate ??
                                                               0,
+                                                          href: uploadDrilldownUrl(
+                                                              filters,
+                                                              'rejected',
+                                                          ),
                                                       },
                                                       {
                                                           label: 'errors',
                                                           value:
                                                               quality.errors_rate ??
                                                               0,
+                                                          href: uploadDrilldownUrl(
+                                                              filters,
+                                                              'errors',
+                                                          ),
                                                       },
                                                       {
                                                           label: 'clean',
@@ -1002,7 +1038,22 @@ export default function Analytics({
                                         'Error rate',
                                     ]}
                                     rows={data.source_quality.map((source) => [
-                                        source.label,
+                                        <Link
+                                            key="source"
+                                            href={
+                                                leadDrilldownUrl(
+                                                    filters,
+                                                    source.label,
+                                                    {
+                                                        source_group:
+                                                            source.label,
+                                                    },
+                                                ) ?? '#'
+                                            }
+                                            className="hover:underline"
+                                        >
+                                            {source.label}
+                                        </Link>,
                                         source.records.toLocaleString(),
                                         source.observed_rows.toLocaleString(),
                                         source.processed.toLocaleString(),
@@ -1110,6 +1161,13 @@ export default function Analytics({
                                             (agent) => ({
                                                 label: agent.name,
                                                 value: agent.records,
+                                                href: leadDrilldownUrl(
+                                                    filters,
+                                                    agent.name,
+                                                    {
+                                                        agent: String(agent.id),
+                                                    },
+                                                ),
                                             }),
                                         )}
                                     />
@@ -1126,6 +1184,14 @@ export default function Analytics({
                                                     possibleByAgent.get(
                                                         agent.id,
                                                     ) ?? 0,
+                                                href: leadDrilldownUrl(
+                                                    filters,
+                                                    agent.name,
+                                                    {
+                                                        agent: String(agent.id),
+                                                        status: 'possible_lead',
+                                                    },
+                                                ),
                                             }))
                                             .filter((row) => row.value > 0)
                                             .sort((a, b) => b.value - a.value)}
@@ -1151,7 +1217,21 @@ export default function Analytics({
                                         'Data quality rate',
                                     ]}
                                     rows={data.contribution.map((agent) => [
-                                        agent.name,
+                                        <Link
+                                            key="agent"
+                                            href={
+                                                leadDrilldownUrl(
+                                                    filters,
+                                                    agent.name,
+                                                    {
+                                                        agent: String(agent.id),
+                                                    },
+                                                ) ?? '#'
+                                            }
+                                            className="hover:underline"
+                                        >
+                                            {agent.name}
+                                        </Link>,
                                         <DataBar
                                             key="records"
                                             value={agent.records}
@@ -1172,40 +1252,6 @@ export default function Analytics({
                                         percent(agent.errors_rate),
                                         percent(agent.clean_rate),
                                     ])}
-                                />
-                            </Visual>
-                        </>
-                    )}
-
-                    {activeTab === 'replies' && (
-                        <>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-                                <KpiCard
-                                    label="Replies"
-                                    value={summary.replies}
-                                    icon={Mail}
-                                />
-                                <KpiCard
-                                    label="Interested replies"
-                                    value={summary.interested_replies}
-                                    icon={Sparkles}
-                                />
-                                <KpiCard
-                                    label="Reply rate"
-                                    value={percent(summary.reply_rate)}
-                                    icon={FileWarning}
-                                />
-                            </div>
-                            <Visual title="Reply classifications">
-                                <BarList
-                                    rows={replyClassifications.map((row) => ({
-                                        ...row,
-                                        percent: sharePercent(
-                                            row.value,
-                                            summary.replies,
-                                        ),
-                                    }))}
-                                    empty="No replies in this period."
                                 />
                             </Visual>
                         </>

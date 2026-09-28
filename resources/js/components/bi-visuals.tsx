@@ -110,6 +110,7 @@ export function KpiCard({
     icon: Icon,
     trend,
     trendLabel,
+    href,
 }: {
     label: string;
     value: string | number;
@@ -118,9 +119,13 @@ export function KpiCard({
     icon: LucideIcon;
     trend?: Array<{ date: string; value: number }>;
     trendLabel?: string;
+    /** Opens the records behind this figure. */
+    href?: string;
 }) {
-    return (
-        <div className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-xs">
+    const className =
+        'flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-xs';
+    const content = (
+        <>
             <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-xs font-medium text-muted-foreground">
                     {label}
@@ -166,7 +171,19 @@ export function KpiCard({
                     </ResponsiveContainer>
                 </div>
             )}
-        </div>
+        </>
+    );
+
+    return href ? (
+        <Link
+            href={href}
+            className={`${className} transition-colors hover:border-primary/40 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none`}
+            title={`View the records behind ${label.toLowerCase()}`}
+        >
+            {content}
+        </Link>
+    ) : (
+        <div className={className}>{content}</div>
     );
 }
 

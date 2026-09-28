@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\LeadStatus;
-use App\Models\EmailReply;
 use App\Models\Lead;
 use App\Models\UploadBatch;
 use App\Models\User;
@@ -18,7 +17,7 @@ class AnalyticsReport
 {
     /**
      * This is the slowest page in the app to build - dozens of full-table
-     * aggregate queries across leads, replies, and batches, on top of the
+     * aggregate queries across leads and batches, on top of the
      * (separately cached) DatabaseIntelligenceReport it embeds. The leads
      * behind it don't change second-to-second, so a short cache turns the
      * common case - revisiting or refreshing the report - into an instant
@@ -47,27 +46,20 @@ class AnalyticsReport
         $previousTo = $from->subDay()->endOfDay();
         $previousFrom = $previousTo->subDays($days - 1)->startOfDay();
         $leads = $this->leadQuery($user, $from, $to);
-        $replies = $this->replyQuery($user, $from, $to);
-        $current = $this->summary($leads, $replies, $user, $from, $to);
-        $previous = $this->summary($this->leadQuery($user, $previousFrom, $previousTo), $this->replyQuery($user, $previousFrom, $previousTo), $user, $previousFrom, $previousTo);
+        $current = $this->summary($leads, $user, $from, $to);
+        $previous = $this->summary($this->leadQuery($user, $previousFrom, $previousTo), $user, $previousFrom, $previousTo);
         $funnel = $user->isAdministrator() ? $this->funnel($leads) : ['stages' => [], 'excluded' => []];
-
-        $canViewReplies = $user->isSuperAdministrator();
-        $summary = [...$current, 'lead_change' => $this->change($current['total_leads'], $previous['total_leads']), 'reply_change' => $this->change($current['replies'], $previous['replies'])];
 
         return [
             'databaseReport' => app(DatabaseIntelligenceReport::class)->for($user, [...$filters, 'period' => 'custom', 'date_from' => $from->toDateString(), 'date_to' => $to->toDateString()]),
             'period' => $period,
             'filters' => ['date_from' => $from->toDateString(), 'date_to' => $to->toDateString()],
-            'summary' => $canViewReplies ? $summary : [...$summary, 'replies' => 0, 'replied_leads' => 0, 'reply_rate' => 0.0, 'interested_replies' => 0, 'reply_change' => 0.0],
-            'dailyActivity' => $canViewReplies
-                ? $this->dailyActivity($leads, $replies, $from, $to)
-                : array_map(fn (array $day): array => [...$day, 'replies' => 0], $this->dailyActivity($leads, $replies, $from, $to)),
+            'summary' => [...$current, 'lead_change' => $this->change($current['total_leads'], $previous['total_leads'])],
+            'dailyActivity' => $this->dailyActivity($leads, $from, $to),
             'leadStatuses' => $this->distribution($leads, 'status'),
             'sources' => $this->distribution($leads, 'data_source'),
             'countries' => $this->distribution($leads, 'country_code', 8),
-            'replyClassifications' => $canViewReplies ? $this->distribution($replies, 'classification') : [],
-            'agentPerformance' => $user->isAdministrator() ? $this->agentPerformance($from, $to, $canViewReplies) : [],
+            'agentPerformance' => $user->isAdministrator() ? $this->agentPerformance($from, $to) : [],
             'funnel' => $funnel['stages'],
             'funnelExcluded' => $funnel['excluded'],
             'dataQualityTrend' => $user->isAdministrator() ? $this->dataQualityTrend($this->batchQuery($user, $from, $to), $from, $to) : [],
@@ -116,14 +108,6 @@ class AnalyticsReport
             ->whereBetween('created_at', [$from, $to]);
     }
 
-    /** @return Builder<EmailReply> */
-    private function replyQuery(User $user, CarbonImmutable $from, CarbonImmutable $to): Builder
-    {
-        return EmailReply::query()
-            ->when(! $user->canViewAllLeads(), fn (Builder $query) => $query->whereBelongsTo($user, 'agent'))
-            ->whereBetween('received_at', [$from, $to]);
-    }
-
     /** @return Builder<UploadBatch> */
     private function batchQuery(User $user, CarbonImmutable $from, CarbonImmutable $to): Builder
     {
@@ -134,49 +118,40 @@ class AnalyticsReport
 
     /**
      * @param  Builder<Lead>  $leads
-     * @param  Builder<EmailReply>  $replies
-     * @return array{total_leads: int, qualified_leads: int, qualification_rate: float, replies: int, replied_leads: int, reply_rate: float, interested_replies: int, duplicates: int}
+     * @return array{total_leads: int, qualified_leads: int, qualification_rate: float, duplicates: int}
      */
-    private function summary(Builder $leads, Builder $replies, User $user, CarbonImmutable $from, CarbonImmutable $to): array
+    private function summary(Builder $leads, User $user, CarbonImmutable $from, CarbonImmutable $to): array
     {
         $total = (clone $leads)->count();
         $qualified = (clone $leads)->where('status', 'qualified_lead')->count();
-        $replyCount = (clone $replies)->count();
-        $repliedLeads = (clone $replies)->whereNotNull('lead_id')->distinct()->count('lead_id');
 
         return [
             'total_leads' => $total,
             'qualified_leads' => $qualified,
             'qualification_rate' => $total > 0 ? round(($qualified / $total) * 100, 1) : 0.0,
-            'replies' => $replyCount,
-            'replied_leads' => $repliedLeads,
-            'reply_rate' => $total > 0 ? round(($repliedLeads / $total) * 100, 1) : 0.0,
-            'interested_replies' => (clone $replies)->whereIn('classification', ['interested', 'possible_lead'])->count(),
             'duplicates' => (int) $this->batchQuery($user, $from, $to)->sum('duplicate_rows'),
         ];
     }
 
     /**
      * @param  Builder<Lead>  $leads
-     * @param  Builder<EmailReply>  $replies
-     * @return array<int, array{date: string, label: string, leads: int, replies: int}>
+     * @return array<int, array{date: string, label: string, leads: int}>
      */
-    private function dailyActivity(Builder $leads, Builder $replies, CarbonImmutable $from, CarbonImmutable $to): array
+    private function dailyActivity(Builder $leads, CarbonImmutable $from, CarbonImmutable $to): array
     {
         $leadCounts = (clone $leads)->selectRaw('DATE(created_at) as activity_date, COUNT(*) as aggregate')->groupBy('activity_date')->pluck('aggregate', 'activity_date');
-        $replyCounts = (clone $replies)->selectRaw('DATE(received_at) as activity_date, COUNT(*) as aggregate')->groupBy('activity_date')->pluck('aggregate', 'activity_date');
         $activity = [];
 
         for ($date = $from->startOfDay(); $date->lte($to); $date = $date->addDay()) {
             $key = $date->toDateString();
-            $activity[] = ['date' => $key, 'label' => $date->format('M j'), 'leads' => (int) ($leadCounts[$key] ?? 0), 'replies' => (int) ($replyCounts[$key] ?? 0)];
+            $activity[] = ['date' => $key, 'label' => $date->format('M j'), 'leads' => (int) ($leadCounts[$key] ?? 0)];
         }
 
         return $activity;
     }
 
     /**
-     * @param  Builder<Lead>|Builder<EmailReply>  $query
+     * @param  Builder<Lead>  $query
      * @return array<int, array{label: string, value: int}>
      */
     private function distribution(Builder $query, string $column, int $limit = 10): array
@@ -185,7 +160,6 @@ class AnalyticsReport
             'status' => "COALESCE(NULLIF(status, ''), 'Unknown') as label, COUNT(*) as aggregate",
             'data_source' => "COALESCE(NULLIF(data_source, ''), 'Unknown') as label, COUNT(*) as aggregate",
             'country_code' => "COALESCE(NULLIF(country_code, ''), 'Unknown') as label, COUNT(*) as aggregate",
-            'classification' => "COALESCE(NULLIF(classification, ''), 'Unknown') as label, COUNT(*) as aggregate",
             'industry' => "COALESCE(NULLIF(industry, ''), 'Unknown') as label, COUNT(*) as aggregate",
             default => throw new LogicException('Unsupported analytics distribution.'),
         };
@@ -201,17 +175,13 @@ class AnalyticsReport
     }
 
     /** @return array<int, array<string, int|string|float>> */
-    private function agentPerformance(CarbonImmutable $from, CarbonImmutable $to, bool $canViewReplies): array
+    private function agentPerformance(CarbonImmutable $from, CarbonImmutable $to): array
     {
         return User::query()
             ->where('role', UserRole::Agent)
             ->withCount([
                 'leads as leads_count' => fn (Builder $query) => $query->whereBetween('created_at', [$from, $to]),
                 'leads as qualified_count' => fn (Builder $query) => $query->whereBetween('created_at', [$from, $to])->where('status', 'qualified_lead'),
-                ...($canViewReplies ? [
-                    'emailReplies as replies_count' => fn (Builder $query) => $query->whereBetween('received_at', [$from, $to]),
-                    'emailReplies as interested_count' => fn (Builder $query) => $query->whereBetween('received_at', [$from, $to])->whereIn('classification', ['interested', 'possible_lead']),
-                ] : []),
                 'uploadBatches as uploads_count' => fn (Builder $query) => $query->whereBetween('created_at', [$from, $to]),
             ])
             ->withSum(['uploadBatches as total_rows_sum' => fn (Builder $query) => $query->whereBetween('created_at', [$from, $to])], 'total_rows')
@@ -220,7 +190,7 @@ class AnalyticsReport
             ->orderByDesc('leads_count')
             ->limit(20)
             ->get(['id', 'name'])
-            ->map(function (User $agent) use ($canViewReplies): array {
+            ->map(function (User $agent): array {
                 $leads = (int) $agent->getAttribute('leads_count');
                 $qualified = (int) $agent->getAttribute('qualified_count');
                 $uploads = (int) $agent->getAttribute('uploads_count');
@@ -231,8 +201,6 @@ class AnalyticsReport
                     'name' => $agent->name,
                     'leads' => $leads,
                     'qualified' => $qualified,
-                    'replies' => $canViewReplies ? (int) $agent->getAttribute('replies_count') : 0,
-                    'interested' => $canViewReplies ? (int) $agent->getAttribute('interested_count') : 0,
                     'qualification_rate' => $leads > 0 ? round(($qualified / $leads) * 100, 1) : 0.0,
                     'uploads' => $uploads,
                     'avg_batch_size' => $uploads > 0 ? round($totalRows / $uploads, 1) : 0.0,

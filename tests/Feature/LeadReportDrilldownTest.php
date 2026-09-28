@@ -3,6 +3,8 @@
 use App\Models\Lead;
 use App\Models\User;
 use App\Services\DashboardReport;
+use App\Services\DatabaseIntelligenceReport;
+use App\Support\CountryRegions;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /**
@@ -69,6 +71,38 @@ it('lists the leads behind company, industry and raw data source bars', function
     expect(drilldownCompanies($administrator, ['company' => 'kiewit']))->toBe(['Kiewit'])
         ->and(drilldownCompanies($administrator, ['industry' => 'Unknown']))->toBe(['Globex'])
         ->and(drilldownCompanies($administrator, ['data_source' => 'lusha/tendata']))->toBe(['Kiewit']);
+});
+
+it('lists the same leads the demographics tab counts for each region, country and city', function () {
+    $administrator = User::factory()->administrator()->create();
+    foreach ([
+        ['US', null, 'Texas'], [null, 'United States', 'texas'], ['CA', null, 'Ontario'], [null, 'Trinidad and Tobago', null],
+        ['GB', null, 'London'], ['XX', null, 'Nowhere City'], [null, 'Atlantis', 'Poseidonia'], [null, null, null],
+    ] as $index => [$code, $country, $city]) {
+        Lead::factory()->create(['company_name' => "Lead {$index}", 'country_code' => $code, 'country' => $country, 'city' => $city]);
+    }
+    $intelligence = app(DatabaseIntelligenceReport::class);
+    $report = $intelligence->for($administrator, ['date_from' => '2026-09-01', 'date_to' => '2026-09-28']);
+
+    foreach (['region' => 'region', 'country' => 'country_group'] as $dimension => $key) {
+        foreach ($intelligence->demographicBreakdown($report, $dimension) as $row) {
+            $criterion = $dimension === 'country' ? (CountryRegions::codeForName($row['label']) ?? $row['label']) : $row['label'];
+
+            expect(drilldownCompanies($administrator, [$key => $criterion]))->toHaveCount($row['records'], "{$dimension} {$row['label']}");
+        }
+    }
+    expect(drilldownCompanies($administrator, ['region' => 'Unassigned']))->toBe(['Lead 5', 'Lead 6', 'Lead 7'])
+        ->and(drilldownCompanies($administrator, ['country_group' => 'US', 'city' => 'Texas']))->toBe(['Lead 0', 'Lead 1'])
+        ->and(drilldownCompanies($administrator, ['city' => 'Unknown']))->toBe(['Lead 3', 'Lead 7']);
+});
+
+it('lists the leads of the owner picked on the demographics tab', function () {
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create();
+    Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Owned']);
+    Lead::factory()->create(['company_name' => 'Colleague']);
+
+    expect(drilldownCompanies($administrator, ['agent' => (string) $agent->id]))->toBe(['Owned']);
 });
 
 it('keeps an agent drill-down to their own leads and clears the default lead date', function () {

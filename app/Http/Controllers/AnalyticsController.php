@@ -31,7 +31,7 @@ class AnalyticsController extends Controller
         [$user, $data] = $this->reportData($request, $analytics);
         $this->logExport($request, $user, 'analytics.exported', 'Downloaded an analytics report export.', $data['filters']);
 
-        return response()->streamDownload(function () use ($user, $data, $csv): void {
+        return response()->streamDownload(function () use ($data, $csv): void {
             $stream = fopen('php://output', 'wb');
             if (! is_resource($stream)) {
                 return;
@@ -48,8 +48,6 @@ class AnalyticsController extends Controller
                 $writeSection($title, [['Label', 'Count'], ...array_map(fn (array $item): array => [$item['label'], $item['value']], $items)]);
             };
 
-            $canViewReplies = $user->isSuperAdministrator();
-
             fputcsv($stream, ['Report period', "{$data['filters']['date_from']} to {$data['filters']['date_to']}"], escape: '');
             fputcsv($stream, [], escape: '');
             foreach ($data['databaseSections'] as $title => $rows) {
@@ -60,24 +58,16 @@ class AnalyticsController extends Controller
                 ['Leads created', $data['summary']['total_leads']],
                 ['Qualified leads', $data['summary']['qualified_leads']],
                 ['Qualification rate', $data['summary']['qualification_rate'].'%'],
-                ...($canViewReplies ? [
-                    ['Email replies', $data['summary']['replies']],
-                    ['Reply rate', $data['summary']['reply_rate'].'%'],
-                    ['Interested replies', $data['summary']['interested_replies']],
-                ] : []),
                 ['Duplicates flagged', $data['summary']['duplicates']],
             ]);
             $writeDistribution('Lead status', $data['leadStatuses']);
-            if ($canViewReplies) {
-                $writeDistribution('Reply classification', $data['replyClassifications']);
-            }
             $writeDistribution('Lead sources', $data['sources']);
             $writeDistribution('Top countries', $data['countries']);
 
             if ($data['agentPerformance'] !== []) {
                 $writeSection('Agent performance', [
-                    ['Agent', 'Leads', 'Qualified', 'Qualification rate', ...($canViewReplies ? ['Replies', 'Interested'] : []), 'Uploads', 'Avg batch size', 'Duplicate rate', 'Error rate'],
-                    ...array_map(fn (array $agent): array => [$agent['name'], $agent['leads'], $agent['qualified'], $agent['qualification_rate'].'%', ...($canViewReplies ? [$agent['replies'], $agent['interested']] : []), $agent['uploads'], $agent['avg_batch_size'], $agent['duplicate_rate'].'%', $agent['error_rate'].'%'], $data['agentPerformance']),
+                    ['Agent', 'Leads', 'Qualified', 'Qualification rate', 'Uploads', 'Avg batch size', 'Duplicate rate', 'Error rate'],
+                    ...array_map(fn (array $agent): array => [$agent['name'], $agent['leads'], $agent['qualified'], $agent['qualification_rate'].'%', $agent['uploads'], $agent['avg_batch_size'], $agent['duplicate_rate'].'%', $agent['error_rate'].'%'], $data['agentPerformance']),
                 ]);
             }
 
@@ -93,7 +83,6 @@ class AnalyticsController extends Controller
         $pdf = Pdf::loadView('reports.analytics', [
             'data' => $data,
             'pdf' => $pdfReport->for($data),
-            'canViewReplies' => $user->isSuperAdministrator(),
             'scope' => $user->canViewAllLeads() ? 'All records' : 'Your records only',
             'generatedBy' => $user->name,
         ])->setPaper('a4');

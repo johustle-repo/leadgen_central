@@ -9,6 +9,7 @@ use App\Jobs\ProcessUploadBatch;
 use App\Models\AuditLog;
 use App\Models\SystemSetting;
 use App\Models\UploadBatch;
+use App\Models\UploadRow;
 use App\Models\User;
 use App\Services\CsvCellSanitizer;
 use App\Services\CsvHeaderMapper;
@@ -22,9 +23,11 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UploadBatchController extends Controller
@@ -36,6 +39,9 @@ class UploadBatchController extends Controller
         'completed' => ['completed'],
         'failed' => ['failed'],
     ];
+
+    /** Row outcomes a Lead Reports quality figure can open, as in DatabaseIntelligenceReport. */
+    public const ROW_OUTCOMES = ['accepted', 'needs_review', 'duplicates', 'rejected', 'errors', 'location_issues'];
 
     public function index(Request $request): Response
     {
@@ -62,6 +68,21 @@ class UploadBatchController extends Controller
         if ($search !== '') {
             $query->where(fn (Builder $builder) => $builder->where('upload_batches.original_filename', 'like', "%{$search}%")
                 ->orWhere('upload_batches.batch_code', 'like', "%{$search}%"));
+        }
+        $request->validate([
+            'created_from' => ['nullable', 'date_format:Y-m-d'],
+            'created_to' => ['nullable', 'date_format:Y-m-d'],
+            'row_outcome' => ['nullable', Rule::in(self::ROW_OUTCOMES)],
+        ]);
+        $reportFilters = array_filter($request->only(['created_from', 'created_to', 'row_outcome']), fn (mixed $value): bool => is_string($value) && $value !== '');
+        if (isset($reportFilters['created_from'])) {
+            $query->where('upload_batches.created_at', '>=', $reportFilters['created_from'].' 00:00:00');
+        }
+        if (isset($reportFilters['created_to'])) {
+            $query->where('upload_batches.created_at', '<=', $reportFilters['created_to'].' 23:59:59');
+        }
+        if (isset($reportFilters['row_outcome'])) {
+            $query->whereIn('upload_batches.id', $this->rowsWithOutcome($reportFilters['row_outcome'])->select('upload_batch_id'));
         }
         // Summary figures describe everything matching the owner, agent and
         // search filters; the status tab only narrows the list below them.
@@ -92,7 +113,7 @@ class UploadBatchController extends Controller
         return Inertia::render('uploads/index', [
             'batches' => $query->paginate($perPage)->withQueryString(),
             'sort' => $sort,
-            'filters' => ['agent_id' => $request->string('agent_id')->toString(), 'per_page' => (string) $perPage, 'status' => $status, 'search' => $search],
+            'filters' => ['agent_id' => $request->string('agent_id')->toString(), 'per_page' => (string) $perPage, 'status' => $status, 'search' => $search, ...$reportFilters],
             'summary' => [
                 'uploads' => (int) $summary->uploads,
                 'rows' => (int) $summary->rows_total,
@@ -105,6 +126,28 @@ class UploadBatchController extends Controller
             'deletableTotal' => $deletableTotal,
             'agents' => $request->user()->canViewAllLeads() ? User::query()->orderBy('name')->get(['id', 'name']) : [],
         ]);
+    }
+
+    /**
+     * Rows counted by one Lead Reports quality outcome. Accepted includes
+     * rows needing review, and duplicates include accepted rows flagged as
+     * possible duplicates, matching the report's overlapping categories.
+     *
+     * @return Builder<UploadRow>
+     */
+    private function rowsWithOutcome(string $outcome): Builder
+    {
+        $rows = UploadRow::query();
+
+        return match ($outcome) {
+            'accepted' => $rows->whereIn('processing_status', [UploadRowStatus::Accepted, UploadRowStatus::NeedsReview]),
+            'needs_review' => $rows->where('processing_status', UploadRowStatus::NeedsReview),
+            'duplicates' => $rows->where('processing_status', '!=', UploadRowStatus::Pending)->where(fn (Builder $query) => $query->where('processing_status', UploadRowStatus::Duplicate)->orWhere('error_category', 'possible_duplicate')),
+            'rejected' => $rows->where('processing_status', UploadRowStatus::Rejected),
+            'errors' => $rows->where('processing_status', UploadRowStatus::Error),
+            'location_issues' => $rows->where('processing_status', '!=', UploadRowStatus::Pending)->where('error_category', 'location'),
+            default => throw new InvalidArgumentException("Unknown upload row outcome [{$outcome}]."),
+        };
     }
 
     public function create(): Response
