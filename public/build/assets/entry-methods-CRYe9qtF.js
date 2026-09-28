@@ -1,0 +1,1 @@
+var e={csv:`CSV upload`,manual:`Manual entry`,scraper:`Scraper`},t=t=>e[t]??t;export{t as n,e as t};
