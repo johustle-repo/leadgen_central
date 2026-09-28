@@ -162,6 +162,25 @@ it('skips the upload totals when the progress poll reloads only the batch list',
     expect(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'SUM(total_rows)') || str_contains($sql, 'group by "processing_status"')))->toBeEmpty();
 });
 
+it('lists the batches behind a source in the lead report source quality table', function () {
+    $administrator = User::factory()->administrator()->create();
+    $other = UploadBatch::factory()->create(['original_filename' => 'other.csv']);
+    UploadRow::factory()->for($other)->create(['processing_status' => 'accepted', 'processed_data' => ['data_source' => 'Apollo']]);
+    $unknown = UploadBatch::factory()->create(['original_filename' => 'unknown.csv']);
+    UploadRow::factory()->for($unknown)->create(['processing_status' => 'rejected', 'processed_data' => ['company_name' => 'Orphan']]);
+    $tendata = UploadBatch::factory()->create(['original_filename' => 'tendata.csv']);
+    UploadRow::factory()->for($tendata)->create(['processing_status' => 'accepted', 'processed_data' => ['source_url' => 'https://bizr.tendata.cn/enterprise']]);
+
+    foreach (['Other' => $other, 'Unknown' => $unknown, 'Tendata' => $tendata] as $source => $batch) {
+        $this->actingAs($administrator)->get(route('uploads.index', ['row_source' => $source]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.row_source', $source)
+                ->has('batches.data', 1)
+                ->where('batches.data.0.id', $batch->id));
+    }
+    $this->actingAs($administrator)->get(route('uploads.index', ['row_source' => 'Everything']))->assertSessionHasErrors('row_source');
+});
+
 it('rejects an unknown report row outcome for upload history', function () {
     $this->actingAs(User::factory()->administrator()->create())
         ->get(route('uploads.index', ['row_outcome' => 'everything']))

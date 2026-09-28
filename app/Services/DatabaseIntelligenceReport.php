@@ -64,18 +64,7 @@ class DatabaseIntelligenceReport
         ];
         $source = LeadReportDimensions::sourceExpression('data_source', 'source');
         $sourceCounts = (clone $leads)->selectRaw("{$source} as label, COUNT(*) as records")->groupBy('label')->toBase()->get()->keyBy('label');
-        $sqlite = DB::connection()->getDriverName() === 'sqlite';
-        $snapshotSource = $sqlite ? "json_extract(upload_rows.processed_data, '$.data_source')" : "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(upload_rows.processed_data, '$.data_source')), 'null')";
-        $snapshotLink = $sqlite ? "json_extract(upload_rows.processed_data, '$.source_url')" : "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(upload_rows.processed_data, '$.source_url')), 'null')";
-        // An import row's source is what its CSV row said, else its link's
-        // provider, else the current source of the lead it created or matched,
-        // so rows from files without a source column count under the same
-        // source as their leads instead of all landing in Unknown.
-        $rowSource = LeadReportDimensions::sourceExpression("(CASE
-            WHEN LOWER(TRIM(COALESCE({$snapshotSource}, ''))) NOT IN ('', 'n/a', 'na', 'none', 'null', '-', 'unknown') THEN {$snapshotSource}
-            WHEN LOWER({$snapshotLink}) LIKE '%tendata.%' THEN 'Tendata'
-            WHEN LOWER({$snapshotLink}) LIKE '%lusha.%' THEN 'Lusha'
-            ELSE row_leads.data_source END)");
+        $rowSource = LeadReportDimensions::importRowSourceExpression();
         $sourceQuality = $this->rowMetrics((clone $rows)->leftJoin('leads as row_leads', 'row_leads.id', '=', 'upload_rows.lead_id'))
             ->selectRaw("{$rowSource} as label")->groupBy('label')->get()->keyBy('label');
         $data['source_quality'] = [];

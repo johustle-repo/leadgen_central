@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Country;
 use App\Models\Lead;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * How the lead reports group records (canonical source, resolved country,
@@ -70,6 +71,28 @@ class LeadReportDimensions
             WHEN LOWER(TRIM({$column})) IN ('manual', 'manual entry') THEN 'Manual'
             WHEN LOWER(TRIM({$column})) IN ('email', 'email reply', 'email outreach') THEN 'Email'
             {$manual} WHEN NULLIF(TRIM({$column}), '') IS NULL OR LOWER(TRIM({$column})) IN ('unknown', 'n/a') THEN 'Unknown' ELSE 'Other' END";
+    }
+
+    /**
+     * SQL for the SOURCE_GROUPS entry of an import row: what its CSV row said,
+     * else its link's provider, else the current source of the lead it
+     * created or matched, so rows from files without a source column count
+     * under the same source as their leads instead of all landing in Unknown.
+     * Expects upload_rows left-joined to leads as row_leads.
+     *
+     * @return literal-string
+     */
+    public static function importRowSourceExpression(): string
+    {
+        $sqlite = DB::connection()->getDriverName() === 'sqlite';
+        $snapshotSource = $sqlite ? "json_extract(upload_rows.processed_data, '$.data_source')" : "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(upload_rows.processed_data, '$.data_source')), 'null')";
+        $snapshotLink = $sqlite ? "json_extract(upload_rows.processed_data, '$.source_url')" : "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(upload_rows.processed_data, '$.source_url')), 'null')";
+
+        return self::sourceExpression("(CASE
+            WHEN LOWER(TRIM(COALESCE({$snapshotSource}, ''))) NOT IN ('', 'n/a', 'na', 'none', 'null', '-', 'unknown') THEN {$snapshotSource}
+            WHEN LOWER({$snapshotLink}) LIKE '%tendata.%' THEN 'Tendata'
+            WHEN LOWER({$snapshotLink}) LIKE '%lusha.%' THEN 'Lusha'
+            ELSE row_leads.data_source END)");
     }
 
     /**

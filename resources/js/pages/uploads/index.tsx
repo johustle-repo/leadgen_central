@@ -134,6 +134,7 @@ export default function UploadIndex({
         created_from?: string;
         created_to?: string;
         row_outcome?: RowOutcome;
+        row_source?: string;
     };
     deletableTotal: number;
     agents: Agent[];
@@ -202,6 +203,7 @@ export default function UploadIndex({
                 created_from: filters.created_from,
                 created_to: filters.created_to,
                 row_outcome: filters.row_outcome,
+                row_source: filters.row_source,
                 ...changes,
             },
             { preserveState: true, replace: true },
@@ -308,13 +310,20 @@ export default function UploadIndex({
                         icon={AlertTriangle}
                     />
                 </div>
-                {(filters.created_from || filters.row_outcome) && (
+                {(filters.created_from ||
+                    filters.row_outcome ||
+                    filters.row_source) && (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                         <span className="font-medium">From report</span>
                         {filters.row_outcome && (
                             <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium">
                                 Batches with{' '}
                                 {ROW_OUTCOMES[filters.row_outcome].label} rows
+                            </span>
+                        )}
+                        {filters.row_source && (
+                            <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium">
+                                Batches with {filters.row_source} rows
                             </span>
                         )}
                         <span className="text-xs text-muted-foreground">

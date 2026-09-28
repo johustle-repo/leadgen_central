@@ -16,6 +16,7 @@ use App\Services\CsvHeaderMapper;
 use App\Services\UploadBatchCreator;
 use App\Services\UploadBatchDeletion;
 use App\Services\UploadBatchReanalyzer;
+use App\Support\LeadReportDimensions;
 use App\UploadBatchStatus;
 use App\UploadRowStatus;
 use Illuminate\Database\Eloquent\Builder;
@@ -74,8 +75,9 @@ class UploadBatchController extends Controller
             'created_from' => ['nullable', 'date_format:Y-m-d'],
             'created_to' => ['nullable', 'date_format:Y-m-d'],
             'row_outcome' => ['nullable', Rule::in(self::ROW_OUTCOMES)],
+            'row_source' => ['nullable', Rule::in(LeadReportDimensions::SOURCE_GROUPS)],
         ]);
-        $reportFilters = array_filter($request->only(['created_from', 'created_to', 'row_outcome']), fn (mixed $value): bool => is_string($value) && $value !== '');
+        $reportFilters = array_filter($request->only(['created_from', 'created_to', 'row_outcome', 'row_source']), fn (mixed $value): bool => is_string($value) && $value !== '');
         if (isset($reportFilters['created_from'])) {
             $query->where('upload_batches.created_at', '>=', $reportFilters['created_from'].' 00:00:00');
         }
@@ -84,6 +86,13 @@ class UploadBatchController extends Controller
         }
         if (isset($reportFilters['row_outcome'])) {
             $query->whereIn('upload_batches.id', $this->rowsWithOutcome($reportFilters['row_outcome'])->select('upload_batch_id'));
+        }
+        if (isset($reportFilters['row_source'])) {
+            // Same source rule as Lead Reports' source quality table.
+            $query->whereIn('upload_batches.id', UploadRow::query()
+                ->leftJoin('leads as row_leads', 'row_leads.id', '=', 'upload_rows.lead_id')
+                ->whereRaw(LeadReportDimensions::importRowSourceExpression().' = ?', [$reportFilters['row_source']])
+                ->select('upload_rows.upload_batch_id'));
         }
         // Summary figures describe everything matching the owner, agent and
         // search filters; the status tab only narrows the list below them.

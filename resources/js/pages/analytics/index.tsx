@@ -1028,7 +1028,7 @@ export default function Analytics({
                             </div>
                             <Visual
                                 title="Source quality"
-                                subtitle="Total records use current lead sources; import rows use the source in the file, else their link, else the lead they created. Click a source to open its leads"
+                                subtitle="Total records use current lead sources; import rows use the source in the file, else their link, else the lead they created. Click a source for its leads, or an import row count for its upload batches"
                             >
                                 <ReportTable
                                     headings={[
@@ -1042,29 +1042,46 @@ export default function Analytics({
                                         'Error rate',
                                     ]}
                                     rows={data.source_quality.map((source) => [
-                                        // Only sources with leads have a list to open.
-                                        source.records > 0 ? (
+                                        // A source opens its leads; one with
+                                        // only import rows opens its batches.
+                                        <Link
+                                            key="source"
+                                            href={
+                                                source.records > 0
+                                                    ? (leadDrilldownUrl(
+                                                          filters,
+                                                          source.label,
+                                                          {
+                                                              source_group:
+                                                                  source.label,
+                                                          },
+                                                      ) ?? '#')
+                                                    : uploadDrilldownUrl(
+                                                          filters,
+                                                          undefined,
+                                                          source.label,
+                                                      )
+                                            }
+                                            className="hover:underline"
+                                        >
+                                            {source.label}
+                                        </Link>,
+                                        source.records.toLocaleString(),
+                                        source.observed_rows > 0 ? (
                                             <Link
-                                                key="source"
-                                                href={
-                                                    leadDrilldownUrl(
-                                                        filters,
-                                                        source.label,
-                                                        {
-                                                            source_group:
-                                                                source.label,
-                                                        },
-                                                    ) ?? '#'
-                                                }
+                                                key="rows"
+                                                href={uploadDrilldownUrl(
+                                                    filters,
+                                                    undefined,
+                                                    source.label,
+                                                )}
                                                 className="hover:underline"
                                             >
-                                                {source.label}
+                                                {source.observed_rows.toLocaleString()}
                                             </Link>
                                         ) : (
-                                            source.label
+                                            '0'
                                         ),
-                                        source.records.toLocaleString(),
-                                        source.observed_rows.toLocaleString(),
                                         source.processed.toLocaleString(),
                                         source.accepted.toLocaleString(),
                                         percent(source.duplicates_rate),

@@ -64,17 +64,20 @@ export type RowOutcome =
 
 /**
  * Link to the upload batches behind a data quality figure: batches uploaded in
- * the report period, optionally only those with rows of one outcome.
+ * the report period, optionally only those with rows of one outcome or from
+ * one source (as grouped in the source quality table).
  */
 export function uploadDrilldownUrl(
     period: { date_from: string; date_to: string },
     rowOutcome?: RowOutcome,
+    rowSource?: string,
 ): string {
     return uploadsIndex.url({
         query: {
             created_from: period.date_from,
             created_to: period.date_to,
             row_outcome: rowOutcome,
+            row_source: rowSource,
         },
     });
 }
