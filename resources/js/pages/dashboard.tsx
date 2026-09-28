@@ -30,6 +30,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useReportRefresh } from '@/hooks/use-report-refresh';
+import { ENTRY_METHOD_LABELS, entryMethodLabel } from '@/lib/entry-methods';
 import { leadDrilldownUrl } from '@/lib/lead-drilldown';
 import { dashboard } from '@/routes';
 import { edit as leadEdit, index as leadsIndex } from '@/routes/leads';
@@ -64,9 +65,9 @@ const PERIODS = {
 };
 
 const ENTRY_METHOD_COLORS: Record<string, string> = {
-    csv: CATEGORICAL[0],
-    manual: CATEGORICAL[1],
-    scraper: CATEGORICAL[2],
+    [ENTRY_METHOD_LABELS.csv]: CATEGORICAL[0],
+    [ENTRY_METHOD_LABELS.manual]: CATEGORICAL[1],
+    [ENTRY_METHOD_LABELS.scraper]: CATEGORICAL[2],
 };
 
 export default function Dashboard({
@@ -307,7 +308,12 @@ export default function Dashboard({
                         className="lg:col-span-4"
                     >
                         <Donut
-                            rows={data.distributions.entry_methods}
+                            rows={data.distributions.entry_methods.map(
+                                (row) => ({
+                                    ...row,
+                                    label: entryMethodLabel(row.label),
+                                }),
+                            )}
                             centerLabel="records"
                             colors={ENTRY_METHOD_COLORS}
                         />

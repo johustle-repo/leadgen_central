@@ -44,6 +44,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { entryMethodLabel } from '@/lib/entry-methods';
 import { DRILLDOWN_LABELS } from '@/lib/lead-drilldown';
 import {
     bulkDestroy,
@@ -634,8 +635,8 @@ export default function LeadsIndex({
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <span className="capitalize">
-                                            {lead.source}
+                                        <span>
+                                            {entryMethodLabel(lead.source)}
                                         </span>
                                         <div className="text-xs text-muted-foreground">
                                             {lead.data_source?.trim() ||
