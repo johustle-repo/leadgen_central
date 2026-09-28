@@ -112,9 +112,12 @@ function CompanyField({
     );
 }
 
-/** Mirrors Lead::isTendataLink() so the form fills the source as you type. */
-const isTendataLink = (url: string) =>
-    /(^|[/.@])tendata\.[a-z]{2,}/i.test(url.trim());
+/** Mirrors Lead::sourceFromLink() so the form fills the source as you type. */
+const LINK_SOURCES = { tendata: 'Tendata', lusha: 'Lusha' } as const;
+const sourceFromLink = (url: string): string | undefined =>
+    Object.entries(LINK_SOURCES).find(([domain]) =>
+        new RegExp(`(^|[/.@])${domain}\\.[a-z]{2,}`, 'i').test(url.trim()),
+    )?.[1];
 
 function DataSourceSelect({
     id,
@@ -247,7 +250,7 @@ export default function LeadForm({
         ),
     );
     const [suggestedSource, setSuggestedSource] = useState<string | undefined>(
-        () => (isTendataLink(defaultFor('source_url')) ? 'Tendata' : undefined),
+        () => sourceFromLink(defaultFor('source_url')),
     );
     const autosaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
         undefined,
@@ -493,13 +496,11 @@ export default function LeadForm({
                                                                 'source_url'
                                                                     ? (event) =>
                                                                           setSuggestedSource(
-                                                                              isTendataLink(
+                                                                              sourceFromLink(
                                                                                   event
                                                                                       .target
                                                                                       .value,
-                                                                              )
-                                                                                  ? 'Tendata'
-                                                                                  : undefined,
+                                                                              ),
                                                                           )
                                                                     : undefined
                                                             }

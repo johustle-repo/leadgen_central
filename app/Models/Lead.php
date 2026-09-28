@@ -38,18 +38,28 @@ class Lead extends Model
         });
     }
 
+    /** Data sources recognised from the site a lead's link points at. */
+    public const LINK_SOURCES = ['tendata' => 'Tendata', 'lusha' => 'Lusha'];
+
     /**
-     * Whether a link points at Tendata (e.g. bizr.tendata.cn).
+     * The data source a link belongs to, judged by its domain (e.g.
+     * bizr.tendata.cn is Tendata, dashboard.lusha.com is Lusha).
      */
-    public static function isTendataLink(?string $url): bool
+    public static function sourceFromLink(?string $url): ?string
     {
-        return $url !== null && preg_match('~(^|[/.@])tendata\.[a-z]{2,}~i', trim($url)) === 1;
+        foreach (self::LINK_SOURCES as $domain => $source) {
+            if ($url !== null && preg_match("~(^|[/.@]){$domain}\\.[a-z]{2,}~i", trim($url)) === 1) {
+                return $source;
+            }
+        }
+
+        return null;
     }
 
     /**
      * Applied on every save, whatever created or edited the lead: a missing
      * LinkedIn stays blank instead of a placeholder, and a lead with no data
-     * source but a Tendata link is recorded as sourced from Tendata.
+     * source but a Tendata or Lusha link is recorded as sourced from that site.
      */
     private function fillDerivedFields(): void
     {
@@ -57,8 +67,8 @@ class Lead extends Model
             $this->linkedin_url = null;
         }
 
-        if ($this->isPlaceholder($this->data_source) && self::isTendataLink($this->source_url)) {
-            $this->data_source = 'Tendata';
+        if ($this->isPlaceholder($this->data_source)) {
+            $this->data_source = self::sourceFromLink($this->source_url) ?? $this->data_source;
         }
     }
 
