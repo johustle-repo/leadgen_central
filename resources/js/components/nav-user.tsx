@@ -27,7 +27,7 @@ const ROLE_LABELS: Record<string, string> = {
  * just the photo when the sidebar is collapsed to icons.
  */
 export function NavUser() {
-    const { auth, appVersion } = usePage().props;
+    const { auth } = usePage().props;
     const { state, isMobile } = useSidebar();
     const { resolvedAppearance, updateAppearance } = useAppearance();
     const getInitials = useInitials();
@@ -132,9 +132,6 @@ export function NavUser() {
                     <LogOut className="size-4.5" />
                 </Link>
             </div>
-            <p className="px-1 text-[10px] text-sidebar-foreground/40">
-                v{appVersion} · by jo_hustle
-            </p>
         </div>
     );
 }

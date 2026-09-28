@@ -8,7 +8,7 @@ import { cn, toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
-import type { Auth, NavItem } from '@/types';
+import type { NavItem } from '@/types';
 
 const DESCRIPTIONS: Record<string, string> = {
     Profile: 'Photo, name and email',
@@ -18,7 +18,7 @@ const DESCRIPTIONS: Record<string, string> = {
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
-    const { auth } = usePage<{ auth: Auth }>().props;
+    const { auth, appVersion } = usePage().props;
     const getInitials = useInitials();
 
     const sidebarNavItems: NavItem[] = [
@@ -53,43 +53,48 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             </header>
 
             <div className="flex flex-col gap-6 lg:flex-row">
-                <nav
-                    className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:w-60 lg:shrink-0 lg:flex-col lg:self-start lg:overflow-visible lg:rounded-xl lg:border lg:bg-card lg:p-2 lg:shadow-xs"
-                    aria-label="Settings"
-                >
-                    {sidebarNavItems.map((item, index) => {
-                        const active = isCurrentOrParentUrl(item.href);
+                <div className="flex flex-col gap-3 lg:w-60 lg:shrink-0 lg:self-start">
+                    <nav
+                        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:rounded-xl lg:border lg:bg-card lg:p-2 lg:shadow-xs"
+                        aria-label="Settings"
+                    >
+                        {sidebarNavItems.map((item, index) => {
+                            const active = isCurrentOrParentUrl(item.href);
 
-                        return (
-                            <Link
-                                key={`${toUrl(item.href)}-${index}`}
-                                href={item.href}
-                                aria-current={active ? 'page' : undefined}
-                                className={cn(
-                                    'flex shrink-0 items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors lg:border-transparent',
-                                    active
-                                        ? 'border-primary bg-primary/10 font-semibold text-foreground'
-                                        : 'bg-card text-muted-foreground hover:bg-muted hover:text-foreground lg:bg-transparent',
-                                )}
-                            >
-                                {item.icon && (
-                                    <item.icon
-                                        className={cn(
-                                            'size-4 shrink-0',
-                                            active && 'text-primary',
-                                        )}
-                                    />
-                                )}
-                                <span className="flex flex-col">
-                                    {item.title}
-                                    <span className="hidden text-xs font-normal text-muted-foreground lg:block">
-                                        {DESCRIPTIONS[item.title]}
+                            return (
+                                <Link
+                                    key={`${toUrl(item.href)}-${index}`}
+                                    href={item.href}
+                                    aria-current={active ? 'page' : undefined}
+                                    className={cn(
+                                        'flex shrink-0 items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors lg:border-transparent',
+                                        active
+                                            ? 'border-primary bg-primary/10 font-semibold text-foreground'
+                                            : 'bg-card text-muted-foreground hover:bg-muted hover:text-foreground lg:bg-transparent',
+                                    )}
+                                >
+                                    {item.icon && (
+                                        <item.icon
+                                            className={cn(
+                                                'size-4 shrink-0',
+                                                active && 'text-primary',
+                                            )}
+                                        />
+                                    )}
+                                    <span className="flex flex-col">
+                                        {item.title}
+                                        <span className="hidden text-xs font-normal text-muted-foreground lg:block">
+                                            {DESCRIPTIONS[item.title]}
+                                        </span>
                                     </span>
-                                </span>
-                            </Link>
-                        );
-                    })}
-                </nav>
+                                </Link>
+                            );
+                        })}
+                    </nav>
+                    <p className="hidden px-3 text-xs text-muted-foreground lg:block">
+                        LeadGen Central v{appVersion} · by jo_hustle
+                    </p>
+                </div>
 
                 <div className="min-w-0 flex-1 lg:max-w-3xl">
                     <section className="flex flex-col gap-6">
@@ -97,6 +102,9 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     </section>
                 </div>
             </div>
+            <p className="text-center text-xs text-muted-foreground lg:hidden">
+                LeadGen Central v{appVersion} · by jo_hustle
+            </p>
         </div>
     );
 }
