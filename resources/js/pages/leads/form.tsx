@@ -138,9 +138,16 @@ function DataSourceSelect({
     onValueChange?: (value: string) => void;
 }) {
     // An explicit pick wins; otherwise the saved value, then the suggestion.
-    // A saved placeholder such as "N/A" counts as no source.
+    // A saved placeholder such as "N/A" counts as no source, and a saved
+    // spelling such as "TENDATA/LUSHA" selects its matching option.
     const [chosen, setChosen] = useState<string | null>(null);
-    const saved = isPlaceholder(defaultValue) ? '' : defaultValue;
+    const saved = isPlaceholder(defaultValue)
+        ? ''
+        : (dataSources.find(
+              (source) =>
+                  source.toLowerCase() ===
+                  defaultValue.replace(/\s+/g, '').toLowerCase(),
+          ) ?? defaultValue);
     const value = chosen ?? (saved || suggested || NO_DATA_SOURCE);
 
     const handleValueChange = (next: string) => {

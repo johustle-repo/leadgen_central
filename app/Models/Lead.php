@@ -39,6 +39,9 @@ class Lead extends Model
         });
     }
 
+    /** The data sources a lead can record, spelled as the lead form offers them. */
+    public const DATA_SOURCES = ['Tendata', 'Lusha', 'Tendata/Lusha', 'Email', 'Manual'];
+
     /** Data sources recognised from the site a lead's link points at. */
     public const LINK_SOURCES = ['tendata' => 'Tendata', 'lusha' => 'Lusha'];
 
@@ -61,7 +64,9 @@ class Lead extends Model
      * Applied on every save, whatever created or edited the lead: a missing
      * LinkedIn stays blank instead of a placeholder, and a lead with no data
      * source takes it from its Tendata or Lusha link, or is Manual when it
-     * has no link either. A US or Canadian lead's City holds its full state
+     * has no link either. A recorded source spelled differently from a known
+     * one (such as "TENDATA/LUSHA" from a CSV) takes the known spelling.
+     * A US or Canadian lead's City holds its full state
      * or province name (see LeadStateResolver).
      *
      * Only fields loaded on this instance are considered, so saving a lead
@@ -80,6 +85,10 @@ class Lead extends Model
             app(LeadStateResolver::class)->normalize($this);
         }
 
+        if ($loaded('data_source') && ! $this->isPlaceholder($this->data_source)) {
+            $this->data_source = self::canonicalDataSource($this->data_source) ?? $this->data_source;
+        }
+
         if (! $loaded('data_source', 'source_url') || ! $this->isPlaceholder($this->data_source)) {
             return;
         }
@@ -91,6 +100,22 @@ class Lead extends Model
         if ($derived !== null) {
             $this->data_source = $derived;
         }
+    }
+
+    /**
+     * The known data source a value names, ignoring case and spacing, e.g.
+     * "TENDATA / LUSHA" is Tendata/Lusha.
+     */
+    public static function canonicalDataSource(string $value): ?string
+    {
+        $key = mb_strtolower(preg_replace('/\s+/', '', $value) ?? $value);
+        foreach (self::DATA_SOURCES as $source) {
+            if (mb_strtolower($source) === $key) {
+                return $source;
+            }
+        }
+
+        return null;
     }
 
     private function isPlaceholder(?string $value): bool

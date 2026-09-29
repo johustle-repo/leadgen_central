@@ -145,3 +145,40 @@ it('backfills existing leads saved before the rules applied', function () {
     expect($tendata->refresh()->only(['data_source', 'linkedin_url']))->toBe(['data_source' => 'Tendata', 'linkedin_url' => null])
         ->and($chosen->refresh()->only(['data_source', 'linkedin_url']))->toBe(['data_source' => 'Lusha', 'linkedin_url' => 'https://linkedin.com/in/ada']);
 });
+
+it('records a known data source in the spelling the lead form offers', function (string $source, string $expected) {
+    $lead = Lead::factory()->create(['data_source' => $source]);
+
+    expect($lead->refresh()->data_source)->toBe($expected);
+})->with([
+    'uppercase combined' => ['TENDATA/LUSHA', 'Tendata/Lusha'],
+    'spaced combined' => ['tendata / lusha', 'Tendata/Lusha'],
+    'uppercase single' => ['LUSHA', 'Lusha'],
+    'unknown source kept' => ['LinkedIn Sales Navigator', 'LinkedIn Sales Navigator'],
+]);
+
+it('imports an uppercase data source in the spelling the lead form offers', function () {
+    Storage::fake('local');
+    $agent = User::factory()->create();
+    $file = UploadedFile::fake()->createWithContent('africa.csv', "Company,Email,Sources of Data\nImbabala,riana@imbacontra.co.za,TENDATA/LUSHA\n");
+    $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
+    $batch = UploadBatch::firstOrFail();
+
+    $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
+        0 => 'company_name', 1 => 'email', 2 => 'data_source',
+    ]]);
+
+    expect(Lead::firstOrFail()->data_source)->toBe('Tendata/Lusha');
+});
+
+it('backfills existing leads with another spelling of a known data source', function () {
+    $uppercase = Lead::factory()->create();
+    $unknown = Lead::factory()->create();
+    Lead::query()->whereKey($uppercase->id)->update(['data_source' => 'TENDATA/LUSHA']);
+    Lead::query()->whereKey($unknown->id)->update(['data_source' => 'Other Vendor']);
+
+    (require database_path('migrations/2026_09_29_085702_canonicalize_lead_data_sources.php'))->up();
+
+    expect($uppercase->refresh()->data_source)->toBe('Tendata/Lusha')
+        ->and($unknown->refresh()->data_source)->toBe('Other Vendor');
+});
