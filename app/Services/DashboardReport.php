@@ -354,7 +354,8 @@ class DashboardReport
         $query = User::withTrashed()->where('role', UserRole::Agent)->select($userTable.'.id', $userTable.'.name')
             ->leftJoinSub($leadCounts, 'lead_counts', 'lead_counts.agent_id', '=', $userTable.'.id')
             ->leftJoinSub($batchCounts, 'batch_counts', 'batch_counts.user_id', '=', $userTable.'.id')
-            ->leftJoinSub($rowCounts, 'row_counts', 'row_counts.user_id', '=', $userTable.'.id');
+            ->leftJoinSub($rowCounts, 'row_counts', 'row_counts.user_id', '=', $userTable.'.id')
+            ->where(fn (Builder $agents) => $agents->whereNull($userTable.'.deleted_at')->orWhereNotNull('lead_counts.agent_id')->orWhereNotNull('batch_counts.user_id'));
         foreach (['records', 'possible', 'qualified', 'forwarded'] as $field) {
             $query->selectRaw("COALESCE(lead_counts.{$field}, 0) as {$field}");
         }

@@ -271,7 +271,8 @@ class DatabaseIntelligenceReport
         $query = User::withTrashed()->where('role', UserRole::Agent)->select('users.id', 'users.name')
             ->leftJoinSub($leadCounts, 'lead_counts', 'lead_counts.agent_id', '=', 'users.id')
             ->leftJoinSub($batchCounts, 'batch_counts', 'batch_counts.user_id', '=', 'users.id')
-            ->leftJoinSub($rowCounts, 'row_counts', 'row_counts.user_id', '=', 'users.id');
+            ->leftJoinSub($rowCounts, 'row_counts', 'row_counts.user_id', '=', 'users.id')
+            ->where(fn (Builder $agents) => $agents->whereNull('users.deleted_at')->orWhereNotNull('lead_counts.agent_id')->orWhereNotNull('batch_counts.user_id'));
         foreach (['records', 'companies'] as $key) {
             $query->selectRaw("COALESCE(lead_counts.{$key}, 0) as {$key}");
         }

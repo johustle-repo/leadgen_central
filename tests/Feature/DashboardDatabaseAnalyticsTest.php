@@ -219,3 +219,15 @@ test('geographic groups use projected country codes and trimmed location labels'
         ->where('databaseAnalytics.geography.rows.0.city', 'Manila')
         ->where('databaseAnalytics.geography.rows.0.records', 2));
 });
+
+test('contribution hides deleted agents with no activity in the period', function () {
+    $user = User::factory()->administrator()->create();
+    $idleDeleted = User::factory()->create(['name' => 'Idle Deleted Agent']);
+    $activeDeleted = User::factory()->create(['name' => 'Active Deleted Agent']);
+    Lead::factory()->for($activeDeleted, 'agent')->create();
+    $idleDeleted->delete();
+    $activeDeleted->delete();
+
+    $this->actingAs($user)->get(route('dashboard'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('databaseAnalytics.contribution', fn ($rows) => collect($rows)->pluck('name')->all() === ['Active Deleted Agent']));
+});

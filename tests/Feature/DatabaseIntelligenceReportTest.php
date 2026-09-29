@@ -283,3 +283,15 @@ test('database report query count does not grow with lead or upload row volume',
     expect(count(DB::getQueryLog()))->toBe($initialCount);
     DB::disableQueryLog();
 });
+
+test('contribution by agent hides deleted agents with no activity in the period', function () {
+    $user = User::factory()->administrator()->create();
+    $idleDeleted = User::factory()->create(['name' => 'Idle Deleted Agent']);
+    $activeDeleted = User::factory()->create(['name' => 'Active Deleted Agent']);
+    UploadBatch::factory()->for($activeDeleted)->create();
+    $idleDeleted->delete();
+    $activeDeleted->delete();
+
+    $this->actingAs($user)->get(route('report.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('databaseReport.contribution', fn ($rows) => collect($rows)->pluck('name')->all() === ['Active Deleted Agent']));
+});
