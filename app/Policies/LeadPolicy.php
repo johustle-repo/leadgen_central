@@ -24,6 +24,15 @@ class LeadPolicy
     }
 
     /**
+     * Determine whether the user can open the model read-only. Search reaches
+     * every lead, so any user may preview a colleague's lead from the results.
+     */
+    public function preview(User $user, Lead $lead): bool
+    {
+        return true;
+    }
+
+    /**
      * Determine whether the user can create models.
      */
     public function create(User $user): bool

@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Download,
+    Eye,
     Mail,
     Pencil,
     Plus,
@@ -665,18 +666,25 @@ export default function LeadsIndex({
                                     )}
                                     <TableCell align="right">
                                         <div className="flex justify-end gap-2">
-                                            {lead.can_update && (
-                                                <Button
-                                                    asChild
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    <Link href={edit(lead.id)}>
-                                                        <Pencil className="size-3.5" />
-                                                        Edit
-                                                    </Link>
-                                                </Button>
-                                            )}
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                variant="outline"
+                                            >
+                                                <Link href={edit(lead.id)}>
+                                                    {lead.can_update ? (
+                                                        <>
+                                                            <Pencil className="size-3.5" />
+                                                            Edit
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Eye className="size-3.5" />
+                                                            View
+                                                        </>
+                                                    )}
+                                                </Link>
+                                            </Button>
                                         </div>
                                     </TableCell>
                                 </TableRow>

@@ -246,17 +246,18 @@ class LeadController extends Controller
      */
     public function show(Lead $lead): RedirectResponse
     {
-        Gate::authorize('view', $lead);
+        Gate::authorize('preview', $lead);
 
         return redirect()->route('leads.edit', $lead);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Show the form for editing the specified resource, read-only when the
+     * user may preview but not update it.
      */
     public function edit(Request $request, Lead $lead): Response
     {
-        Gate::authorize('update', $lead);
+        Gate::authorize('preview', $lead);
 
         $changeHistory = AuditLog::query()
             ->where('auditable_type', 'lead')
@@ -290,7 +291,7 @@ class LeadController extends Controller
                 ?? $companyContacts()->orderBy('created_at')->orderBy('id')->first(['id']);
         }
 
-        return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $lead->company_name, $lead->agent_id), 'lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : [], 'changeHistory' => $changeHistory, 'nextLeadId' => $nextLead?->id]);
+        return Inertia::render('leads/form', ['companyContactCount' => fn (): array => $this->formCompanyContactCount($request, $lead->company_name, $lead->agent_id), 'lead' => $lead, 'defaults' => [], 'formVersion' => $lead->id, 'agents' => $request->user()->canViewAllLeads() ? User::where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : [], 'changeHistory' => $changeHistory, 'nextLeadId' => $nextLead?->id, 'canUpdate' => $request->user()->can('update', $lead)]);
     }
 
     /**

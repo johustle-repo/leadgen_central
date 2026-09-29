@@ -281,17 +281,26 @@ it('prefills todays date in the leads filter', function () {
         ->where('filters.date', '2026-09-01'));
 });
 
-it('prevents agents from viewing another agents lead', function () {
+it('lets agents preview another agents lead read-only without updating it', function () {
     $agent = User::factory()->create();
-    $otherLead = Lead::factory()->create();
-    $this->actingAs($agent)->get(route('leads.edit', $otherLead))->assertForbidden();
+    $otherLead = Lead::factory()->create(['company_name' => 'Colleague Company']);
+
+    $this->actingAs($agent)->get(route('leads.edit', $otherLead))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('leads/form')
+            ->where('lead.id', $otherLead->id)
+            ->where('canUpdate', false));
+
+    $this->actingAs($agent)->put(route('leads.update', $otherLead), ['company_name' => 'Hijacked Company'])->assertForbidden();
+    $this->assertDatabaseHas('leads', ['id' => $otherLead->id, 'company_name' => 'Colleague Company']);
 });
 
 it('allows a lead owner to edit and update their own lead', function () {
     $agent = User::factory()->create();
     $lead = Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Original Company', 'created_by' => $agent->id]);
 
-    $this->actingAs($agent)->get(route('leads.edit', $lead))->assertOk();
+    $this->actingAs($agent)->get(route('leads.edit', $lead))->assertOk()->assertInertia(fn (Assert $page) => $page->where('canUpdate', true));
     $response = $this->actingAs($agent)->put(route('leads.update', $lead), ['company_name' => 'Updated Company']);
 
     $response->assertRedirect();

@@ -230,6 +230,7 @@ export default function LeadForm({
     companyContactCount,
     changeHistory = [],
     nextLeadId = null,
+    canUpdate = true,
 }: {
     lead: Lead | null;
     defaults: Record<string, string | number | null>;
@@ -238,6 +239,7 @@ export default function LeadForm({
     agents: Array<{ id: number; name: string }>;
     changeHistory?: ChangeHistoryEntry[];
     nextLeadId?: number | null;
+    canUpdate?: boolean;
 }) {
     const form = lead ? update.form(lead.id) : store.form();
     const isCreating = !lead;
@@ -303,7 +305,13 @@ export default function LeadForm({
 
     return (
         <>
-            <Head title={lead ? `Edit ${lead.company_name}` : 'Add Lead'} />
+            <Head
+                title={
+                    lead
+                        ? `${canUpdate ? 'Edit' : 'View'} ${lead.company_name}`
+                        : 'Add Lead'
+                }
+            />
             <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 md:p-6">
                 <Form
                     key={formVersion}
@@ -404,14 +412,18 @@ export default function LeadForm({
                                                 Raw lead details
                                             </CardTitle>
                                             <CardDescription>
-                                                Match the fields from the raw
-                                                lead source.
+                                                {canUpdate
+                                                    ? 'Match the fields from the raw lead source.'
+                                                    : 'This lead belongs to another agent, so it is read-only.'}
                                             </CardDescription>
                                         </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="grid gap-4 md:grid-cols-2">
+                                    <fieldset
+                                        disabled={!canUpdate}
+                                        className="grid gap-4 md:grid-cols-2"
+                                    >
                                         {fields.map((field) => {
                                             const value = defaultFor(
                                                 field.name,
@@ -526,7 +538,7 @@ export default function LeadForm({
                                                 </div>
                                             );
                                         })}
-                                    </div>
+                                    </fieldset>
                                 </CardContent>
                             </Card>
                             <div className="flex items-center justify-between gap-3">
@@ -546,11 +558,18 @@ export default function LeadForm({
                                         variant="outline"
                                         onClick={() => history.back()}
                                     >
-                                        Cancel
+                                        {canUpdate ? 'Cancel' : 'Back'}
                                     </Button>
-                                    <Button type="submit" disabled={processing}>
-                                        {processing ? 'Saving…' : 'Save lead'}
-                                    </Button>
+                                    {canUpdate && (
+                                        <Button
+                                            type="submit"
+                                            disabled={processing}
+                                        >
+                                            {processing
+                                                ? 'Saving…'
+                                                : 'Save lead'}
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </>
