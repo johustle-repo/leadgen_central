@@ -7,6 +7,7 @@ use App\Models\UploadBatch;
 use App\Models\User;
 use App\Support\ReportCache;
 use App\UploadBatchStatus;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
@@ -36,7 +37,11 @@ class WelcomeOverview
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     stats: array{total: int, total_change: float|null, validated: int, validated_rate: float|null, this_month: int, this_month_change: float|null},
+     *     growth: list<array{week_start: string, leads: int}>,
+     *     activity: list<array{type: string, label: string, occurred_at: string}>,
+     * }
      */
     private function build(User $user): array
     {
@@ -74,12 +79,13 @@ class WelcomeOverview
     private function growth(Builder $leads, CarbonImmutable $now): array
     {
         $end = $now->addDay()->startOfDay();
-
-        return collect(range(self::GROWTH_WEEKS, 1))->map(function (int $weeksAgo) use ($leads, $end): array {
+        $weeks = [];
+        for ($weeksAgo = self::GROWTH_WEEKS; $weeksAgo >= 1; $weeksAgo--) {
             $from = $end->subWeeks($weeksAgo);
+            $weeks[] = ['week_start' => $from->toDateString(), 'leads' => (clone $leads)->where('created_at', '>=', $from)->where('created_at', '<', $from->addWeek())->count()];
+        }
 
-            return ['week_start' => $from->toDateString(), 'leads' => (clone $leads)->where('created_at', '>=', $from)->where('created_at', '<', $from->addWeek())->count()];
-        })->values()->all();
+        return $weeks;
     }
 
     /**
@@ -91,19 +97,32 @@ class WelcomeOverview
      */
     private function activity(Builder $leads, Builder $batches): array
     {
-        $batchEvents = (clone $batches)->latest('updated_at')->limit(self::ACTIVITY_LIMIT)->get(['id', 'processing_status', 'created_at', 'completed_at', 'updated_at'])
-            ->map(fn (UploadBatch $batch): array => match ($batch->processing_status) {
-                UploadBatchStatus::Completed => ['type' => 'batch', 'label' => 'CSV batch accepted', 'occurred_at' => ($batch->completed_at ?? $batch->updated_at)->toIso8601String()],
-                UploadBatchStatus::Failed => ['type' => 'batch_failed', 'label' => 'CSV batch failed', 'occurred_at' => $batch->updated_at->toIso8601String()],
-                default => ['type' => 'batch', 'label' => 'CSV batch uploaded', 'occurred_at' => $batch->created_at->toIso8601String()],
-            });
-        $leadEvents = (clone $leads)->latest()->limit(self::ACTIVITY_LIMIT)->pluck('created_at')
-            ->map(fn ($createdAt): array => ['type' => 'lead', 'label' => 'New lead added', 'occurred_at' => $createdAt->toIso8601String()]);
-        $verifiedEvents = (clone $leads)->whereNotNull('verified_at')->latest('verified_at')->limit(self::ACTIVITY_LIMIT)->pluck('verified_at')
-            ->map(fn ($verifiedAt): array => ['type' => 'verified', 'label' => 'Lead verified', 'occurred_at' => $verifiedAt->toIso8601String()]);
+        $events = [];
+        foreach ((clone $batches)->latest('updated_at')->limit(self::ACTIVITY_LIMIT)->get(['id', 'processing_status', 'created_at', 'completed_at', 'updated_at']) as $batch) {
+            $events[] = match ($batch->processing_status) {
+                UploadBatchStatus::Completed => $this->event('batch', 'CSV batch accepted', $batch->completed_at ?? $batch->updated_at),
+                UploadBatchStatus::Failed => $this->event('batch_failed', 'CSV batch failed', $batch->updated_at),
+                default => $this->event('batch', 'CSV batch uploaded', $batch->created_at),
+            };
+        }
+        foreach ((clone $leads)->latest()->limit(self::ACTIVITY_LIMIT)->get(['id', 'created_at']) as $lead) {
+            $events[] = $this->event('lead', 'New lead added', $lead->created_at);
+        }
+        foreach ((clone $leads)->whereNotNull('verified_at')->latest('verified_at')->limit(self::ACTIVITY_LIMIT)->get(['id', 'verified_at']) as $lead) {
+            $events[] = $this->event('verified', 'Lead verified', $lead->verified_at);
+        }
 
-        return $batchEvents->concat($leadEvents)->concat($verifiedEvents)
-            ->sortByDesc('occurred_at')->take(self::ACTIVITY_LIMIT)->values()->all();
+        usort($events, fn (array $first, array $second): int => strcmp($second['occurred_at'], $first['occurred_at']));
+
+        return array_slice($events, 0, self::ACTIVITY_LIMIT);
+    }
+
+    /**
+     * @return array{type: string, label: string, occurred_at: string}
+     */
+    private function event(string $type, string $label, mixed $occurredAt): array
+    {
+        return ['type' => $type, 'label' => $label, 'occurred_at' => Carbon::parse($occurredAt)->toIso8601String()];
     }
 
     private function change(int $current, int $previous): ?float
