@@ -19,9 +19,10 @@ use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\UploadBatchController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VerificationController;
+use App\Http\Controllers\WelcomeController;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'welcome')->name('home');
+Route::get('/', WelcomeController::class)->name('home');
 
 Route::get('email/verify/{id}/{hash}', AuthVerifyEmailController::class)
     ->whereNumber('id')

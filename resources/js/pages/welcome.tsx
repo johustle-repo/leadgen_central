@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, usePage, usePoll } from '@inertiajs/react';
 import {
     ArrowRight,
     BadgeCheck,
@@ -34,8 +34,99 @@ const features = [
     },
 ];
 
+type Overview = {
+    stats: {
+        total: number;
+        total_change: number | null;
+        validated: number;
+        validated_rate: number | null;
+        this_month: number;
+        this_month_change: number | null;
+    };
+    growth: { week_start: string; leads: number }[];
+    activity: {
+        type: 'batch' | 'batch_failed' | 'lead' | 'verified';
+        label: string;
+        occurred_at: string;
+    }[];
+};
+
+const minutesAgo = (minutes: number) =>
+    new Date(Date.now() - minutes * 60_000).toISOString();
+
+/** Illustrative figures shown to guests, who cannot see real lead data. */
+const sampleOverview: Overview = {
+    stats: {
+        total: 18642,
+        total_change: 12.4,
+        validated: 16208,
+        validated_rate: 86.9,
+        this_month: 2481,
+        this_month_change: 18.1,
+    },
+    growth: [30, 45, 38, 62, 55, 78, 69, 94].map((leads, index) => ({
+        week_start: String(index),
+        leads,
+    })),
+    activity: [
+        {
+            type: 'batch',
+            label: 'CSV batch accepted',
+            occurred_at: minutesAgo(2),
+        },
+        { type: 'lead', label: 'New lead added', occurred_at: minutesAgo(3) },
+        {
+            type: 'verified',
+            label: 'Lead verified',
+            occurred_at: minutesAgo(4),
+        },
+    ],
+};
+
+const activityDotColors: Record<Overview['activity'][number]['type'], string> =
+    {
+        batch: 'bg-cyan-300',
+        batch_failed: 'bg-rose-400',
+        lead: 'bg-indigo-400',
+        verified: 'bg-emerald-400',
+    };
+
+const formatChange = (change: number | null) =>
+    change === null ? 'No prior data' : `${change > 0 ? '+' : ''}${change}%`;
+
+const relativeTime = new Intl.RelativeTimeFormat(undefined, {
+    numeric: 'auto',
+});
+
+function timeAgo(timestamp: string): string {
+    const seconds = Math.round(
+        (new Date(timestamp).getTime() - Date.now()) / 1000,
+    );
+    const units: [Intl.RelativeTimeFormatUnit, number][] = [
+        ['day', 86400],
+        ['hour', 3600],
+        ['minute', 60],
+    ];
+
+    for (const [unit, size] of units) {
+        if (Math.abs(seconds) >= size) {
+            return relativeTime.format(Math.round(seconds / size), unit);
+        }
+    }
+
+    return 'just now';
+}
+
 export default function Welcome() {
-    const { auth } = usePage<{ auth: Auth }>().props;
+    const { auth, overview: liveOverview } = usePage<{
+        auth: Auth;
+        overview: Overview | null;
+    }>().props;
+    const isLive = liveOverview !== null;
+    const overview = liveOverview ?? sampleOverview;
+    const peakWeek = Math.max(...overview.growth.map(({ leads }) => leads), 1);
+
+    usePoll(15000, { only: ['overview'] }, { autoStart: isLive });
 
     return (
         <>
@@ -143,13 +234,40 @@ export default function Welcome() {
                                     <span className="text-xs text-slate-500">
                                         Lead intelligence overview
                                     </span>
-                                    <ShieldCheck className="size-4 text-cyan-300" />
+                                    {isLive ? (
+                                        <span className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-emerald-300 uppercase">
+                                            <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
+                                            Live
+                                        </span>
+                                    ) : (
+                                        <ShieldCheck className="size-4 text-cyan-300" />
+                                    )}
                                 </div>
                                 <div className="grid gap-3 p-3 sm:grid-cols-3">
                                     {[
-                                        ['Total leads', '18,642', '+12.4%'],
-                                        ['Validated', '16,208', '86.9%'],
-                                        ['This month', '2,481', '+18.1%'],
+                                        [
+                                            'Total leads',
+                                            overview.stats.total.toLocaleString(),
+                                            formatChange(
+                                                overview.stats.total_change,
+                                            ),
+                                        ],
+                                        [
+                                            'Validated',
+                                            overview.stats.validated.toLocaleString(),
+                                            overview.stats.validated_rate ===
+                                            null
+                                                ? '—'
+                                                : `${overview.stats.validated_rate}%`,
+                                        ],
+                                        [
+                                            'This month',
+                                            overview.stats.this_month.toLocaleString(),
+                                            formatChange(
+                                                overview.stats
+                                                    .this_month_change,
+                                            ),
+                                        ],
                                     ].map(([label, value, trend]) => (
                                         <div
                                             key={label}
@@ -181,17 +299,22 @@ export default function Welcome() {
                                             <ChartNoAxesCombined className="size-5 text-cyan-300" />
                                         </div>
                                         <div className="mt-8 flex h-40 items-end gap-2">
-                                            {[
-                                                30, 45, 38, 62, 55, 78, 69, 94,
-                                            ].map((height, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="flex-1 rounded-t-md bg-cyan-300"
-                                                    style={{
-                                                        height: `${height}%`,
-                                                    }}
-                                                />
-                                            ))}
+                                            {overview.growth.map(
+                                                ({ week_start, leads }) => (
+                                                    <div
+                                                        key={week_start}
+                                                        title={
+                                                            isLive
+                                                                ? `Week of ${week_start}: ${leads.toLocaleString()} leads`
+                                                                : undefined
+                                                        }
+                                                        className="flex-1 rounded-t-md bg-cyan-300 transition-[height] duration-500"
+                                                        style={{
+                                                            height: `${Math.max((leads / peakWeek) * 100, 3)}%`,
+                                                        }}
+                                                    />
+                                                ),
+                                            )}
                                         </div>
                                     </div>
                                     <div className="rounded-2xl border border-white/8 bg-white/[.035] p-5">
@@ -199,29 +322,33 @@ export default function Welcome() {
                                             Recent activity
                                         </p>
                                         <div className="mt-5 flex flex-col gap-5">
-                                            {[
-                                                'CSV batch accepted',
-                                                'New lead added',
-                                                'Agent invited',
-                                            ].map((item, index) => (
-                                                <div
-                                                    key={item}
-                                                    className="flex gap-3"
-                                                >
-                                                    <span
-                                                        className={`mt-1 size-2 rounded-full ${index === 1 ? 'bg-indigo-400' : 'bg-cyan-300'}`}
-                                                    />
-                                                    <div>
-                                                        <p className="text-xs text-slate-200">
-                                                            {item}
-                                                        </p>
-                                                        <p className="text-[10px] text-slate-500">
-                                                            {index + 2} minutes
-                                                            ago
-                                                        </p>
+                                            {overview.activity.length === 0 && (
+                                                <p className="text-xs text-slate-500">
+                                                    No activity yet.
+                                                </p>
+                                            )}
+                                            {overview.activity.map(
+                                                (event, index) => (
+                                                    <div
+                                                        key={`${event.type}-${event.occurred_at}-${index}`}
+                                                        className="flex gap-3"
+                                                    >
+                                                        <span
+                                                            className={`mt-1 size-2 shrink-0 rounded-full ${activityDotColors[event.type]}`}
+                                                        />
+                                                        <div>
+                                                            <p className="text-xs text-slate-200">
+                                                                {event.label}
+                                                            </p>
+                                                            <p className="text-[10px] text-slate-500">
+                                                                {timeAgo(
+                                                                    event.occurred_at,
+                                                                )}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                ),
+                                            )}
                                         </div>
                                     </div>
                                 </div>
