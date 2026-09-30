@@ -540,6 +540,88 @@ it('lays out the attendance summary sheet like the team template', function () {
         ->and($sheet->getDrawingCollection()[0]->getCoordinates())->toBe('A13');
 });
 
+it('includes the team leader in the attendance workbook ahead of the agents', function () {
+    User::factory()->create(['name' => 'Jonathan F. Quiles', 'employee_code' => 'DUS-002']);
+    User::factory()->administrator()->create(['name' => 'Elmar B. Noche', 'employee_code' => 'DUS-001', 'alias_name' => 'Alexander Bennett', 'alias_email' => 'a.bennett@duscaff.com']);
+    User::factory()->administrator()->create(['name' => 'Other Administrator']);
+
+    $path = tempnam(sys_get_temp_dir(), 'attendance').'.xlsx';
+    file_put_contents($path, Excel::raw(
+        new AttendanceBackupExport(Carbon\Carbon::parse('2026-08-01')->startOfMonth(), Carbon\Carbon::parse('2026-08-01')->endOfMonth()),
+        ExcelFormat::XLSX,
+    ));
+    $workbook = IOFactory::load($path);
+    unlink($path);
+
+    $leaderSheet = $workbook->getSheetByName('Elmar B. Noche');
+
+    expect($workbook->getSheetNames())->toBe(['Attendance Summary', 'Elmar B. Noche', 'Jonathan F. Quiles'])
+        ->and($workbook->getSheetByName('Attendance Summary')->rangeToArray('A11:C11', null, false, false)[0])->toBe(['DUS-001', 'Elmar B. Noche', 'Team Leader'])
+        ->and($leaderSheet->rangeToArray('B6:B8', null, false, false))->toBe([['Alexander Bennett'], ['a.bennett@duscaff.com'], ['Team Leader']]);
+});
+
+it('lays out each member sheet like the team template', function () {
+    $this->travelTo('2026-09-01 06:08:00');
+    $staff = User::factory()->create([
+        'name' => 'Jonathan F. Quiles',
+        'employee_code' => 'DUS-002',
+        'alias_name' => 'James Whitaker',
+        'alias_email' => 'j.whitaker@duscaff.com',
+    ]);
+    Attendance::factory()->for($staff)->create(['recorded_at' => '2026-08-03 07:53:00', 'entry_type' => 'time_in']);
+    Attendance::factory()->for($staff)->create(['recorded_at' => '2026-08-03 17:21:00', 'entry_type' => 'time_out']);
+    Holiday::query()->create(['holiday_date' => '2026-08-31', 'name' => 'National Heroes Day', 'country_code' => 'PH', 'type' => 'regular']);
+
+    $path = tempnam(sys_get_temp_dir(), 'attendance').'.xlsx';
+    file_put_contents($path, Excel::raw(
+        new AttendanceBackupExport(Carbon\Carbon::parse('2026-08-01')->startOfMonth(), Carbon\Carbon::parse('2026-08-01')->endOfMonth()),
+        ExcelFormat::XLSX,
+    ));
+    $sheet = IOFactory::load($path)->getSheetByName('Jonathan F. Quiles');
+    unlink($path);
+
+    expect($sheet->getCell('A1')->getValue())->toBe("Elmar B. Noche's Team PH Attendance Summary - TimeIn/TimeOut-Month of August 2026")
+        ->and($sheet->rangeToArray('A5:B12', null, false, false))->toBe([
+            ['Name', 'Jonathan F. Quiles'],
+            ['Sub Name', 'James Whitaker'],
+            ['Email', 'j.whitaker@duscaff.com'],
+            ['Role', 'Member'],
+            ['Employee Code', 'DUS-002'],
+            ['Status', 'Active'],
+            ['Attendance Days', 1],
+            ['Attendance Logs', 2],
+        ])
+        ->and($sheet->getCell('A13')->getValue())->toBe('Member Total Hours')
+        ->and($sheet->rangeToArray('A15:F15', null, false, false)[0])->toBe(['Date', 'Day', 'Time In', 'Time Out', 'Daily Total Hours', 'Logs'])
+        ->and($sheet->rangeToArray('A18:D18', null, false, false)[0])->toBe(['Aug 03, 2026', 'Monday', '07:53', '17:21'])
+        ->and($sheet->getCell('F18')->getValue())->toBe('Time In - 07:53, Time Out - 17:21')
+        ->and($sheet->rangeToArray('A17:D17', null, false, false)[0])->toBe(['Aug 02, 2026', 'Sunday', 'Rest Day', 'Rest Day'])
+        ->and($sheet->getCell('F17')->getValue())->toBe('Rest Day - Sunday Rest Day')
+        ->and($sheet->getStyle('A17')->getFill()->getStartColor()->getRGB())->toBe('FFE699')
+        ->and($sheet->rangeToArray('A46:D46', null, false, false)[0])->toBe(['Aug 31, 2026', 'Monday', 'Holiday', 'Holiday'])
+        ->and($sheet->getCell('G46')->getValue())->toBe('National Heroes Day')
+        ->and($sheet->getStyle('G46')->getFill()->getStartColor()->getRGB())->toBe('A9D18E')
+        ->and($sheet->getCell('A48')->getValue())->toBe('Approved and verified by:')
+        ->and($sheet->getCell('A50')->getValue())->toBe('Elmar B. Noche')
+        ->and($sheet->getHighestRow())->toBe(50)
+        ->and($sheet->getDrawingCollection()[0]->getCoordinates())->toBe('A48');
+});
+
+it('assigns the team employee codes, sub names and emails from the attendance workbook', function () {
+    $leader = User::factory()->administrator()->create(['name' => 'Elmar B. Noche']);
+    $member = User::factory()->create(['name' => 'Haryll L. Caido', 'employee_code' => 'OLD-1']);
+    $codeHolder = User::factory()->create(['name' => 'Someone Else', 'employee_code' => 'DUS-003']);
+    $conflicted = User::factory()->create(['name' => 'Dexter L. Javelosa']);
+
+    (require database_path('migrations/2026_09_30_075850_assign_team_payroll_profiles.php'))->up();
+
+    expect($leader->refresh()->only(['employee_code', 'alias_name', 'alias_email']))->toBe(['employee_code' => 'DUS-001', 'alias_name' => 'Alexander Bennett', 'alias_email' => 'a.bennett@duscaff.com'])
+        ->and($member->refresh()->employee_code)->toBe('DUS-008')
+        ->and($codeHolder->refresh()->employee_code)->toBe('DUS-003')
+        ->and($conflicted->refresh()->alias_name)->toBe('Daniel Hoffman')
+        ->and($conflicted->refresh()->employee_code)->toBeNull();
+});
+
 it('lets the super administrator fill in a missing time in', function () {
     $superAdministrator = User::factory()->superAdministrator()->create();
     $staff = User::factory()->create();

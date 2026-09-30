@@ -6,12 +6,14 @@ use App\Models\User;
 use App\Services\AttendanceDaySummaryService;
 use App\UserRole;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 /**
  * Monthly attendance backup workbook: one "Attendance Summary" roll-up
- * sheet plus one sheet per active staff member with a daily breakdown.
+ * sheet plus one sheet per active payroll member (the agents and their
+ * team leader) with a daily breakdown, ordered by employee code.
  */
 class AttendanceBackupExport implements Export, WithMultipleSheets
 {
@@ -19,14 +21,20 @@ class AttendanceBackupExport implements Export, WithMultipleSheets
 
     public function sheets(): array
     {
-        $users = User::query()->where('status', 'active')->where('role', UserRole::Agent)->orderBy('name')->get();
+        $users = User::query()
+            ->where('status', 'active')
+            ->where(fn (Builder $payroll) => $payroll->where('role', UserRole::Agent)->orWhere('name', AttendanceSummarySheet::APPROVER_NAME))
+            ->orderByRaw('employee_code is null')
+            ->orderBy('employee_code')
+            ->orderBy('name')
+            ->get();
         $periods = app(AttendanceDaySummaryService::class)->buildForPeriod($this->start, $this->end, $users);
 
         $sheets = [new AttendanceSummarySheet($periods, $this->start)];
 
         $usedTitles = [];
         foreach ($periods as $period) {
-            $sheets[] = new AttendanceMemberSheet($period, $this->uniqueSheetTitle($period['user']->name, $usedTitles));
+            $sheets[] = new AttendanceMemberSheet($period, $this->uniqueSheetTitle($period['user']->name, $usedTitles), $this->start);
         }
 
         return $sheets;

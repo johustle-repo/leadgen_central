@@ -4,7 +4,6 @@ namespace App\Exports;
 
 use App\Models\Attendance;
 use App\Models\User;
-use App\UserRole;
 use Carbon\CarbonInterface;
 use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -14,6 +13,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
  * Monthly roll-up sheet laid out like the team's hand-made attendance
@@ -24,9 +24,12 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
 {
     private const TABLE_HEADER_ROW = 10;
 
-    private const APPROVER_NAME = 'Elmar B. Noche';
+    public const APPROVER_NAME = 'Elmar B. Noche';
 
-    private const APPROVER_POSITION = 'Team Leader';
+    public const APPROVER_POSITION = 'Team Leader';
+
+    /** @var array{name: string, size: int, bold: bool} */
+    public const BOLD_FONT = ['name' => 'Arial', 'size' => 10, 'bold' => true];
 
     /** @var array<string, float> */
     private const COLUMN_WIDTHS = ['A' => 35.71, 'B' => 28.43, 'C' => 14.0, 'D' => 16.0, 'E' => 15.71, 'F' => 11.0];
@@ -53,30 +56,24 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
 
         foreach ($this->periods as $period) {
             $user = $period['user'];
-            $days = $period['days'];
+            $totals = self::memberTotals($period['days']);
 
-            $attendanceDays = count(array_filter($days, fn (array $day): bool => $day['time_in'] !== null));
-            $logCount = array_sum(array_map(fn (array $day): int => ($day['time_in'] !== null ? 1 : 0) + ($day['time_out'] !== null ? 1 : 0), $days));
-            $workedMinutes = array_sum(array_column($days, 'worked_minutes'));
-
-            $totalDays += $attendanceDays;
-            $totalLogs += $logCount;
-            $totalMinutes += $workedMinutes;
+            $totalDays += $totals['attendance_days'];
+            $totalLogs += $totals['log_count'];
+            $totalMinutes += $totals['worked_minutes'];
 
             $memberRows[] = [
                 $user->employee_code ?? '',
                 $user->name,
-                $user->role === UserRole::Agent ? 'Team Member' : $user->role->label(),
-                $attendanceDays,
-                $logCount,
-                Attendance::formatMinutes($workedMinutes),
+                self::isApprover($user) ? self::APPROVER_POSITION : 'Team Member',
+                $totals['attendance_days'],
+                $totals['log_count'],
+                Attendance::formatMinutes($totals['worked_minutes']),
             ];
         }
 
         return [
-            [self::APPROVER_NAME."'s Team PH Attendance Summary - TimeIn/TimeOut-Month of ".$this->start->format('F Y')],
-            ['Period', $this->start->format('F Y')],
-            ['Generated at', now()->format('M j, Y g:i A')],
+            ...self::reportHeaderRows($this->start),
             [''],
             ['Total Members', count($this->periods)],
             ['Total Attendance Days', $totalDays],
@@ -100,44 +97,91 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
             AfterSheet::class => function (AfterSheet $event): void {
                 $sheet = $event->sheet->getDelegate();
                 $lastRow = $sheet->getHighestRow();
-                $signatureRow = $lastRow - 4;
-                $boldFont = ['name' => 'Arial', 'size' => 10, 'bold' => true];
 
-                foreach (self::COLUMN_WIDTHS as $column => $width) {
-                    $sheet->getColumnDimension($column)->setWidth($width);
-                }
-
-                $sheet->getStyle("A1:F{$lastRow}")->applyFromArray([
-                    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '000000']]],
-                    'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-                ]);
-
-                $sheet->mergeCells('A1:F1');
+                self::styleReportFrame($sheet, self::COLUMN_WIDTHS, $lastRow);
                 $sheet->getRowDimension(1)->setRowHeight(34.5);
-                $sheet->getStyle('A1')->applyFromArray([
-                    'font' => $boldFont,
-                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
-                ]);
-
-                $sheet->getStyle('B2')->getFont()->applyFromArray($boldFont);
-                $sheet->getStyle('B8')->getFont()->applyFromArray($boldFont);
-                $sheet->getStyle('A'.self::TABLE_HEADER_ROW.':F'.self::TABLE_HEADER_ROW)->getFont()->applyFromArray($boldFont);
+                $sheet->getStyle('B8')->getFont()->applyFromArray(self::BOLD_FONT);
+                $sheet->getStyle('A'.self::TABLE_HEADER_ROW.':F'.self::TABLE_HEADER_ROW)->getFont()->applyFromArray(self::BOLD_FONT);
 
                 $sheet->getRowDimension($lastRow - 2)->setRowHeight(37.5);
-                $sheet->getStyle('A'.($lastRow - 1))->getFont()->applyFromArray($boldFont);
+                $sheet->getStyle('A'.($lastRow - 1))->getFont()->applyFromArray(self::BOLD_FONT);
                 $sheet->getStyle('A'.($lastRow - 1).':A'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                $signature = new Drawing;
-                $signature->setName('Approver Signature');
-                $signature->setPath(resource_path('images/attendance-approver-signature.png'));
-                $signature->setCoordinates("A{$signatureRow}");
-                $signature->setOffsetX(45);
-                $signature->setOffsetY(16);
-                $signature->setResizeProportional(false);
-                $signature->setWidth(153);
-                $signature->setHeight(141);
-                $signature->setWorksheet($sheet);
+                self::addSignature($sheet, 'A'.($lastRow - 4), 45, 16);
             },
         ];
+    }
+
+    /**
+     * Title, period and generated-at rows shared by every sheet in the workbook.
+     *
+     * @return list<list<string>>
+     */
+    public static function reportHeaderRows(CarbonInterface $month): array
+    {
+        return [
+            [self::APPROVER_NAME."'s Team PH Attendance Summary - TimeIn/TimeOut-Month of ".$month->format('F Y')],
+            ['Period', $month->format('F Y')],
+            ['Generated at', now()->format('M j, Y g:i A')],
+        ];
+    }
+
+    /**
+     * @param  list<array{time_in: CarbonInterface|null, time_out: CarbonInterface|null, worked_minutes: int}>  $days
+     * @return array{attendance_days: int, log_count: int, worked_minutes: int}
+     */
+    public static function memberTotals(array $days): array
+    {
+        return [
+            'attendance_days' => count(array_filter($days, fn (array $day): bool => $day['time_in'] !== null)),
+            'log_count' => array_sum(array_map(fn (array $day): int => ($day['time_in'] !== null ? 1 : 0) + ($day['time_out'] !== null ? 1 : 0), $days)),
+            'worked_minutes' => array_sum(array_column($days, 'worked_minutes')),
+        ];
+    }
+
+    public static function isApprover(User $user): bool
+    {
+        return $user->name === self::APPROVER_NAME;
+    }
+
+    /**
+     * Column widths, thin borders around every used cell, the merged bold
+     * title and the bold period value.
+     *
+     * @param  array<string, float>  $columnWidths
+     */
+    public static function styleReportFrame(Worksheet $sheet, array $columnWidths, int $lastRow): void
+    {
+        foreach ($columnWidths as $column => $width) {
+            $sheet->getColumnDimension($column)->setWidth($width);
+        }
+
+        $lastColumn = array_key_last($columnWidths);
+
+        $sheet->getStyle("A1:{$lastColumn}{$lastRow}")->applyFromArray([
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '000000']]],
+            'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+
+        $sheet->mergeCells('A1:F1');
+        $sheet->getStyle('A1')->applyFromArray([
+            'font' => self::BOLD_FONT,
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        ]);
+        $sheet->getStyle('B2')->getFont()->applyFromArray(self::BOLD_FONT);
+    }
+
+    public static function addSignature(Worksheet $sheet, string $coordinates, int $offsetX, int $offsetY): void
+    {
+        $signature = new Drawing;
+        $signature->setName('Approver Signature');
+        $signature->setPath(resource_path('images/attendance-approver-signature.png'));
+        $signature->setCoordinates($coordinates);
+        $signature->setOffsetX($offsetX);
+        $signature->setOffsetY($offsetY);
+        $signature->setResizeProportional(false);
+        $signature->setWidth(153);
+        $signature->setHeight(141);
+        $signature->setWorksheet($sheet);
     }
 }
