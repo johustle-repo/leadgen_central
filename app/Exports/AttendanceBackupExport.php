@@ -30,6 +30,26 @@ class AttendanceBackupExport implements Export, WithMultipleSheets
 
     public function sheets(): array
     {
+        $periods = $this->payrollPeriods();
+
+        $sheets = [new AttendanceSummarySheet($periods, $this->start)];
+
+        $usedTitles = [];
+        foreach ($periods as $period) {
+            $sheets[] = new AttendanceMemberSheet($period, $this->uniqueSheetTitle($period['user']->name, $usedTitles), $this->start);
+        }
+
+        return $sheets;
+    }
+
+    /**
+     * Each payroll member's day-by-day attendance for the month. Shared by
+     * the Excel workbook and the PDF report so both list the same people.
+     *
+     * @return list<array{user: User, days: list<array{date: CarbonInterface, time_in: CarbonInterface|null, time_out: CarbonInterface|null, worked_minutes: int, status: string, late_minutes: int, holiday_label: string|null}>}>
+     */
+    public function payrollPeriods(): array
+    {
         $excludedNames = array_map(AttendanceImportService::normalizeNameForMatch(...), self::NON_PAYROLL_NAMES);
 
         $users = User::query()
@@ -41,16 +61,8 @@ class AttendanceBackupExport implements Export, WithMultipleSheets
             ->get()
             ->reject(fn (User $user): bool => in_array(AttendanceImportService::normalizeNameForMatch($user->name), $excludedNames, true))
             ->values();
-        $periods = app(AttendanceDaySummaryService::class)->buildForPeriod($this->start, $this->end, $users);
 
-        $sheets = [new AttendanceSummarySheet($periods, $this->start)];
-
-        $usedTitles = [];
-        foreach ($periods as $period) {
-            $sheets[] = new AttendanceMemberSheet($period, $this->uniqueSheetTitle($period['user']->name, $usedTitles), $this->start);
-        }
-
-        return $sheets;
+        return app(AttendanceDaySummaryService::class)->buildForPeriod($this->start, $this->end, $users);
     }
 
     /**

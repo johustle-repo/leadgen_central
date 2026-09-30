@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\AttendanceEntryType;
 use App\Exports\AttendanceBackupExport;
+use App\Exports\AttendanceMemberSheet;
+use App\Exports\AttendanceSummarySheet;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\Holiday;
@@ -422,48 +424,24 @@ class AttendanceController extends Controller
             ->with('importErrors', array_slice($errors, 0, 30));
     }
 
-    public function exportPdf(Request $request, AttendanceDaySummaryService $summaryService, HolidayService $holidayService): HttpResponse
+    /**
+     * The same monthly payroll report as the Excel workbook, as a PDF: a
+     * team summary page, then one page per payroll member.
+     */
+    public function exportPdf(Request $request): HttpResponse
     {
         Gate::authorize('manage-attendance');
 
         $monthStart = $this->resolveMonthStart($request);
-        $monthEnd = $monthStart->copy()->endOfMonth();
+        $periods = (new AttendanceBackupExport($monthStart, $monthStart->copy()->endOfMonth()))->payrollPeriods();
 
-        $attendances = Attendance::query()
-            ->with('user:id,name,role')
-            ->whereBetween('recorded_at', [$monthStart, $monthEnd])
-            ->orderByDesc('recorded_at')
-            ->limit(500)
-            ->get();
-
-        $holidaysByDate = $holidayService->forDates(
-            $attendances->map(fn (Attendance $attendance): string => $attendance->recorded_at->toDateString())->unique()->values()->all(),
-        );
-
-        $records = $attendances->map(function (Attendance $attendance) use ($summaryService, $holidaysByDate): array {
-            $holiday = $holidaysByDate[$attendance->recorded_at->toDateString()] ?? null;
-
-            $totalHoursLabel = null;
-            if ($attendance->entry_type === AttendanceEntryType::TimeOut && $attendance->user instanceof User) {
-                $day = $summaryService->buildForUserAndDate($attendance->user, $attendance->recorded_at, $holiday);
-                $totalHoursLabel = Attendance::formatMinutes($day['worked_minutes']);
-            }
-
-            $statusLabel = $holiday !== null
-                ? $holiday->name
-                : ($attendance->entry_type === AttendanceEntryType::TimeIn
-                    ? ucfirst(str_replace('_', ' ', Attendance::lateStatusFor($attendance->recorded_at)['status']))
-                    : null);
-
-            return [
-                'user_name' => $attendance->user?->name,
-                'role_label' => $attendance->user?->role?->label(),
-                'entry_label' => $attendance->entry_type->label(),
-                'recorded_at' => $attendance->recorded_at->format('Y-m-d H:i'),
-                'status_label' => $statusLabel,
-                'total_hours_label' => $totalHoursLabel,
-            ];
-        });
+        $members = array_map(fn (array $period): array => [
+            'user' => $period['user'],
+            'position' => AttendanceSummarySheet::positionLabel($period['user']),
+            'role' => AttendanceMemberSheet::roleLabel($period['user']),
+            'totals' => AttendanceSummarySheet::memberTotals($period['days']),
+            'days' => array_map(AttendanceMemberSheet::describeDay(...), $period['days']),
+        ], $periods);
 
         $performedBy = $request->user();
         abort_unless($performedBy instanceof User, 401);
@@ -474,11 +452,23 @@ class AttendanceController extends Controller
             'auditable_type' => 'attendance',
             'auditable_id' => null,
             'description' => 'Downloaded an attendance PDF export.',
-            'metadata' => ['record_count' => $records->count()],
+            'metadata' => ['period' => $monthStart->toDateString(), 'member_count' => count($members)],
         ]);
 
-        return Pdf::loadView('attendance.export', ['records' => $records])
-            ->download('Attendance-Report-'.now()->format('Y-m-d').'.pdf');
+        return Pdf::loadView('attendance.export', [
+            'headerRows' => AttendanceSummarySheet::reportHeaderRows($monthStart),
+            'members' => $members,
+            'teamTotals' => [
+                'attendance_days' => array_sum(array_column(array_column($members, 'totals'), 'attendance_days')),
+                'log_count' => array_sum(array_column(array_column($members, 'totals'), 'log_count')),
+                'worked_minutes' => array_sum(array_column(array_column($members, 'totals'), 'worked_minutes')),
+            ],
+            'approverName' => AttendanceSummarySheet::APPROVER_NAME,
+            'approverPosition' => AttendanceSummarySheet::APPROVER_POSITION,
+            'signatureDataUri' => 'data:image/png;base64,'.base64_encode((string) file_get_contents(resource_path(AttendanceSummarySheet::SIGNATURE_PATH))),
+        ])
+            ->setPaper('a4', 'landscape')
+            ->download('Attendance_'.$monthStart->format('F_Y').'.pdf');
     }
 
     public function exportExcel(Request $request): BinaryFileResponse

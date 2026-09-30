@@ -56,7 +56,7 @@ class AttendanceMemberSheet implements Export, FromArray, WithEvents, WithTitle
             ['Name', $user->name],
             ['Sub Name', $user->alias_name ?? ''],
             ['Email', $user->alias_email ?? ''],
-            ['Role', AttendanceSummarySheet::isApprover($user) ? AttendanceSummarySheet::APPROVER_POSITION : 'Member'],
+            ['Role', self::roleLabel($user)],
             ['Employee Code', $user->employee_code ?? ''],
             ['Status', ucfirst($user->status->value)],
             ['Attendance Days', $totals['attendance_days']],
@@ -69,37 +69,9 @@ class AttendanceMemberSheet implements Export, FromArray, WithEvents, WithTitle
         $this->dayTypes = [];
 
         foreach ($this->period['days'] as $day) {
-            $isRestDay = $day['status'] === 'holiday' && str_contains(strtolower((string) $day['holiday_label']), 'rest');
-            $isHoliday = $day['status'] === 'holiday' && ! $isRestDay;
-            $timeIn = $day['time_in']?->format('H:i');
-            $timeOut = $day['time_out']?->format('H:i');
-
-            $placeholder = match (true) {
-                $isRestDay => 'Rest Day',
-                $isHoliday => 'Holiday',
-                default => null,
-            };
-
-            $logs = match (true) {
-                $isRestDay => 'Rest Day - '.$day['holiday_label'],
-                $isHoliday => '',
-                default => implode(', ', array_filter([
-                    $timeIn !== null ? "Time In - {$timeIn}" : null,
-                    $timeOut !== null ? "Time Out - {$timeOut}" : null,
-                ])),
-            };
-
-            $rows[] = [
-                $day['date']->format('M d, Y'),
-                $day['date']->format('l'),
-                $placeholder ?? $timeIn ?? '',
-                $placeholder ?? $timeOut ?? '',
-                Attendance::formatMinutes($day['worked_minutes']),
-                $logs,
-                $isHoliday ? (string) $day['holiday_label'] : '',
-            ];
-
-            $this->dayTypes[] = $isRestDay ? 'rest_day' : ($isHoliday ? 'holiday' : 'workday');
+            $describedDay = self::describeDay($day);
+            $rows[] = array_values(array_diff_key($describedDay, ['type' => true]));
+            $this->dayTypes[] = $describedDay['type'];
         }
 
         return [
@@ -109,6 +81,55 @@ class AttendanceMemberSheet implements Export, FromArray, WithEvents, WithTitle
             [''],
             [AttendanceSummarySheet::APPROVER_NAME],
         ];
+    }
+
+    /**
+     * The printed wording for one day: rest days and holidays replace the
+     * times with a placeholder, worked days list their logs.
+     *
+     * @param  array{date: CarbonInterface, time_in: CarbonInterface|null, time_out: CarbonInterface|null, worked_minutes: int, status: string, holiday_label: string|null}  $day
+     * @return array{date: string, day: string, time_in: string, time_out: string, total_hours: string, logs: string, remarks: string, type: 'workday'|'rest_day'|'holiday'}
+     */
+    public static function describeDay(array $day): array
+    {
+        $isRestDay = $day['status'] === 'holiday' && str_contains(strtolower((string) $day['holiday_label']), 'rest');
+        $isHoliday = $day['status'] === 'holiday' && ! $isRestDay;
+        $timeIn = $day['time_in']?->format('H:i');
+        $timeOut = $day['time_out']?->format('H:i');
+
+        $placeholder = match (true) {
+            $isRestDay => 'Rest Day',
+            $isHoliday => 'Holiday',
+            default => null,
+        };
+
+        $logs = match (true) {
+            $isRestDay => 'Rest Day - '.$day['holiday_label'],
+            $isHoliday => '',
+            default => implode(', ', array_filter([
+                $timeIn !== null ? "Time In - {$timeIn}" : null,
+                $timeOut !== null ? "Time Out - {$timeOut}" : null,
+            ])),
+        };
+
+        return [
+            'date' => $day['date']->format('M d, Y'),
+            'day' => $day['date']->format('l'),
+            'time_in' => $placeholder ?? $timeIn ?? '',
+            'time_out' => $placeholder ?? $timeOut ?? '',
+            'total_hours' => Attendance::formatMinutes($day['worked_minutes']),
+            'logs' => $logs,
+            'remarks' => $isHoliday ? (string) $day['holiday_label'] : '',
+            'type' => $isRestDay ? 'rest_day' : ($isHoliday ? 'holiday' : 'workday'),
+        ];
+    }
+
+    /**
+     * Member-sheet role wording: the team leader keeps their title, everyone else is a member.
+     */
+    public static function roleLabel(User $user): string
+    {
+        return AttendanceSummarySheet::isApprover($user) ? AttendanceSummarySheet::APPROVER_POSITION : 'Member';
     }
 
     public function registerEvents(): array

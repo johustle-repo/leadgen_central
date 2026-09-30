@@ -6,6 +6,8 @@ use App\Models\AuditLog;
 use App\Models\Holiday;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\View;
+use Illuminate\View\View as RenderedView;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Excel as ExcelFormat;
 use Maatwebsite\Excel\Facades\Excel;
@@ -262,15 +264,39 @@ it('keeps the self-service QR attendance page and self-scan agent-only', functio
         ->assertForbidden();
 })->skip('QR self-attendance is temporarily disabled - see routes/settings.php');
 
-it('exports attendance records as a pdf', function () {
+it('exports the monthly payroll attendance report as a pdf', function () {
+    $this->travelTo('2026-09-01 06:08:00');
     $superAdministrator = User::factory()->superAdministrator()->create();
-    $staff = User::factory()->create();
-    Attendance::factory()->for($staff)->create();
+    $staff = User::factory()->create(['name' => 'Jonathan F. Quiles', 'employee_code' => 'DUS-002', 'alias_name' => 'James Whitaker']);
+    User::factory()->administrator()->create(['name' => 'Elmar B. Noche', 'employee_code' => 'DUS-001']);
+    User::factory()->create(['name' => 'Amea Sofia Veloria']);
+    Attendance::factory()->for($staff)->create(['recorded_at' => '2026-08-03 07:53:00', 'entry_type' => 'time_in']);
+    Attendance::factory()->for($staff)->create(['recorded_at' => '2026-08-03 17:21:00', 'entry_type' => 'time_out']);
 
-    $response = $this->actingAs($superAdministrator)->get(route('attendance.export-pdf'));
+    $renderedReport = null;
+    View::composer('attendance.export', function (RenderedView $view) use (&$renderedReport): void {
+        $renderedReport = $view->getData();
+    });
 
-    $response->assertOk();
-    expect($response->headers->get('Content-Type'))->toBe('application/pdf');
+    $response = $this->actingAs($superAdministrator)->get(route('attendance.export-pdf', ['month' => '2026-08']));
+
+    $response->assertOk()->assertDownload('Attendance_August_2026.pdf');
+    expect($response->headers->get('Content-Type'))->toBe('application/pdf')
+        ->and(array_map(fn (array $member): string => $member['user']->name, $renderedReport['members']))->toBe(['Elmar B. Noche', 'Jonathan F. Quiles'])
+        ->and($renderedReport['members'][0]['position'])->toBe('Team Leader')
+        ->and($renderedReport['members'][1]['totals'])->toMatchArray(['attendance_days' => 6, 'log_count' => 2])
+        ->and($renderedReport['members'][1]['days'][2])->toMatchArray(['date' => 'Aug 03, 2026', 'logs' => 'Time In - 07:53, Time Out - 17:21', 'type' => 'workday'])
+        ->and($renderedReport['members'][1]['days'][1])->toMatchArray(['time_in' => 'Rest Day', 'type' => 'rest_day'])
+        ->and($renderedReport['teamTotals']['log_count'])->toBe(2);
+
+    $html = view('attendance.export', $renderedReport)->render();
+    expect($html)->toContain('Team PH Attendance Summary - TimeIn/TimeOut-Month of August 2026')
+        ->toContain('James Whitaker')
+        ->toContain('Approved and verified by:')
+        ->toContain('data:image/png;base64,')
+        ->not->toContain('Amea Sofia Veloria');
+
+    $this->assertDatabaseHas('audit_logs', ['user_id' => $superAdministrator->id, 'action' => 'attendance.exported_pdf']);
 });
 
 it('filters and paginates attendance records', function () {

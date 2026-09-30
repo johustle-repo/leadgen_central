@@ -28,6 +28,8 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
 
     public const APPROVER_POSITION = 'Team Leader';
 
+    public const SIGNATURE_PATH = 'images/attendance-approver-signature.png';
+
     /** @var array{name: string, size: int, bold: bool} */
     public const BOLD_FONT = ['name' => 'Arial', 'size' => 10, 'bold' => true];
 
@@ -65,7 +67,7 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
             $memberRows[] = [
                 $user->employee_code ?? '',
                 $user->name,
-                self::isApprover($user) ? self::APPROVER_POSITION : 'Team Member',
+                self::positionLabel($user),
                 $totals['attendance_days'],
                 $totals['log_count'],
                 Attendance::formatMinutes($totals['worked_minutes']),
@@ -147,6 +149,14 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
     }
 
     /**
+     * Summary-table position wording: the team leader keeps their title, everyone else is a team member.
+     */
+    public static function positionLabel(User $user): string
+    {
+        return self::isApprover($user) ? self::APPROVER_POSITION : 'Team Member';
+    }
+
+    /**
      * Column widths, thin borders around every used cell, the merged bold
      * title and the bold period value.
      *
@@ -177,7 +187,7 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
     {
         $signature = new Drawing;
         $signature->setName('Approver Signature');
-        $signature->setPath(resource_path('images/attendance-approver-signature.png'));
+        $signature->setPath(resource_path(self::SIGNATURE_PATH));
         $signature->setCoordinates($coordinates);
         $signature->setOffsetX($offsetX);
         $signature->setOffsetY($offsetY);
