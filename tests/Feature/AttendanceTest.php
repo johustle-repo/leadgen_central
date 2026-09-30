@@ -6,7 +6,6 @@ use App\Models\AuditLog;
 use App\Models\Holiday;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Excel as ExcelFormat;
 use Maatwebsite\Excel\Facades\Excel;
@@ -511,7 +510,7 @@ it('lays out the attendance summary sheet like the team template', function () {
 
     $path = tempnam(sys_get_temp_dir(), 'attendance').'.xlsx';
     file_put_contents($path, Excel::raw(
-        new AttendanceBackupExport(Carbon::parse('2026-08-01')->startOfMonth(), Carbon::parse('2026-08-01')->endOfMonth()),
+        new AttendanceBackupExport(Carbon\Carbon::parse('2026-08-01')->startOfMonth(), Carbon\Carbon::parse('2026-08-01')->endOfMonth()),
         ExcelFormat::XLSX,
     ));
     $sheet = IOFactory::load($path)->getSheetByName('Attendance Summary');
