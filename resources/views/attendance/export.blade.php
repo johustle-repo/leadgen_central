@@ -56,9 +56,10 @@
         .legend .swatch.rest-day { background-color: #fff4d1; border: 1px solid #e6c65c; }
         .legend .swatch.holiday { background-color: #e1f3d8; border: 1px solid #8cc57a; }
 
-        .approval { margin-top: 14px; width: 230px; page-break-inside: avoid; }
+        .approval { margin-top: 14px; width: 250px; page-break-inside: avoid; }
         .approval .caption { font-size: 8px; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; }
-        .approval img { height: 64px; margin: 2px 0 -8px 30px; }
+        .approval .signature { text-align: center; margin: 0 0 -12px; }
+        .approval .signature img { height: 92px; }
         .approval .name { font-weight: bold; font-size: 10.5px; color: #0f172a; border-top: 1px solid #0b3a5b; padding-top: 4px; text-align: center; }
         .approval .position { text-align: center; color: #64748b; }
         .empty { color: #64748b; font-style: italic; padding: 12px 0; }
