@@ -315,6 +315,7 @@ it('filters and paginates attendance records', function () {
 });
 
 it('reports summary stats on the attendance summary page', function () {
+    $this->travelTo(Carbon\Carbon::parse('2026-09-15 04:00:00', 'UTC'));
     $superAdministrator = User::factory()->superAdministrator()->create();
     $matchingStaff = User::factory()->create(['name' => 'Filter Target']);
     $otherStaff = User::factory()->create(['name' => 'Someone Else']);
@@ -546,7 +547,7 @@ it('lays out the attendance summary sheet like the team template', function () {
         ->and($sheet->getMergeCells())->toHaveKey('A1:F1')
         ->and($sheet->rangeToArray('A2:B8', null, false, false))->toBe([
             ['Period', 'August 2026'],
-            ['Generated at', 'Sep 1, 2026 6:08 AM'],
+            ['Generated at', 'Sep 1, 2026 2:08 PM'],
             [null, null],
             ['Total Members', 1],
             ['Total Attendance Days', 6],

@@ -115,7 +115,9 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
     }
 
     /**
-     * Title, period and generated-at rows shared by every sheet in the workbook.
+     * Title, period and generated-at rows shared by every sheet in the
+     * workbook and the PDF. "Generated at" is the Philippine wall-clock
+     * time of the export, matching how attendance times are recorded.
      *
      * @return list<list<string>>
      */
@@ -124,7 +126,7 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
         return [
             [self::APPROVER_NAME."'s Team PH Attendance Summary - TimeIn/TimeOut-Month of ".$month->format('F Y')],
             ['Period', $month->format('F Y')],
-            ['Generated at', now()->format('M j, Y g:i A')],
+            ['Generated at', Attendance::now()->format('M j, Y g:i A')],
         ];
     }
 
