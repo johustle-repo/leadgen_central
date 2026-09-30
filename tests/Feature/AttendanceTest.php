@@ -1,11 +1,17 @@
 <?php
 
+use App\Exports\AttendanceBackupExport;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\Holiday;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
+use Maatwebsite\Excel\Excel as ExcelFormat;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 
 it('allows only the super administrator to view attendance', function () {
     $superAdministrator = User::factory()->superAdministrator()->create();
@@ -495,6 +501,44 @@ it('exports the attendance backup workbook for the super administrator only', fu
 
     $response->assertOk();
     expect($response->headers->get('Content-Type'))->toContain('spreadsheet');
+});
+
+it('lays out the attendance summary sheet like the team template', function () {
+    $this->travelTo('2026-09-01 06:08:00');
+    $staff = User::factory()->create(['name' => 'Jonathan F. Quiles', 'employee_code' => 'DUS-002']);
+    Attendance::factory()->for($staff)->create(['recorded_at' => '2026-08-03 08:00:00', 'entry_type' => 'time_in']);
+    Attendance::factory()->for($staff)->create(['recorded_at' => '2026-08-03 17:00:00', 'entry_type' => 'time_out']);
+
+    $path = tempnam(sys_get_temp_dir(), 'attendance').'.xlsx';
+    file_put_contents($path, Excel::raw(
+        new AttendanceBackupExport(Carbon::parse('2026-08-01')->startOfMonth(), Carbon::parse('2026-08-01')->endOfMonth()),
+        ExcelFormat::XLSX,
+    ));
+    $sheet = IOFactory::load($path)->getSheetByName('Attendance Summary');
+    unlink($path);
+
+    expect($sheet->getCell('A1')->getValue())->toBe("Elmar B. Noche's Team PH Attendance Summary - TimeIn/TimeOut-Month of August 2026")
+        ->and($sheet->getMergeCells())->toHaveKey('A1:F1')
+        ->and($sheet->rangeToArray('A2:B8', null, false, false))->toBe([
+            ['Period', 'August 2026'],
+            ['Generated at', 'Sep 1, 2026 6:08 AM'],
+            [null, null],
+            ['Total Members', 1],
+            ['Total Attendance Days', 1],
+            ['Total Attendance Logs', 2],
+            ['Total Hours', $sheet->getCell('F11')->getValue()],
+        ])
+        ->and($sheet->rangeToArray('A10:E11', null, false, false))->toBe([
+            ['Employee Code', 'Name', 'Position', 'Attendance Days', 'Attendance Logs'],
+            ['DUS-002', 'Jonathan F. Quiles', 'Team Member', 1, 2],
+        ])
+        ->and($sheet->getCell('F10')->getValue())->toBe('Total Hours')
+        ->and($sheet->getCell('A14')->getValue())->toBe('Approved and verified by:')
+        ->and($sheet->getCell('A16')->getValue())->toBe('Elmar B. Noche')
+        ->and($sheet->getCell('A17')->getValue())->toBe('Team Leader')
+        ->and($sheet->getStyle('F17')->getBorders()->getBottom()->getBorderStyle())->toBe(Border::BORDER_THIN)
+        ->and($sheet->getDrawingCollection())->toHaveCount(1)
+        ->and($sheet->getDrawingCollection()[0]->getCoordinates())->toBe('A13');
 });
 
 it('lets the super administrator fill in a missing time in', function () {
