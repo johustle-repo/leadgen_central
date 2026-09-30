@@ -466,8 +466,9 @@ class AttendanceController extends Controller
             'approverName' => AttendanceSummarySheet::APPROVER_NAME,
             'approverPosition' => AttendanceSummarySheet::APPROVER_POSITION,
             'signatureDataUri' => 'data:image/png;base64,'.base64_encode((string) file_get_contents(resource_path(AttendanceSummarySheet::SIGNATURE_PATH))),
+            'logoDataUri' => 'data:image/png;base64,'.base64_encode((string) file_get_contents(resource_path('images/attendance-report-logo.png'))),
         ])
-            ->setPaper('a4', 'landscape')
+            ->setPaper('a4', 'portrait')
             ->download('Attendance_'.$monthStart->format('F_Y').'.pdf');
     }
 
