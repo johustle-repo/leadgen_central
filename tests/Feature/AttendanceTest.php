@@ -523,13 +523,13 @@ it('lays out the attendance summary sheet like the team template', function () {
             ['Generated at', 'Sep 1, 2026 6:08 AM'],
             [null, null],
             ['Total Members', 1],
-            ['Total Attendance Days', 1],
+            ['Total Attendance Days', 6],
             ['Total Attendance Logs', 2],
             ['Total Hours', $sheet->getCell('F11')->getValue()],
         ])
         ->and($sheet->rangeToArray('A10:E11', null, false, false))->toBe([
             ['Employee Code', 'Name', 'Position', 'Attendance Days', 'Attendance Logs'],
-            ['DUS-002', 'Jonathan F. Quiles', 'Team Member', 1, 2],
+            ['DUS-002', 'Jonathan F. Quiles', 'Team Member', 6, 2],
         ])
         ->and($sheet->getCell('F10')->getValue())->toBe('Total Hours')
         ->and($sheet->getCell('A14')->getValue())->toBe('Approved and verified by:')
@@ -588,7 +588,7 @@ it('lays out each member sheet like the team template', function () {
             ['Role', 'Member'],
             ['Employee Code', 'DUS-002'],
             ['Status', 'Active'],
-            ['Attendance Days', 1],
+            ['Attendance Days', 7],
             ['Attendance Logs', 2],
         ])
         ->and($sheet->getCell('A13')->getValue())->toBe('Member Total Hours')

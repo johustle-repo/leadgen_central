@@ -127,13 +127,15 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
     }
 
     /**
-     * @param  list<array{time_in: CarbonInterface|null, time_out: CarbonInterface|null, worked_minutes: int}>  $days
+     * Attendance days count every day with a time in plus paid rest days and holidays.
+     *
+     * @param  list<array{time_in: CarbonInterface|null, time_out: CarbonInterface|null, worked_minutes: int, status: string}>  $days
      * @return array{attendance_days: int, log_count: int, worked_minutes: int}
      */
     public static function memberTotals(array $days): array
     {
         return [
-            'attendance_days' => count(array_filter($days, fn (array $day): bool => $day['time_in'] !== null)),
+            'attendance_days' => count(array_filter($days, fn (array $day): bool => $day['time_in'] !== null || $day['status'] === 'holiday')),
             'log_count' => array_sum(array_map(fn (array $day): int => ($day['time_in'] !== null ? 1 : 0) + ($day['time_out'] !== null ? 1 : 0), $days)),
             'worked_minutes' => array_sum(array_column($days, 'worked_minutes')),
         ];

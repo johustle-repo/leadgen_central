@@ -90,7 +90,7 @@ export default function AttendanceSummary({
     const teamSummary = monthlyAttendance
         .map((agent) => {
             const attendanceDays = agent.days.filter(
-                (day) => day.time_in !== null,
+                (day) => day.time_in !== null || day.status === 'holiday',
             ).length;
             const logCount = agent.days.reduce(
                 (sum, day) =>
