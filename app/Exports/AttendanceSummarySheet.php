@@ -29,7 +29,7 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
     private const APPROVER_POSITION = 'Team Leader';
 
     /** @var array<string, float> */
-    private const COLUMN_WIDTHS = ['A' => 35.71, 'B' => 28.43, 'C' => 14, 'D' => 16, 'E' => 15.71, 'F' => 11];
+    private const COLUMN_WIDTHS = ['A' => 35.71, 'B' => 28.43, 'C' => 14.0, 'D' => 16.0, 'E' => 15.71, 'F' => 11.0];
 
     /**
      * @param  list<array{user: User, days: list<array{date: CarbonInterface, time_in: CarbonInterface|null, time_out: CarbonInterface|null, worked_minutes: int, status: string, late_minutes: int, holiday_label: string|null}>}>  $periods
@@ -37,7 +37,6 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
     public function __construct(
         private readonly array $periods,
         private readonly CarbonInterface $start,
-        private readonly CarbonInterface $end,
     ) {}
 
     public function title(): string

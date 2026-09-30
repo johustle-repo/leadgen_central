@@ -22,7 +22,7 @@ class AttendanceBackupExport implements Export, WithMultipleSheets
         $users = User::query()->where('status', 'active')->where('role', UserRole::Agent)->orderBy('name')->get();
         $periods = app(AttendanceDaySummaryService::class)->buildForPeriod($this->start, $this->end, $users);
 
-        $sheets = [new AttendanceSummarySheet($periods, $this->start, $this->end)];
+        $sheets = [new AttendanceSummarySheet($periods, $this->start)];
 
         $usedTitles = [];
         foreach ($periods as $period) {
