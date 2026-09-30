@@ -540,8 +540,9 @@ it('lays out the attendance summary sheet like the team template', function () {
         ->and($sheet->getDrawingCollection()[0]->getCoordinates())->toBe('A13');
 });
 
-it('includes the team leader in the attendance workbook ahead of the agents', function () {
+it('includes the team leader in the attendance workbook ahead of the agents and leaves off non-payroll agents', function () {
     User::factory()->create(['name' => 'Jonathan F. Quiles', 'employee_code' => 'DUS-002']);
+    User::factory()->create(['name' => 'Amea Sofia Veloria']);
     User::factory()->administrator()->create(['name' => 'Elmar B. Noche', 'employee_code' => 'DUS-001', 'alias_name' => 'Alexander Bennett', 'alias_email' => 'a.bennett@duscaff.com']);
     User::factory()->administrator()->create(['name' => 'Other Administrator']);
 
