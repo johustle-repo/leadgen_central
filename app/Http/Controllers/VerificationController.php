@@ -6,6 +6,7 @@ use App\Http\Requests\FilterVerificationRequest;
 use App\Http\Requests\MarkPossibleLeadRequest;
 use App\Http\Requests\StoreImportPossibleLeadsRequest;
 use App\Http\Requests\StorePossibleLeadRequest;
+use App\Http\Requests\UpdateLeadOwnerRequest;
 use App\Http\Requests\VerifyLeadRequest;
 use App\Models\AuditLog;
 use App\Models\Lead;
@@ -56,6 +57,7 @@ class VerificationController extends Controller
             'summary' => $summary,
             'statusCounts' => $statusCounts,
             'agents' => $request->user()->canViewAllLeads() ? User::query()->where('role', UserRole::Agent)->orderBy('name')->get(['id', 'name']) : [],
+            'owners' => $request->user()->canViewAllLeads() ? User::query()->where('role', UserRole::Agent)->where('status', 'active')->orderBy('name')->get(['id', 'name']) : [],
             'canDelete' => $request->user()->isAdministrator(),
         ]);
     }
@@ -175,6 +177,27 @@ class VerificationController extends Controller
         ], $request->user());
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Contact saved to Possible Leads.']);
+    }
+
+    public function updateOwner(UpdateLeadOwnerRequest $request, Lead $lead): RedirectResponse
+    {
+        $oldOwnerId = $lead->agent_id;
+        $lead->update(['agent_id' => $request->integer('agent_id'), 'updated_by' => $request->user()->id]);
+
+        if ($oldOwnerId !== $lead->agent_id) {
+            AuditLog::query()->create([
+                'user_id' => $request->user()->id,
+                'action' => 'leads.owner_changed',
+                'auditable_type' => 'lead',
+                'auditable_id' => $lead->id,
+                'description' => 'Changed the lead owner from Lead Review.',
+                'metadata' => ['changes' => ['agent_id' => ['old' => $oldOwnerId, 'new' => $lead->agent_id]]],
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+        }
+
+        return back()->with('toast', ['type' => 'success', 'message' => 'Owner changed to '.$lead->agent()->value('name').'.']);
     }
 
     public function exportPossible(FilterVerificationRequest $request, CsvCellSanitizer $csv): StreamedResponse

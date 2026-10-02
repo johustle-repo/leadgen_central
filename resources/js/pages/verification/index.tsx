@@ -44,7 +44,12 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { destroy } from '@/routes/leads';
-import { index, possible as markPossible, show } from '@/routes/verification';
+import {
+    index,
+    possible as markPossible,
+    owner as updateOwner,
+    show,
+} from '@/routes/verification';
 import possibleLeads from '@/routes/verification/possible-leads';
 
 type Agent = { id: number; name: string };
@@ -65,6 +70,7 @@ type Lead = {
     validation_status: string;
     created_at: string;
     attachments_count: number;
+    agent_id: number | null;
     agent: { name: string } | null;
 };
 type Filters = { status: string; search: string; agent_id: string };
@@ -105,6 +111,7 @@ export default function VerificationIndex({
     summary,
     statusCounts,
     agents,
+    owners,
     canDelete,
 }: {
     leads: {
@@ -118,6 +125,7 @@ export default function VerificationIndex({
     summary: Summary;
     statusCounts: Partial<Record<string, number>>;
     agents: Agent[];
+    owners: Agent[];
     canDelete: boolean;
 }) {
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
@@ -375,7 +383,50 @@ export default function VerificationIndex({
                                         {lead.product_requested || '—'}
                                     </TableCell>
                                     <TableCell>
-                                        {lead.agent?.name || 'Unassigned'}
+                                        {owners.length > 0 ? (
+                                            <Select
+                                                value={String(
+                                                    lead.agent_id ?? '',
+                                                )}
+                                                onValueChange={(value) =>
+                                                    router.put(
+                                                        updateOwner.url(
+                                                            lead.id,
+                                                        ),
+                                                        { agent_id: value },
+                                                        {
+                                                            preserveScroll: true,
+                                                            preserveState: true,
+                                                        },
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger
+                                                    size="sm"
+                                                    className="w-40 text-xs"
+                                                    aria-label={`Owner of ${lead.company_name}`}
+                                                >
+                                                    <SelectValue placeholder="Unassigned">
+                                                        {lead.agent?.name ||
+                                                            'Unassigned'}
+                                                    </SelectValue>
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {owners.map((owner) => (
+                                                        <SelectItem
+                                                            key={owner.id}
+                                                            value={String(
+                                                                owner.id,
+                                                            )}
+                                                        >
+                                                            {owner.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            lead.agent?.name || 'Unassigned'
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         {lead.attachments_count > 0 ? (

@@ -60,6 +60,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::get('verification/possible-leads/import', [VerificationController::class, 'importPossible'])->name('verification.possible-leads.import');
     Route::post('verification/possible-leads/import', [VerificationController::class, 'storeImportPossible'])->middleware('throttle:data-imports')->name('verification.possible-leads.import.store');
     Route::put('verification/{lead}/possible', [VerificationController::class, 'markPossible'])->name('verification.possible');
+    Route::put('verification/{lead}/owner', [VerificationController::class, 'updateOwner'])->name('verification.owner');
     Route::get('verification/{lead}', [VerificationController::class, 'show'])->name('verification.show');
     Route::put('verification/{lead}', [VerificationController::class, 'update'])->name('verification.update');
     Route::post('leads/{lead}/attachments', [LeadAttachmentController::class, 'store'])->middleware('throttle:20,1')->name('leads.attachments.store');

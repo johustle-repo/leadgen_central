@@ -103,6 +103,35 @@ it('lets a reviewer reassign a lead to a different agent while verifying it', fu
     expect($lead->refresh()->agent_id)->toBe($newOwner->id);
 });
 
+it('lets a sub-administrator change a possible lead owner from the Lead Review list', function () {
+    $reviewer = User::factory()->subAdministrator()->create();
+    $newOwner = User::factory()->create();
+    User::factory()->inactive()->create();
+    $lead = Lead::factory()->for(User::factory(), 'agent')->create(['status' => 'possible_lead']);
+
+    $this->actingAs($reviewer)->get(route('verification.index'))
+        ->assertInertia(fn (Assert $page) => $page->has('owners', 2));
+
+    $this->actingAs($reviewer)->put(route('verification.owner', $lead), ['agent_id' => $newOwner->id])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($lead->refresh()->agent_id)->toBe($newOwner->id);
+    $this->assertDatabaseHas('audit_logs', ['user_id' => $reviewer->id, 'action' => 'leads.owner_changed', 'auditable_id' => $lead->id]);
+});
+
+it('prevents agents from changing a lead owner and rejects inactive or non-agent owners', function () {
+    $agent = User::factory()->create();
+    $reviewer = User::factory()->subAdministrator()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create(['status' => 'possible_lead']);
+
+    $this->actingAs($agent)->put(route('verification.owner', $lead), ['agent_id' => User::factory()->create()->id])->assertForbidden();
+    $this->actingAs($reviewer)->put(route('verification.owner', $lead), ['agent_id' => User::factory()->inactive()->create()->id])->assertSessionHasErrors('agent_id');
+    $this->actingAs($reviewer)->put(route('verification.owner', $lead), ['agent_id' => $reviewer->id])->assertSessionHasErrors('agent_id');
+
+    expect($lead->refresh()->agent_id)->toBe($agent->id);
+});
+
 it('lets administrators search the verification contact workspace', function () {
     $reviewer = User::factory()->subAdministrator()->create();
     $owner = User::factory()->create(['name' => 'North Team Agent']);
