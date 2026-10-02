@@ -88,9 +88,9 @@ it('creates a manual lead owned by the authenticated agent', function () {
     $this->getJson(route('leads.company-contact-count', ['company_name' => 'Acme Ventures']))->assertJson(['count' => 1]);
 });
 
-it('saves a lowercased secondary email alongside the primary email', function () {
+it('saves lowercased primary and secondary emails', function () {
     $agent = User::factory()->create();
-    $this->actingAs($agent)->post(route('leads.store'), ['lead_date' => '2026-08-25', 'company_name' => 'Acme Ventures', 'contact_person' => 'Ada', 'email' => 'hello@acme.test', 'secondary_email' => 'Backup@Acme.test']);
+    $this->actingAs($agent)->post(route('leads.store'), ['lead_date' => '2026-08-25', 'company_name' => 'Acme Ventures', 'contact_person' => 'Ada', 'email' => 'Hello@ACME.test', 'secondary_email' => 'Backup@Acme.test']);
 
     $this->assertDatabaseHas('leads', ['company_name' => 'Acme Ventures', 'email' => 'hello@acme.test', 'secondary_email' => 'backup@acme.test']);
 });

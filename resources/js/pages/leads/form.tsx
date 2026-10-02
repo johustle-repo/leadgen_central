@@ -518,7 +518,17 @@ export default function LeadForm({
                                                                                       .value,
                                                                               );
                                                                       }
-                                                                    : undefined
+                                                                    : field.type ===
+                                                                        'email'
+                                                                      ? (
+                                                                            event,
+                                                                        ) => {
+                                                                            event.currentTarget.value =
+                                                                                event.currentTarget.value
+                                                                                    .trim()
+                                                                                    .toLowerCase();
+                                                                        }
+                                                                      : undefined
                                                             }
                                                             onChange={
                                                                 field.name ===
@@ -533,7 +543,12 @@ export default function LeadForm({
                                                                           )
                                                                     : undefined
                                                             }
-                                                            className="mt-2"
+                                                            className={
+                                                                field.type ===
+                                                                'email'
+                                                                    ? 'mt-2 lowercase'
+                                                                    : 'mt-2'
+                                                            }
                                                         />
                                                     )}
                                                     <InputError
