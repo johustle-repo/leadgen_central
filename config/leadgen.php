@@ -6,6 +6,16 @@ return [
     'seed_password' => env('LEADGEN_SEED_PASSWORD', 'password'),
 
     /*
+    | Daily database backups (app:backup-database). Files are written to
+    | this disk and path and deleted once older than keep_days.
+    */
+    'backup' => [
+        'disk' => env('LEADGEN_BACKUP_DISK', 'local'),
+        'path' => env('LEADGEN_BACKUP_PATH', 'backups'),
+        'keep_days' => (int) env('LEADGEN_BACKUP_KEEP_DAYS', 14),
+    ],
+
+    /*
     | US and Canadian leads store their state/province in the City field.
     | A city entered without its state is placed using these overrides
     | first (city name => state, per country), then by how other leads

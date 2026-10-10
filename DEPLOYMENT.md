@@ -98,6 +98,26 @@ php artisan app:deployment-check
 
 Use atomic releases when the hosting platform supports them. Back up the database and persistent upload/brochure storage before migrations. Roll back by restoring the previous release and database backup; do not run destructive migration commands on production.
 
+## Database backups
+
+The scheduler runs `app:backup-database` every day at 02:00 Asia/Manila. It writes a gzipped SQL dump of every table to `storage/app/private/backups/leadgen-YYYY-MM-DD-HHMMSS.sql.gz`, reads the file back to confirm it is complete, and deletes backups older than `LEADGEN_BACKUP_KEEP_DAYS` (default 14). Rows in `cache`, `cache_locks`, and `sessions` are not backed up. The dump is written with PDO only, so it works on hosts that disable `proc_open`/`exec`. A failed backup exits non-zero and logs `Database backup failed.`
+
+Run a backup by hand before every migration or risky change:
+
+```bash
+/opt/alt/php84/usr/bin/php artisan app:backup-database
+```
+
+These files sit on the same server as the database, so they do not survive losing the hosting account. Keep the hosting provider's own daily backups enabled and download a recent file to secure off-site storage at least weekly. The backups contain all lead data and are not encrypted, so treat every copy like the production database.
+
+To restore, put the site in maintenance mode, then import the file into an empty database. Use phpMyAdmin (Import accepts `.sql.gz`) or:
+
+```bash
+gunzip -c leadgen-YYYY-MM-DD-HHMMSS.sql.gz | mysql -u USER -p DATABASE
+```
+
+Then run `php artisan migrate --force` (for backups taken before the latest migrations) and `php artisan optimize`. Practise a restore into a separate database before an incident.
+
 ## Monitoring checklist
 
 - Monitor `GET /up`; it verifies that Laravel boots and the database is reachable.

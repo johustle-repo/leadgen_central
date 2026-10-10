@@ -34,6 +34,13 @@ Schedule::call(fn () => Artisan::call('uploads:dispatch-pending'))
     ->onOneServer()
     ->withoutOverlapping(5);
 
+Schedule::call(fn () => Artisan::call('app:backup-database'))
+    ->name('database-backup')
+    ->dailyAt('02:00')
+    ->timezone('Asia/Manila')
+    ->onOneServer()
+    ->withoutOverlapping(120);
+
 Schedule::call(fn () => Artisan::call('queue:work', [
     'connection' => 'database',
     '--queue' => 'default',
