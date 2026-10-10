@@ -5,6 +5,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\VerifyEmailController as AuthVerifyEmailController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DatabaseBackupController;
 use App\Http\Controllers\DuplicateReviewController;
 use App\Http\Controllers\EmailReplyController;
 use App\Http\Controllers\EmailSequenceController;
@@ -80,6 +81,12 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
     Route::put('system-settings', [SystemSettingController::class, 'update'])->middleware(['can:manage-settings', 'password.confirm'])->name('system-settings.update');
     Route::post('system-settings/maintenance', [SystemSettingController::class, 'enableMaintenance'])->middleware('can:manage-maintenance')->name('system-settings.maintenance.enable');
     Route::delete('system-settings/maintenance', [SystemSettingController::class, 'disableMaintenance'])->middleware('can:manage-maintenance')->name('system-settings.maintenance.disable');
+    Route::get('backups', [DatabaseBackupController::class, 'index'])->name('backups.index');
+    Route::post('backups', [DatabaseBackupController::class, 'store'])->middleware('throttle:6,1')->name('backups.store');
+    Route::get('backups/{backup}', [DatabaseBackupController::class, 'download'])
+        ->where('backup', 'leadgen-\d{4}-\d{2}-\d{2}-\d{6}\.sql\.gz')
+        ->middleware(['password.confirm', 'throttle:data-exports'])
+        ->name('backups.download');
     Route::get('audit-logs', AuditLogController::class)->name('audit-logs.index');
     Route::get('email-replies', [EmailReplyController::class, 'index'])->name('email-replies.index');
     Route::put('email-replies/read-all', [EmailReplyController::class, 'markAllRead'])->name('email-replies.mark-all-read');

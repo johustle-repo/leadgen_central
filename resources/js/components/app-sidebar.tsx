@@ -3,6 +3,7 @@ import { usePage, usePoll } from '@inertiajs/react';
 import {
     CalendarClock,
     ChartNoAxesCombined,
+    DatabaseBackup,
     FileClock,
     LayoutGrid,
     MailSearch,
@@ -32,6 +33,7 @@ import {
     scanner as attendanceScanner,
     summary as attendanceSummary,
 } from '@/routes/attendance';
+import { index as backupIndex } from '@/routes/backups';
 import { index as emailReplyIndex } from '@/routes/email-replies';
 import { index as leadIndex } from '@/routes/leads';
 import { index as reportIndex } from '@/routes/report';
@@ -118,6 +120,7 @@ export function AppSidebar() {
             label: 'Administration',
             items: [
                 { title: 'Users', href: userIndex(), icon: Users },
+                { title: 'Backups', href: backupIndex(), icon: DatabaseBackup },
                 // System Settings covers site-wide maintenance mode, so it
                 // stays Super Administrator-only even though a regular
                 // Administrator can already manage the CSV upload limits on

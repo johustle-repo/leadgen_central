@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\DatabaseBackupStore;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -9,7 +10,6 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -35,11 +35,11 @@ class BackupDatabase extends Command
 
     private const string COMPLETION_MARKER = '-- LeadGen Central backup completed';
 
-    public function handle(): int
+    public function handle(DatabaseBackupStore $store): int
     {
         $connection = DB::connection();
-        $disk = Storage::disk((string) config('leadgen.backup.disk'));
-        $directory = trim((string) config('leadgen.backup.path'), '/');
+        $disk = $store->disk();
+        $directory = $store->directory();
         $fileName = 'leadgen-'.now()->format('Y-m-d-His').'.sql.gz';
         $temporaryPath = (string) tempnam(sys_get_temp_dir(), 'leadgen-backup-');
 
@@ -57,7 +57,7 @@ class BackupDatabase extends Command
             @unlink($temporaryPath);
         }
 
-        $removed = $this->removeExpiredBackups($directory, $fileName);
+        $removed = $this->removeExpiredBackups($store, $fileName);
 
         $this->components->info("Database backed up to {$directory}/{$fileName}. Removed {$removed} expired backup(s).");
 
@@ -215,13 +215,13 @@ class BackupDatabase extends Command
         }
     }
 
-    private function removeExpiredBackups(string $directory, string $currentFileName): int
+    private function removeExpiredBackups(DatabaseBackupStore $store, string $currentFileName): int
     {
-        $disk = Storage::disk((string) config('leadgen.backup.disk'));
+        $disk = $store->disk();
         $cutoff = now()->subDays((int) config('leadgen.backup.keep_days'))->getTimestamp();
 
-        $expired = collect($disk->files($directory))
-            ->filter(fn (string $path): bool => preg_match('/^leadgen-\d{4}-\d{2}-\d{2}-\d{6}\.sql\.gz$/', basename($path)) === 1)
+        $expired = collect($disk->files($store->directory()))
+            ->filter(fn (string $path): bool => $store->isBackupFileName(basename($path)))
             ->reject(fn (string $path): bool => basename($path) === $currentFileName)
             ->filter(fn (string $path): bool => $disk->lastModified($path) < $cutoff)
             ->values();
