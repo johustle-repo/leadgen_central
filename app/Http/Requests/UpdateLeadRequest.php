@@ -7,6 +7,13 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateLeadRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('linkedin_url')) {
+            $this->merge(['linkedin_url' => StoreLeadRequest::shortenLinkedInUrl((string) $this->input('linkedin_url'))]);
+        }
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */

@@ -21,6 +21,34 @@ class StoreLeadRequest extends FormRequest
                 'contact_person' => Str::title(Str::lower(Str::squish((string) $this->input('contact_person')))),
             ]);
         }
+
+        if ($this->filled('linkedin_url')) {
+            $this->merge(['linkedin_url' => self::shortenLinkedInUrl((string) $this->input('linkedin_url'))]);
+        }
+    }
+
+    /**
+     * Shorten a LinkedIn link to its profile or company page, dropping
+     * tracking parameters and sub-pages. Mirrors shortenLinkedInUrl() in
+     * resources/js/pages/leads/form.tsx; other links are returned as entered.
+     */
+    public static function shortenLinkedInUrl(string $url): string
+    {
+        $url = trim($url);
+        $parts = parse_url(preg_match('#^https?://#i', $url) ? $url : "https://{$url}");
+        $host = strtolower($parts['host'] ?? '');
+
+        if ($parts === false || ! preg_match('/(^|\.)linkedin\.com$/', $host)) {
+            return $url;
+        }
+
+        $segments = array_values(array_filter(explode('/', $parts['path'] ?? '')));
+
+        if (in_array(strtolower($segments[0] ?? ''), ['in', 'company', 'school', 'showcase'], true) && isset($segments[1])) {
+            $segments = [strtolower($segments[0]), $segments[1]];
+        }
+
+        return rtrim('https://linkedin.com/'.implode('/', $segments), '/');
     }
 
     /**

@@ -95,6 +95,29 @@ it('saves lowercased primary and secondary emails', function () {
     $this->assertDatabaseHas('leads', ['company_name' => 'Acme Ventures', 'email' => 'hello@acme.test', 'secondary_email' => 'backup@acme.test']);
 });
 
+it('shortens LinkedIn links to the profile or company page', function (string $entered, string $saved) {
+    $agent = User::factory()->create();
+    $this->actingAs($agent)->post(route('leads.store'), ['company_name' => 'Acme Ventures', 'contact_person' => 'Ada', 'email' => 'ada@acme.test', 'linkedin_url' => $entered])
+        ->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('leads', ['email' => 'ada@acme.test', 'linkedin_url' => $saved]);
+})->with([
+    'tracked profile link' => ['https://www.linkedin.com/in/ada-lovelace-123/?utm_source=share&utm_medium=member_desktop', 'https://linkedin.com/in/ada-lovelace-123'],
+    'profile sub-page without scheme' => ['ph.linkedin.com/in/ada-lovelace-123/details/experience/', 'https://linkedin.com/in/ada-lovelace-123'],
+    'company page' => ['https://www.linkedin.com/company/acme/about/#top', 'https://linkedin.com/company/acme'],
+    'other site' => ['https://example.com/ada?ref=1', 'https://example.com/ada?ref=1'],
+]);
+
+it('shortens LinkedIn links when updating a lead', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create();
+
+    $this->actingAs($agent)->put(route('leads.update', $lead), ['company_name' => $lead->company_name, 'linkedin_url' => 'https://www.linkedin.com/in/ada/?trk=public'])
+        ->assertSessionHasNoErrors();
+
+    expect($lead->refresh()->linkedin_url)->toBe('https://linkedin.com/in/ada');
+});
+
 it('normalizes manually entered contact names to title case', function (string $contactName) {
     $agent = User::factory()->create();
 

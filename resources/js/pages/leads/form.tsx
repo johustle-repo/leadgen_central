@@ -123,6 +123,34 @@ const sourceFromLink = (url: string): string | undefined =>
         new RegExp(`(^|[/.@])${domain}\\.[a-z]{2,}`, 'i').test(url.trim()),
     )?.[1];
 
+/** Mirrors StoreLeadRequest::shortenLinkedInUrl(). */
+const LINKEDIN_PAGE_TYPES = ['in', 'company', 'school', 'showcase'];
+const shortenLinkedInUrl = (value: string): string => {
+    const url = value.trim();
+    let parsed: URL;
+
+    try {
+        parsed = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+    } catch {
+        return url;
+    }
+
+    if (!/(^|\.)linkedin\.com$/.test(parsed.hostname)) {
+        return url;
+    }
+
+    let segments = parsed.pathname.split('/').filter(Boolean);
+
+    if (
+        LINKEDIN_PAGE_TYPES.includes(segments[0]?.toLowerCase()) &&
+        segments[1]
+    ) {
+        segments = [segments[0].toLowerCase(), segments[1]];
+    }
+
+    return `https://linkedin.com/${segments.join('/')}`.replace(/\/$/, '');
+};
+
 function DataSourceSelect({
     id,
     name,
@@ -528,7 +556,19 @@ export default function LeadForm({
                                                                                     .trim()
                                                                                     .toLowerCase();
                                                                         }
-                                                                      : undefined
+                                                                      : field.name ===
+                                                                          'linkedin_url'
+                                                                        ? (
+                                                                              event,
+                                                                          ) => {
+                                                                              event.currentTarget.value =
+                                                                                  shortenLinkedInUrl(
+                                                                                      event
+                                                                                          .currentTarget
+                                                                                          .value,
+                                                                                  );
+                                                                          }
+                                                                        : undefined
                                                             }
                                                             onChange={
                                                                 field.name ===
