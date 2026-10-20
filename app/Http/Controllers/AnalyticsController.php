@@ -27,7 +27,7 @@ class AnalyticsController extends Controller
 
         $version = ReportCache::version();
 
-        return Inertia::render('analytics/index', [...$analytics->for($user, $request->validated()), 'reportVersion' => $version]);
+        return Inertia::render('analytics/index', [...$analytics->for($user, $request->reportFilters()), 'reportVersion' => $version]);
     }
 
     /**
@@ -42,7 +42,7 @@ class AnalyticsController extends Controller
     public function export(AnalyticsRequest $request, AnalyticsReport $analytics, CsvCellSanitizer $csv): StreamedResponse
     {
         [$user, $data] = $this->reportData($request, $analytics);
-        $this->logExport($request, $user, 'analytics.exported', 'Downloaded an analytics report export.', $data['filters']);
+        $this->logExport($request, $user, 'analytics.exported', 'Downloaded an analytics report export.', [...$data['filters'], ...$request->demographicFilters()]);
 
         return response()->streamDownload(function () use ($data, $csv): void {
             $stream = fopen('php://output', 'wb');
@@ -62,6 +62,9 @@ class AnalyticsController extends Controller
             };
 
             fputcsv($stream, ['Report period', "{$data['filters']['date_from']} to {$data['filters']['date_to']}"], escape: '');
+            foreach ($data['demographicFilters'] as $label => $value) {
+                fputcsv($stream, $csv->sanitizeRow(["Demographics filter: {$label}", $value]), escape: '');
+            }
             fputcsv($stream, [], escape: '');
             foreach ($data['databaseSections'] as $title => $rows) {
                 $writeSection($title, $rows);
@@ -91,7 +94,7 @@ class AnalyticsController extends Controller
     public function exportPdf(AnalyticsRequest $request, AnalyticsReport $analytics, AnalyticsPdfReport $pdfReport): HttpResponse
     {
         [$user, $data] = $this->reportData($request, $analytics);
-        $this->logExport($request, $user, 'analytics.exported_pdf', 'Downloaded an analytics PDF report.', $data['filters']);
+        $this->logExport($request, $user, 'analytics.exported_pdf', 'Downloaded an analytics PDF report.', [...$data['filters'], ...$request->demographicFilters()]);
 
         $pdf = Pdf::loadView('reports.analytics', [
             'data' => $data,
@@ -126,8 +129,12 @@ class AnalyticsController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
-        $data = $analytics->for($user, $request->validated());
-        $data['databaseSections'] = app(DatabaseIntelligenceReport::class)->exportSections($data['databaseReport']);
+        $intelligence = app(DatabaseIntelligenceReport::class);
+        $data = $analytics->for($user, $request->reportFilters());
+        $demographicFilters = $request->demographicFilters();
+        $data['databaseReport']['demographics'] = $intelligence->filterDemographics($data['databaseReport']['demographics'], $demographicFilters);
+        $data['demographicFilters'] = $intelligence->demographicFilterLabels($data['databaseReport']['demographics'], $demographicFilters);
+        $data['databaseSections'] = $intelligence->exportSections($data['databaseReport']);
 
         return [$user, $data];
     }

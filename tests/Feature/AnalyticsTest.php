@@ -100,6 +100,31 @@ it('downloads a report CSV scoped to the agents own leads and logs the export', 
     ]);
 });
 
+it('limits the exported demographic breakdowns to the demographics slicers', function () {
+    $this->travelTo('2026-09-01 12:00:00');
+    $administrator = User::factory()->administrator()->create();
+    $agent = User::factory()->create(['name' => 'Slicer Agent']);
+    foreach ([['PH', 'Philippines', 'Manila'], ['PH', 'Philippines', 'Cebu City'], ['US', 'United States', 'Los Angeles']] as [$code, $country, $city]) {
+        Lead::factory()->for($agent, 'agent')->create(['country_code' => $code, 'country' => $country, 'city' => $city, 'created_at' => '2026-08-30 10:00:00']);
+    }
+
+    $response = $this->actingAs($administrator)->get(route('report.export', ['period' => '7_days', 'country' => 'PH', 'city' => 'manila', 'agent' => (string) $agent->id]));
+
+    $content = (string) $response->streamedContent();
+    expect($content)
+        ->toContain('"Demographics filter: Country",Philippines')
+        ->toContain('"Demographics filter: City",manila')
+        ->toContain('"Demographics filter: Agent","Slicer Agent"')
+        ->toContain('"Manila, Philippines",1')
+        ->not->toContain('Cebu City, Philippines')
+        ->not->toContain('Los Angeles, United States');
+    $this->assertDatabaseHas(AuditLog::class, ['action' => 'analytics.exported', 'metadata->country' => 'PH', 'metadata->city' => 'manila']);
+
+    $this->actingAs($administrator)->get(route('report.export-pdf', ['period' => '7_days', 'region' => 'Asia']))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+});
+
 it('includes the agent performance section in an administrators report export', function () {
     $this->travelTo('2026-09-01 12:00:00');
     $administrator = User::factory()->administrator()->create();

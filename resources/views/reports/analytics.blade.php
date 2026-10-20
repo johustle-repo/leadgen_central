@@ -114,6 +114,9 @@
                 <span class="pill">{{ $scope }}</span><br><br>
                 Period <strong>{{ $period }}</strong><br>
                 Compared with <strong>{{ $previousPeriod }}</strong><br>
+                @foreach ($data['demographicFilters'] as $label => $value)
+                    {{ $label }} <strong>{{ $value }}</strong><br>
+                @endforeach
                 Generated <strong>{{ now()->format('Y-m-d H:i') }}</strong> by <strong>{{ $generatedBy }}</strong>
             </td>
         </tr></table>
@@ -283,6 +286,9 @@
     {{-- Geography --}}
     <h2>Geography</h2>
     <p class="section-note">Countries resolve from stored codes, the country list or known aliases; unrecognized values keep their historical label. Location data may be incomplete.</p>
+    @if ($data['demographicFilters'] !== [])
+        <p class="section-note">Region, country, city and agent breakdowns are limited to {{ collect($data['demographicFilters'])->map(fn (string $value, string $label): string => "{$label}: {$value}")->implode(', ') }}. Other sections cover the whole period.</p>
+    @endif
     <table class="grid"><tr>
         <td style="width: 50%;">
             <div class="card keep">

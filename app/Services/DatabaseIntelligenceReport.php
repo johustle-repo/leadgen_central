@@ -135,6 +135,52 @@ class DatabaseIntelligenceReport
     }
 
     /**
+     * Keeps the demographic combinations matching the Demographics tab's
+     * slicers: region and country compare exactly, a city matches its
+     * country and case-insensitive name, and an agent of "none" means
+     * unassigned leads.
+     *
+     * @param  array<string, mixed>  $demographics
+     * @param  array<string, string>  $filters
+     * @return array<string, mixed>
+     */
+    public function filterDemographics(array $demographics, array $filters): array
+    {
+        if ($filters === []) {
+            return $demographics;
+        }
+
+        $cityKey = fn (string $city): string => mb_strtolower(trim($city));
+        $demographics['rows'] = array_values(array_filter($demographics['rows'], fn (array $row): bool => (! isset($filters['region']) || $row['region'] === $filters['region'])
+            && (! isset($filters['country']) || $row['country'] === $filters['country'])
+            && (! isset($filters['city']) || $cityKey($row['city']) === $cityKey($filters['city']))
+            && (! isset($filters['agent']) || ($row['agent_id'] === null ? 'none' : (string) $row['agent_id']) === $filters['agent'])));
+
+        return $demographics;
+    }
+
+    /**
+     * Readable labels for the applied demographics slicers, for export headers.
+     *
+     * @param  array<string, mixed>  $demographics
+     * @param  array<string, string>  $filters
+     * @return array<string, string>
+     */
+    public function demographicFilterLabels(array $demographics, array $filters): array
+    {
+        return array_filter([
+            'Region' => $filters['region'] ?? null,
+            'Country' => isset($filters['country']) ? (CountryRegions::COUNTRIES[$filters['country']]['name'] ?? $filters['country']) : null,
+            'City' => $filters['city'] ?? null,
+            'Agent' => match ($filters['agent'] ?? null) {
+                null => null,
+                'none' => 'Unassigned',
+                default => $demographics['agents'][(int) $filters['agent']] ?? 'Deleted user',
+            },
+        ], fn (?string $value): bool => $value !== null);
+    }
+
+    /**
      * Totals the demographic combinations by one dimension, largest first.
      *
      * @param  array<string, mixed>  $data

@@ -35,7 +35,12 @@ import {
     summarize,
 } from '@/components/database-charts';
 import { HeaderActionsPortal } from '@/components/header-actions';
-import { countryLabel, LeadDemographics } from '@/components/lead-demographics';
+import {
+    countryLabel,
+    demographicExportQuery,
+    LeadDemographics,
+} from '@/components/lead-demographics';
+import type { DemographicFilters } from '@/components/lead-demographics';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -186,6 +191,8 @@ export default function Analytics({
     const [processing, setProcessing] = useState(false);
     useReportRefresh(reportVersion);
     const [tab, setTab] = useState<Tab>(initialTab);
+    const [demographicFilters, setDemographicFilters] =
+        useState<DemographicFilters>({});
     const selected = `${filters.date_from} – ${filters.date_to}`;
     const quality = data.quality;
     const appliedQuery = {
@@ -215,6 +222,14 @@ export default function Analytics({
             : []),
     ];
     const activeTab = tabs.some((item) => item.key === tab) ? tab : 'overview';
+    // Exports from the Demographics tab carry its slicers so the region,
+    // country, city and agent breakdowns match what is on screen.
+    const exportQuery = {
+        ...appliedQuery,
+        ...(activeTab === 'demographics'
+            ? demographicExportQuery(demographicFilters, data.demographics.rows)
+            : {}),
+    };
 
     useEffect(() => {
         window.history.replaceState(
@@ -353,7 +368,7 @@ export default function Analytics({
                         >
                             <a
                                 href={reportExport.url({
-                                    query: appliedQuery,
+                                    query: exportQuery,
                                 })}
                             >
                                 Export CSV
@@ -367,7 +382,7 @@ export default function Analytics({
                         >
                             <a
                                 href={reportExportPdf.url({
-                                    query: appliedQuery,
+                                    query: exportQuery,
                                 })}
                             >
                                 Export PDF
@@ -627,6 +642,8 @@ export default function Analytics({
                             demographics={data.demographics}
                             showAgents={data.can_compare_agents}
                             period={filters}
+                            filters={demographicFilters}
+                            onFiltersChange={setDemographicFilters}
                         />
                     )}
 

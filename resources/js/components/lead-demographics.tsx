@@ -49,7 +49,8 @@ import type {
 } from '@/types/database-report';
 
 type Dimension = 'region' | 'country' | 'agent' | 'city';
-type Filters = Partial<Record<Dimension, string>>;
+export type DemographicFilters = Partial<Record<Dimension, string>>;
+type Filters = DemographicFilters;
 type Measure = 'records' | 'possible';
 type Group = DemographicMetrics & { key: string; label: string };
 type SortKey = keyof DemographicMetrics | 'rate' | 'label';
@@ -616,6 +617,29 @@ function Slicer({
 }
 
 /**
+ * The report export query for the selected slicers, so the CSV and PDF
+ * breakdowns cover the same leads as the page. A city is sent as its country
+ * and saved name, since its slicer key folds accents the server cannot.
+ */
+export function demographicExportQuery(
+    filters: DemographicFilters,
+    rows: DemographicRow[],
+): Record<string, string> {
+    const selectedCity = filters.city
+        ? rows.find((row) => KEY_OF.city(row) === filters.city)
+        : undefined;
+
+    return {
+        ...(filters.region ? { region: filters.region } : {}),
+        ...(filters.country ? { country: filters.country } : {}),
+        ...(selectedCity
+            ? { country: selectedCity.country, city: selectedCity.city }
+            : {}),
+        ...(filters.agent ? { agent: filters.agent } : {}),
+    };
+}
+
+/**
  * Power BI-style interactive demographics page: slicers across the top, and
  * every visual cross-filters the rest. Each visual ignores its own dimension's
  * filter so the selected bar stays highlighted among its peers instead of
@@ -625,13 +649,17 @@ export function LeadDemographics({
     demographics,
     showAgents,
     period,
+    filters,
+    onFiltersChange: setFilters,
 }: {
     demographics: Demographics;
     showAgents: boolean;
     /** Report period, so lead list links cover the same leads. */
     period: { date_from: string; date_to: string };
+    /** Slicer selection, held by the page so its exports can apply it. */
+    filters: Filters;
+    onFiltersChange: (update: (current: Filters) => Filters) => void;
 }) {
-    const [filters, setFilters] = useState<Filters>({});
     const [measure, setMeasure] = useState<Measure>('records');
     const { rows, agents } = demographics;
     const agentLabel = (row: DemographicRow) =>
@@ -787,13 +815,20 @@ export function LeadDemographics({
                             size="sm"
                             variant="ghost"
                             className="h-7 text-xs"
-                            onClick={() => setFilters({})}
+                            onClick={() => setFilters(() => ({}))}
                         >
                             Clear all
                         </Button>
                     </div>
                 )}
             </div>
+
+            <Visual
+                title="Region, country and city breakdown"
+                subtitle="Expand a region or country to drill down · click a column to sort · the list icon opens those leads"
+            >
+                <DemographicMatrix rows={filtered} linkFor={linkFor} />
+            </Visual>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
                 <KpiCard label="Leads" value={totals.records} icon={Users} />
@@ -882,12 +917,6 @@ export function LeadDemographics({
                 </Visual>
             </div>
 
-            <Visual
-                title="Region, country and city breakdown"
-                subtitle="Expand a region or country to drill down · click a column to sort · the list icon opens those leads"
-            >
-                <DemographicMatrix rows={filtered} linkFor={linkFor} />
-            </Visual>
             <p className="text-xs text-muted-foreground">
                 Possible, qualified and forwarded use each lead&apos;s current
                 status. Countries missing from the regions reference appear as

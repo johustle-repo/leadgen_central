@@ -7,6 +7,9 @@ use Illuminate\Validation\Rule;
 
 class AnalyticsRequest extends DashboardRequest
 {
+    /** Demographics slicers that narrow the exported region, country, city and agent breakdowns. */
+    public const DEMOGRAPHIC_FILTERS = ['region', 'country', 'city', 'agent'];
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -25,6 +28,30 @@ class AnalyticsRequest extends DashboardRequest
         return [
             ...parent::rules(),
             'period' => ['nullable', Rule::in(['today', 'week', 'last_week', 'month', 'last_month', '30_days', 'quarter', 'custom', '7_days', '90_days'])],
+            'region' => ['nullable', 'string', 'max:100'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'agent' => ['nullable', 'string', 'max:20'],
         ];
+    }
+
+    /**
+     * The report period filters, without the demographics slicers.
+     *
+     * @return array<string, mixed>
+     */
+    public function reportFilters(): array
+    {
+        return $this->safe()->except(self::DEMOGRAPHIC_FILTERS);
+    }
+
+    /**
+     * The demographics slicers that were set.
+     *
+     * @return array<string, string>
+     */
+    public function demographicFilters(): array
+    {
+        return array_filter($this->safe()->only(self::DEMOGRAPHIC_FILTERS), fn (mixed $value): bool => is_string($value) && $value !== '');
     }
 }
