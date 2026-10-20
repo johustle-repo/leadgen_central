@@ -8,12 +8,13 @@ import {
     Globe2,
     List,
     MapPin,
+    Printer,
     Sparkles,
     Target,
     Users,
     X,
 } from 'lucide-react';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
     Bar,
@@ -337,14 +338,63 @@ function buildTree(rows: DemographicRow[]): MatrixNode[] {
     return [...regions.values()];
 }
 
+const PRINT_STYLES = `
+    body { font-family: system-ui, sans-serif; color: #0f172a; margin: 24px; }
+    h1 { font-size: 16px; margin: 0 0 4px; }
+    p { font-size: 11px; color: #64748b; margin: 0 0 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { padding: 4px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    thead th { color: #64748b; border-bottom: 2px solid #cbd5e1; }
+    tfoot td { font-weight: 600; border-top: 2px solid #cbd5e1; }
+    tr { break-inside: avoid; }
+`;
+
+/**
+ * Prints the breakdown table as it is shown (expanded rows, sort and
+ * slicers) in its own window, without the page's chrome and scroll box.
+ * Controls are reduced to their text so only the figures remain.
+ */
+function printTable(table: HTMLTableElement, title: string, subtitle: string) {
+    const printWindow = window.open('', '_blank', 'width=960,height=720');
+
+    if (!printWindow) {
+        return;
+    }
+
+    const copy = table.cloneNode(true) as HTMLTableElement;
+    copy.querySelectorAll('svg').forEach((icon) => icon.remove());
+    copy.querySelectorAll('button, a').forEach((control) =>
+        control.replaceWith(control.textContent ?? ''),
+    );
+
+    const doc = printWindow.document;
+    doc.title = title;
+    const style = doc.createElement('style');
+    style.textContent = PRINT_STYLES;
+    const heading = doc.createElement('h1');
+    heading.textContent = title;
+    const note = doc.createElement('p');
+    note.textContent = subtitle;
+    doc.head.append(style);
+    doc.body.append(heading, note, doc.importNode(copy, true));
+    printWindow.addEventListener('afterprint', () => printWindow.close());
+    printWindow.focus();
+    printWindow.print();
+}
+
 function DemographicMatrix({
     rows,
     linkFor,
+    printSubtitle,
 }: {
     rows: DemographicRow[];
     /** Lead list link for a row's leads within the current selection. */
     linkFor: (drilldown: LeadDrilldown) => string | undefined;
+    /** Period and slicers shown under the printed title. */
+    printSubtitle: string;
 }) {
+    const tableRef = useRef<HTMLTableElement>(null);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({
         key: 'records',
@@ -498,7 +548,10 @@ function DemographicMatrix({
                 </Button>
             </div>
             <div className="max-h-[32rem] overflow-auto">
-                <table className="w-full min-w-[40rem] text-left text-xs">
+                <table
+                    ref={tableRef}
+                    className="w-full min-w-[40rem] text-left text-xs"
+                >
                     <thead className="sticky top-0 z-10 border-b bg-card text-muted-foreground">
                         <tr>
                             {columns.map((column, index) => (
@@ -575,6 +628,26 @@ function DemographicMatrix({
                         </tfoot>
                     )}
                 </table>
+            </div>
+            <div className="mt-3 flex justify-end">
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    disabled={tree.length === 0}
+                    onClick={() =>
+                        tableRef.current &&
+                        printTable(
+                            tableRef.current,
+                            'Region, country and city breakdown',
+                            printSubtitle,
+                        )
+                    }
+                >
+                    <Printer />
+                    Print
+                </Button>
             </div>
         </>
     );
@@ -827,7 +900,17 @@ export function LeadDemographics({
                 title="Region, country and city breakdown"
                 subtitle="Expand a region or country to drill down · click a column to sort · the list icon opens those leads"
             >
-                <DemographicMatrix rows={filtered} linkFor={linkFor} />
+                <DemographicMatrix
+                    rows={filtered}
+                    linkFor={linkFor}
+                    printSubtitle={[
+                        `Report period ${period.date_from} – ${period.date_to}`,
+                        ...active.map(
+                            ([dimension, key]) =>
+                                `${dimension[0].toUpperCase()}${dimension.slice(1)}: ${labels[dimension](key)}`,
+                        ),
+                    ].join(' · ')}
+                />
             </Visual>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
