@@ -11,7 +11,6 @@ use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use LogicException;
 
 class AnalyticsReport
@@ -64,7 +63,6 @@ class AnalyticsReport
             'funnel' => $funnel['stages'],
             'funnelExcluded' => $funnel['excluded'],
             'dataQualityTrend' => $user->isAdministrator() ? $this->dataQualityTrend($this->batchQuery($user, $from, $to), $from, $to) : [],
-            'uploadTimingHeatmap' => $user->isAdministrator() ? $this->uploadTimingHeatmap($this->batchQuery($user, $from, $to)) : [],
             'industries' => $user->isAdministrator() ? $this->distribution($leads, 'industry', 8) : [],
         ];
     }
@@ -288,33 +286,6 @@ class AnalyticsReport
         }
 
         return $trend;
-    }
-
-    /**
-     * Day-of-week x hour-of-day upload volume, using the application timezone
-     * (not each agent's local timezone). Bucketed in SQL (DAYOFWEEK()/HOUR() on
-     * MySQL, strftime() on SQLite) so a large batch history doesn't have to be
-     * pulled into PHP just to be counted.
-     *
-     * @param  Builder<UploadBatch>  $batches
-     * @return list<array{day: string, hours: list<int>}>
-     */
-    private function uploadTimingHeatmap(Builder $batches): array
-    {
-        $dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        $sqlite = DB::connection()->getDriverName() === 'sqlite';
-        $day = $sqlite ? "CAST(strftime('%w', created_at) AS INTEGER)" : 'DAYOFWEEK(created_at) - 1';
-        $hour = $sqlite ? "CAST(strftime('%H', created_at) AS INTEGER)" : 'HOUR(created_at)';
-        /** @var array<int, array<int, int>> $counts */
-        $counts = [];
-        foreach ((clone $batches)->selectRaw("{$day} as weekday, {$hour} as upload_hour, COUNT(*) as aggregate")->groupBy('weekday', 'upload_hour')->toBase()->get() as $row) {
-            $counts[(int) $row->weekday][(int) $row->upload_hour] = (int) $row->aggregate;
-        }
-
-        return array_map(fn (int $weekday, string $label): array => [
-            'day' => $label,
-            'hours' => array_map(fn (int $hour): int => $counts[$weekday][$hour] ?? 0, range(0, 23)),
-        ], array_keys($dayLabels), $dayLabels);
     }
 
     private function change(int $current, int $previous): float

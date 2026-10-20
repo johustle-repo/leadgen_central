@@ -64,7 +64,6 @@ type Props = {
     period: string;
     filters: { date_from: string; date_to: string };
     databaseReport: DatabaseReport;
-    uploadTimingHeatmap: { day: string; hours: number[] }[];
     reportVersion: string;
 };
 type Tab = 'overview' | 'demographics' | 'quality' | 'agents';
@@ -178,7 +177,6 @@ export default function Analytics({
     period,
     filters,
     databaseReport: data,
-    uploadTimingHeatmap,
     reportVersion,
 }: Props) {
     const { auth, errors } = usePage<{
@@ -1114,88 +1112,6 @@ export default function Analytics({
                                         ])}
                                 />
                             </Visual>
-                            {uploadTimingHeatmap.length > 0 && (
-                                <Visual
-                                    title="Upload timing"
-                                    subtitle={`Batches by weekday and hour · ${data.timezone}`}
-                                >
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-center text-xs">
-                                            <thead>
-                                                <tr>
-                                                    <th
-                                                        scope="col"
-                                                        className="text-left font-medium text-muted-foreground"
-                                                    >
-                                                        Day / hour
-                                                    </th>
-                                                    {Array.from(
-                                                        { length: 24 },
-                                                        (_, hour) => (
-                                                            <th
-                                                                key={hour}
-                                                                className="min-w-7 p-1 font-medium text-muted-foreground"
-                                                                scope="col"
-                                                            >
-                                                                {hour}
-                                                            </th>
-                                                        ),
-                                                    )}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {uploadTimingHeatmap.map(
-                                                    (row) => {
-                                                        const max = Math.max(
-                                                            ...uploadTimingHeatmap.flatMap(
-                                                                (day) =>
-                                                                    day.hours,
-                                                            ),
-                                                            1,
-                                                        );
-
-                                                        return (
-                                                            <tr key={row.day}>
-                                                                <th
-                                                                    scope="row"
-                                                                    className="p-1.5 text-left font-medium"
-                                                                >
-                                                                    {row.day}
-                                                                </th>
-                                                                {row.hours.map(
-                                                                    (
-                                                                        count,
-                                                                        hour,
-                                                                    ) => (
-                                                                        <td
-                                                                            key={
-                                                                                hour
-                                                                            }
-                                                                            title={`${row.day} ${hour}:00 · ${count} uploads`}
-                                                                            className={`border-2 border-card p-1 tabular-nums ${count > 0 ? 'font-medium text-foreground' : 'bg-muted/40 text-muted-foreground'}`}
-                                                                            style={
-                                                                                count >
-                                                                                0
-                                                                                    ? {
-                                                                                          backgroundColor: `color-mix(in oklab, var(--color-chart-1) ${Math.round(15 + (count / max) * 55)}%, transparent)`,
-                                                                                      }
-                                                                                    : undefined
-                                                                            }
-                                                                        >
-                                                                            {count ||
-                                                                                '·'}
-                                                                        </td>
-                                                                    ),
-                                                                )}
-                                                            </tr>
-                                                        );
-                                                    },
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </Visual>
-                            )}
                         </>
                     )}
 

@@ -201,7 +201,7 @@ it('shows an agent analytics only for their owned leads', function () {
         ->where('funnel', [])
         ->where('funnelExcluded', [])
         ->where('dataQualityTrend', [])
-        ->where('uploadTimingHeatmap', [])
+        ->missing('uploadTimingHeatmap')
         ->where('industries', []));
 });
 
@@ -295,7 +295,7 @@ it('shows administrators the lead funnel, data quality trend, upload timing heat
         ->where('dataQualityTrend.5.duplicate_rate', 10)
         ->where('dataQualityTrend.5.error_rate', 5)
         ->where('dataQualityTrend.5.location_error_rate', 2)
-        ->has('uploadTimingHeatmap', 7)
+        ->missing('uploadTimingHeatmap')
         ->where('industries.0.label', 'Logistics')
         ->where('industries.0.value', 4)
         ->where('agentPerformance.0.name', 'Pattern Agent')
