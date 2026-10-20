@@ -118,7 +118,8 @@ it('keeps an agent drill-down to their own leads and clears the default lead dat
             ->has('leads.data', 1)
             ->where('leads.data.0.company_name', 'Mine')
             ->where('filters.source_group', 'Unknown')
-            ->where('filters.date', ''));
+            ->where('filters.date_from', '')
+            ->where('filters.date_to', ''));
 });
 
 it('rejects a malformed report period', function () {

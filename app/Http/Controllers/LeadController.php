@@ -172,11 +172,17 @@ class LeadController extends Controller
         if ($duplicate = $request->string('duplicate_status')->toString()) {
             $query->where(fn ($query) => $query->whereHas('duplicateMatchesAsIncoming', fn ($match) => $match->where('match_type', $duplicate))->orWhereHas('duplicateMatchesAsExisting', fn ($match) => $match->where('match_type', $duplicate)));
         }
-        if ($date = $request->string('date')->toString()) {
-            $query->whereDate('lead_date', $date);
-        }
-        $request->validate(['created_from' => ['nullable', 'date_format:Y-m-d'], 'created_to' => ['nullable', 'date_format:Y-m-d']]);
+        $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'created_from' => ['nullable', 'date_format:Y-m-d'],
+            'created_to' => ['nullable', 'date_format:Y-m-d'],
+        ]);
         $drilldown = array_filter($request->only(LeadReportDimensions::DRILLDOWN_KEYS), fn (mixed $value): bool => is_string($value) && $value !== '');
+        $leadDateRange = $this->leadDateRange($request);
+        $query->when($leadDateRange['date_from'], fn ($query, string $date) => $query->whereDate('lead_date', '>=', $date))
+            ->when($leadDateRange['date_to'], fn ($query, string $date) => $query->whereDate('lead_date', '<=', $date));
         LeadReportDimensions::applyDrilldown($query, $drilldown);
         $sort = in_array($request->string('sort')->toString(), ['company_name', 'city', 'country', 'status', 'source', 'agent', 'created_at'], true) ? $request->string('sort')->toString() : 'created_at';
         $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
@@ -202,7 +208,24 @@ class LeadController extends Controller
             'can_send_email' => $lead->agent_id === $user->id && filter_var($lead->email, FILTER_VALIDATE_EMAIL) !== false,
         ]);
 
-        return Inertia::render('leads/index', ['leads' => $leads, 'filters' => [...$request->only(['search', 'status', 'source', 'country', 'validation_status', 'agent_id', 'upload_batch_id', 'duplicate_status', 'sort', 'direction']), ...$drilldown, 'date' => $request->string('date')->toString() ?: ($drilldown === [] ? today()->toDateString() : ''), 'per_page' => (string) $perPage], 'canBulkDelete' => $user->isAdministrator(), 'agents' => $user->canViewAllLeads() ? User::query()->where('role', UserRole::Agent)->orderBy('name')->get(['id', 'name']) : [], 'batches' => $user->canViewAllLeads() ? UploadBatch::query()->latest()->limit(200)->get(['id', 'batch_code']) : []]);
+        return Inertia::render('leads/index', ['leads' => $leads, 'filters' => [...$request->only(['search', 'status', 'source', 'country', 'validation_status', 'agent_id', 'upload_batch_id', 'duplicate_status', 'sort', 'direction']), ...$drilldown, ...(array_filter($leadDateRange) === [] && $drilldown === [] ? ['date_from' => today()->toDateString(), 'date_to' => today()->toDateString()] : $leadDateRange), 'per_page' => (string) $perPage], 'canBulkDelete' => $user->isAdministrator(), 'agents' => $user->canViewAllLeads() ? User::query()->where('role', UserRole::Agent)->orderBy('name')->get(['id', 'name']) : [], 'batches' => $user->canViewAllLeads() ? UploadBatch::query()->latest()->limit(200)->get(['id', 'batch_code']) : []]);
+    }
+
+    /**
+     * Resolve the lead date range for the listing. A single `date` (used by
+     * older links) selects that one day; otherwise `date_from` and `date_to`
+     * bound the range, and either end may be left open.
+     *
+     * @return array{date_from: string, date_to: string}
+     */
+    private function leadDateRange(Request $request): array
+    {
+        $date = $request->string('date')->toString();
+        if ($date !== '') {
+            return ['date_from' => $date, 'date_to' => $date];
+        }
+
+        return ['date_from' => $request->string('date_from')->toString(), 'date_to' => $request->string('date_to')->toString()];
     }
 
     /**

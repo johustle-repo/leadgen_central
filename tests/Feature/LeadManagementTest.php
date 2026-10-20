@@ -288,9 +288,32 @@ it('filters leads by one lead date', function () {
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('leads/index')
-        ->where('filters.date', '2026-08-25')
+        ->where('filters.date_from', '2026-08-25')
+        ->where('filters.date_to', '2026-08-25')
         ->has('leads.data', 1)
         ->where('leads.data.0.id', $matching->id));
+});
+
+it('filters leads by a lead date range', function () {
+    $administrator = User::factory()->administrator()->create();
+    foreach (['2026-08-23', '2026-08-24', '2026-08-26', '2026-08-27'] as $leadDate) {
+        Lead::factory()->create(['lead_date' => $leadDate, 'company_name' => "Company {$leadDate}"]);
+    }
+
+    $this->actingAs($administrator)->get(route('leads.index', ['date_from' => '2026-08-24', 'date_to' => '2026-08-26', 'sort' => 'company_name', 'direction' => 'asc']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.date_from', '2026-08-24')
+            ->where('filters.date_to', '2026-08-26')
+            ->where('leads.data', fn ($leads) => collect($leads)->pluck('company_name')->all() === ['Company 2026-08-24', 'Company 2026-08-26']));
+
+    $this->actingAs($administrator)->get(route('leads.index', ['date_from' => '2026-08-26']))
+        ->assertInertia(fn (Assert $page) => $page->has('leads.data', 2));
+});
+
+it('rejects a lead date range that ends before it starts', function () {
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('leads.index', ['date_from' => '2026-08-26', 'date_to' => '2026-08-24']))
+        ->assertSessionHasErrors('date_to');
 });
 
 it('prefills todays date in the leads filter', function () {
@@ -301,7 +324,8 @@ it('prefills todays date in the leads filter', function () {
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('leads/index')
-        ->where('filters.date', '2026-09-01'));
+        ->where('filters.date_from', '2026-09-01')
+        ->where('filters.date_to', '2026-09-01'));
 });
 
 it('lets agents preview another agents lead read-only without updating it', function () {

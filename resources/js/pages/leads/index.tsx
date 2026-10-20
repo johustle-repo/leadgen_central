@@ -112,7 +112,12 @@ export default function LeadsIndex({
     const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    const [selectedDate, setSelectedDate] = useState(filters.date || '');
+    const [dateFrom, setDateFrom] = useState(filters.date_from || '');
+    const [dateTo, setDateTo] = useState(filters.date_to || '');
+    const clearDateRange = () => {
+        setDateFrom('');
+        setDateTo('');
+    };
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
     const ALL_AGENTS = '__all__';
     const [agentFilter, setAgentFilter] = useState(
@@ -199,7 +204,7 @@ export default function LeadsIndex({
     // standalone action: it ignores every other filter (date, agent, sort,
     // status, etc.) instead of combining with whatever is currently set.
     const searchAllLeads = () => {
-        setSelectedDate('');
+        clearDateRange();
         setAgentFilter(ALL_AGENTS);
         router.get(
             index.url(),
@@ -214,7 +219,7 @@ export default function LeadsIndex({
     // descending order every matching lead instead of just the ones from
     // whatever date happens to still be selected.
     const applySort = (overrides: { sort?: string; direction?: string }) => {
-        setSelectedDate('');
+        clearDateRange();
         router.get(
             index.url(),
             {
@@ -259,8 +264,8 @@ export default function LeadsIndex({
                         <a
                             href={downloadRaw.url({
                                 query: {
-                                    date_from: selectedDate || undefined,
-                                    date_to: selectedDate || undefined,
+                                    date_from: dateFrom || undefined,
+                                    date_to: dateTo || undefined,
                                 },
                             })}
                             download
@@ -278,8 +283,8 @@ export default function LeadsIndex({
                         <a
                             href={downloadCleaned.url({
                                 query: {
-                                    date_from: selectedDate || undefined,
-                                    date_to: selectedDate || undefined,
+                                    date_from: dateFrom || undefined,
+                                    date_to: dateTo || undefined,
                                 },
                             })}
                             download
@@ -494,19 +499,36 @@ export default function LeadsIndex({
                     </div>
                     <div className="flex flex-col gap-1.5">
                         <label
-                            htmlFor="leads-date"
+                            htmlFor="leads-date-from"
                             className="text-xs text-muted-foreground"
                         >
-                            Lead date
+                            Lead date from
                         </label>
                         <Input
-                            id="leads-date"
-                            name="date"
+                            id="leads-date-from"
+                            name="date_from"
                             type="date"
-                            value={selectedDate}
+                            value={dateFrom}
+                            max={dateTo || undefined}
                             onChange={(event) =>
-                                setSelectedDate(event.target.value)
+                                setDateFrom(event.target.value)
                             }
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="leads-date-to"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Lead date to
+                        </label>
+                        <Input
+                            id="leads-date-to"
+                            name="date_to"
+                            type="date"
+                            value={dateTo}
+                            min={dateFrom || undefined}
+                            onChange={(event) => setDateTo(event.target.value)}
                         />
                     </div>
                 </FilterBar>
