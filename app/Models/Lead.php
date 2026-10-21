@@ -5,6 +5,7 @@ namespace App\Models;
 use App\LeadSource;
 use App\LeadStatus;
 use App\Models\Concerns\FlushesReportCache;
+use App\Services\LeadNormalizationService;
 use App\Services\LeadStateResolver;
 use Database\Factories\LeadFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -67,7 +68,9 @@ class Lead extends Model
      * has no link either. A recorded source spelled differently from a known
      * one (such as "TENDATA/LUSHA" from a CSV) takes the known spelling.
      * A US or Canadian lead's City holds its full state
-     * or province name (see LeadStateResolver).
+     * or province name (see LeadStateResolver). A renamed company recomputes
+     * its normalized name, so lookups such as the Add Lead contact count match
+     * it regardless of casing or punctuation.
      *
      * Only fields loaded on this instance are considered, so saving a lead
      * fetched with a partial column list never blanks the columns it skipped.
@@ -78,6 +81,10 @@ class Lead extends Model
 
         if ($loaded('linkedin_url') && $this->linkedin_url !== null && $this->isPlaceholder($this->linkedin_url)) {
             $this->linkedin_url = null;
+        }
+
+        if ($this->isDirty('company_name') && ! $this->isDirty('normalized_company_name')) {
+            $this->normalized_company_name = app(LeadNormalizationService::class)->normalize(['company_name' => $this->company_name])['normalized_company_name'];
         }
 
         $location = ['city', 'raw_city', 'state_province', 'country', 'country_code'];

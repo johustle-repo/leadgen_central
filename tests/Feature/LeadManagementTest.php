@@ -47,6 +47,18 @@ it('counts company contacts for the current agent using normalized names and exc
         ->assertJson(['count' => 2]);
 });
 
+it('counts a company renamed to capitals when the agent types it in lowercase', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create(['company_name' => 'Old Name', 'normalized_company_name' => 'old name']);
+
+    $this->actingAs($agent)->put(route('leads.update', $lead), ['company_name' => 'ACME VENTURES'])
+        ->assertSessionHasNoErrors();
+
+    expect($lead->refresh()->normalized_company_name)->toBe('acme ventures');
+    $this->getJson(route('leads.company-contact-count', ['company_name' => 'acme ventures']))
+        ->assertJson(['count' => 1]);
+});
+
 it('returns zero contacts for a new or empty company', function (string $company) {
     $this->actingAs(User::factory()->create())
         ->getJson(route('leads.company-contact-count', ['company_name' => $company]))
