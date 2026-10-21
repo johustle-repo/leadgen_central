@@ -11,7 +11,7 @@ import {
     Users,
     X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
@@ -213,6 +213,37 @@ export default function LeadsIndex({
         );
     };
 
+    // Runs the same search as the button while the agent types, so matching
+    // leads appear on the spot. Each keystroke cancels the pending request.
+    useEffect(() => {
+        if (searchTerm.trim() === (filters.search ?? '').trim()) {
+            return;
+        }
+
+        let cancel: (() => void) | undefined;
+        const timer = setTimeout(() => {
+            clearDateRange();
+            setAgentFilter(ALL_AGENTS);
+            router.get(
+                index.url(),
+                { search: searchTerm.trim(), per_page: '100' },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onCancelToken: (token) => {
+                        cancel = () => token.cancel();
+                    },
+                },
+            );
+        }, 300);
+
+        return () => {
+            clearTimeout(timer);
+            cancel?.();
+        };
+    }, [searchTerm, filters.search]);
+
     // Sorting applies immediately on selection rather than waiting for
     // "Apply filters", since re-ordering the same result set is expected to
     // react right away. It also drops the lead date filter so ascending and
@@ -312,7 +343,7 @@ export default function LeadsIndex({
                     icon={SlidersHorizontal}
                     label="Filters"
                     gridClassName="sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]"
-                    hint="Search matches company, contact, email, location, and more across every lead. Press the search button (or Enter) to search the entire database on its own, independent of every other filter below."
+                    hint="Search matches company, contact, email, location, and more across every lead. Results update as you type and search the entire database on their own, independent of every other filter below."
                 >
                     {Object.entries(drilldown).map(([key, value]) => (
                         <input
