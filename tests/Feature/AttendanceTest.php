@@ -291,10 +291,11 @@ it('exports the monthly payroll attendance report as a pdf', function () {
 
     $html = view('attendance.export', $renderedReport)->render();
     expect($html)->toContain('Team PH Attendance Summary - TimeIn/TimeOut-Month of August 2026')
-        ->toContain('James Whitaker')
         ->toContain('Approved and verified by:')
         ->toContain('data:image/png;base64,')
-        ->not->toContain('Amea Sofia Veloria');
+        ->not->toContain('Amea Sofia Veloria')
+        ->not->toContain('Sub Name')
+        ->not->toContain('James Whitaker');
 
     $this->assertDatabaseHas('audit_logs', ['user_id' => $superAdministrator->id, 'action' => 'attendance.exported_pdf']);
 });

@@ -124,14 +124,6 @@
                     <td class="label">Name</td><td class="value">{{ $member['user']->name }}</td>
                     <td class="label">Role</td><td class="value">{{ $member['role'] }}</td>
                 </tr>
-                <tr>
-                    <td class="label">Sub Name</td><td class="value">{{ $member['user']->alias_name ?? '-' }}</td>
-                    <td class="label">Employee Code</td><td class="value code">{{ $member['user']->employee_code ?? '-' }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Email</td><td class="value">{{ $member['user']->alias_email ?? '-' }}</td>
-                    <td class="label">Status</td><td class="value">{{ ucfirst($member['user']->status->value) }}</td>
-                </tr>
             </table>
 
             <table class="stats">
