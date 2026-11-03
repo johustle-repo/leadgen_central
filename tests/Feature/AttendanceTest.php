@@ -268,7 +268,7 @@ it('exports the monthly payroll attendance report as a pdf', function () {
     $this->travelTo('2026-09-01 06:08:00');
     $superAdministrator = User::factory()->superAdministrator()->create();
     $staff = User::factory()->create(['name' => 'Jonathan F. Quiles', 'employee_code' => 'DUS-002', 'alias_name' => 'James Whitaker']);
-    User::factory()->administrator()->create(['name' => 'Elmar B. Noche', 'employee_code' => 'DUS-001']);
+    User::factory()->administrator()->create(['name' => 'Elmar Noche', 'employee_code' => 'DUS-001']);
     User::factory()->create(['name' => 'Amea Sofia Veloria']);
     Attendance::factory()->for($staff)->create(['recorded_at' => '2026-08-03 07:53:00', 'entry_type' => 'time_in']);
     Attendance::factory()->for($staff)->create(['recorded_at' => '2026-08-03 17:21:00', 'entry_type' => 'time_out']);
@@ -282,7 +282,7 @@ it('exports the monthly payroll attendance report as a pdf', function () {
 
     $response->assertOk()->assertDownload('Attendance_August_2026.pdf');
     expect($response->headers->get('Content-Type'))->toBe('application/pdf')
-        ->and(array_map(fn (array $member): string => $member['user']->name, $renderedReport['members']))->toBe(['Elmar B. Noche', 'Jonathan F. Quiles'])
+        ->and(array_map(fn (array $member): string => $member['user']->name, $renderedReport['members']))->toBe(['Elmar Noche', 'Jonathan F. Quiles'])
         ->and($renderedReport['members'][0]['position'])->toBe('Team Leader')
         ->and($renderedReport['members'][1]['totals'])->toMatchArray(['attendance_days' => 6, 'log_count' => 2])
         ->and($renderedReport['members'][1]['days'][2])->toMatchArray(['date' => 'Aug 03, 2026', 'logs' => 'Time In - 07:53, Time Out - 17:21', 'type' => 'workday'])

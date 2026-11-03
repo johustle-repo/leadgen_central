@@ -7,7 +7,6 @@ use App\Services\AttendanceDaySummaryService;
 use App\Services\AttendanceImportService;
 use App\UserRole;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
@@ -54,11 +53,11 @@ class AttendanceBackupExport implements Export, WithMultipleSheets
 
         $users = User::query()
             ->where('status', 'active')
-            ->where(fn (Builder $payroll) => $payroll->where('role', UserRole::Agent)->orWhere('name', AttendanceSummarySheet::APPROVER_NAME))
             ->orderByRaw('employee_code is null')
             ->orderBy('employee_code')
             ->orderBy('name')
             ->get()
+            ->filter(fn (User $user): bool => $user->role === UserRole::Agent || AttendanceSummarySheet::isApprover($user))
             ->reject(fn (User $user): bool => in_array(AttendanceImportService::normalizeNameForMatch($user->name), $excludedNames, true))
             ->values();
 

@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Attendance;
 use App\Models\User;
+use App\Services\AttendanceImportService;
 use Carbon\CarbonInterface;
 use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -145,9 +146,13 @@ class AttendanceSummarySheet implements Export, FromArray, WithEvents, WithTitle
         ];
     }
 
+    /**
+     * Matches the team leader the same way attendance imports match names,
+     * ignoring middle initials, so "Elmar Noche" and "Elmar B. Noche" both count.
+     */
     public static function isApprover(User $user): bool
     {
-        return $user->name === self::APPROVER_NAME;
+        return AttendanceImportService::normalizeNameForMatch($user->name) === AttendanceImportService::normalizeNameForMatch(self::APPROVER_NAME);
     }
 
     /**
