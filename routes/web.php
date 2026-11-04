@@ -15,6 +15,7 @@ use App\Http\Controllers\LeadAttachmentController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadForwardingController;
 use App\Http\Controllers\LeadNoteController;
+use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\SendLeadEmailController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\UploadBatchController;
@@ -113,6 +114,13 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
         Route::get('attendance/export.xlsx', [AttendanceController::class, 'exportExcel'])->middleware('throttle:data-exports')->name('attendance.export-excel');
         Route::post('attendance/import', [AttendanceController::class, 'importJson'])->middleware('throttle:data-imports')->name('attendance.import');
         Route::put('attendance/{user}/{date}/{entryType}', [AttendanceController::class, 'updateEntry'])->whereIn('entryType', ['time_in', 'time_out'])->name('attendance.update-entry');
+    });
+
+    Route::middleware('can:manage-payroll')->group(function () {
+        Route::get('payroll', [PayrollController::class, 'index'])->name('payroll.index');
+        Route::get('payroll/export.pdf', [PayrollController::class, 'exportPdf'])->middleware('throttle:data-exports')->name('payroll.export-pdf');
+        Route::put('payroll/members/{user}', [PayrollController::class, 'updateMember'])->name('payroll.members.update');
+        Route::put('payroll/months/{month}', [PayrollController::class, 'updateMonth'])->where('month', '\d{4}-(0[1-9]|1[0-2])')->name('payroll.months.update');
     });
 });
 

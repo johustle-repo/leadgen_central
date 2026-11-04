@@ -12,6 +12,7 @@ import {
     ShieldCheck,
     Upload,
     Users,
+    Wallet,
     Waypoints,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -36,6 +37,7 @@ import {
 import { index as backupIndex } from '@/routes/backups';
 import { index as emailReplyIndex } from '@/routes/email-replies';
 import { index as leadIndex } from '@/routes/leads';
+import { index as payrollIndex } from '@/routes/payroll';
 import { index as reportIndex } from '@/routes/report';
 import { edit as systemSettingsEdit } from '@/routes/system-settings';
 import { create as uploadCreate, index as uploadIndex } from '@/routes/uploads';
@@ -156,6 +158,11 @@ export function AppSidebar() {
                     title: 'Attendance Summary',
                     href: attendanceSummary(),
                     icon: CalendarClock,
+                },
+                {
+                    title: 'Payroll',
+                    href: payrollIndex(),
+                    icon: Wallet,
                 },
             ],
         });

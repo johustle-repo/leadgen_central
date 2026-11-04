@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\AccountStatus;
+use App\EmploymentType;
 use App\UserRole;
+use Carbon\CarbonInterface;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -36,6 +38,9 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $employee_code
  * @property string|null $alias_name
  * @property string|null $alias_email
+ * @property string|null $monthly_salary
+ * @property EmploymentType $employment_type
+ * @property CarbonInterface|null $joined_on
  * @property bool $night_shift_eligible
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
@@ -55,7 +60,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, SoftDeletes, TwoFactorAuthenticatable;
 
-    protected $attributes = ['role' => 'agent', 'status' => 'active'];
+    protected $attributes = ['role' => 'agent', 'status' => 'active', 'employment_type' => 'full_time'];
 
     /**
      * Bootstrap the model and its traits.
@@ -108,6 +113,9 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'role' => UserRole::class,
             'status' => AccountStatus::class,
             'night_shift_eligible' => 'boolean',
+            'monthly_salary' => 'decimal:2',
+            'employment_type' => EmploymentType::class,
+            'joined_on' => 'date',
         ];
     }
 
@@ -119,6 +127,15 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function isSuperAdministrator(): bool
     {
         return $this->role === UserRole::SuperAdministrator;
+    }
+
+    /**
+     * First day the user counts toward payroll: their recorded join date,
+     * falling back to the day their account was created.
+     */
+    public function payrollJoinDate(): ?CarbonInterface
+    {
+        return $this->joined_on ?? $this->created_at?->startOfDay();
     }
 
     public function canViewAllLeads(): bool

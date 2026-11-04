@@ -46,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-backups', fn (User $user): bool => $user->isAdministrator());
         Gate::define('manage-maintenance', fn (User $user): bool => $user->isSuperAdministrator());
         Gate::define('manage-attendance', fn (User $user): bool => $user->isSuperAdministrator());
+        Gate::define('manage-payroll', fn (User $user): bool => $user->isSuperAdministrator());
         Gate::define('manage-agent-gmail', fn (User $user): bool => $user->isSuperAdministrator());
     }
 
