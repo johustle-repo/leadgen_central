@@ -47,7 +47,7 @@
 
         .approval { margin-top: 14px; width: 250px; page-break-inside: avoid; }
         .approval .caption { font-size: 8px; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; }
-        .approval .signature { text-align: center; margin: 0 0 -12px; }
+        .approval .signature { text-align: center; margin: 10px 0 -22px; }
         .approval .signature img { height: 92px; }
         .approval .name { font-weight: bold; font-size: 10.5px; color: #0f172a; border-top: 1px solid #0b3a5b; padding-top: 4px; text-align: center; }
         .approval .position { text-align: center; color: #64748b; }
