@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Models\PayrollMonth;
 use App\Models\User;
 use App\Services\PayrollCalculator;
+use App\Services\PayrollSalaryImportService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
@@ -70,6 +71,39 @@ class PayrollController extends Controller
         $payrollMonth->fill($request->validated())->save();
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Utilities saved for '.$monthStart->format('F Y').'.']);
+    }
+
+    /**
+     * Sets salary, category and join date for many members at once from
+     * an uploaded JSON file.
+     */
+    public function importSalaries(Request $request, PayrollSalaryImportService $service): RedirectResponse
+    {
+        Gate::authorize('manage-payroll');
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:json', 'max:1024'],
+        ]);
+
+        $result = $service->import($validated['file']);
+
+        AuditLog::query()->create([
+            'user_id' => $request->user()->id,
+            'action' => 'payroll.salaries_imported',
+            'auditable_type' => 'payroll',
+            'auditable_id' => null,
+            'description' => "Imported payroll details for {$result['updated']} member(s).",
+            'metadata' => ['total' => $result['total'], 'updated' => $result['updated'], 'skipped' => count($result['errors'])],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        return back()
+            ->with('toast', [
+                'type' => $result['errors'] === [] ? 'success' : 'warning',
+                'message' => "Updated {$result['updated']} of {$result['total']} member(s)".($result['errors'] === [] ? '.' : '; '.count($result['errors']).' skipped.'),
+            ])
+            ->with('importErrors', array_slice($result['errors'], 0, 30));
     }
 
     /**

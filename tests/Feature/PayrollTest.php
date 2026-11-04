@@ -1,8 +1,10 @@
 <?php
 
+use App\EmploymentType;
 use App\Models\Attendance;
 use App\Models\PayrollMonth;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\View;
 use Illuminate\View\View as RenderedView;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -155,4 +157,51 @@ it('downloads the payroll as a PDF and records the export', function () {
         ->toContain('USD 1.67')
         ->toContain('USD 400.00');
     $this->assertDatabaseHas('audit_logs', ['user_id' => $superAdministrator->id, 'action' => 'payroll.exported_pdf']);
+});
+
+it('imports salaries from a JSON file matching by code, email or name', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $byCode = User::factory()->create(['employee_code' => 'EMP-1']);
+    $byEmail = User::factory()->create(['email' => 'agent@example.com']);
+    $byName = User::factory()->create(['name' => 'Casey Q. Rivera']);
+    $untouched = User::factory()->create();
+
+    $file = UploadedFile::fake()->createWithContent('salaries.json', json_encode(['members' => [
+        ['employee_code' => 'EMP-1', 'monthly_salary' => 550, 'joined_on' => '2026-03-20'],
+        ['email' => 'AGENT@example.com', 'monthly_salary' => 400, 'employment_type' => 'part_time', 'joined_on' => '2026-03-26'],
+        ['name' => 'Casey Rivera', 'monthly_salary' => '400.00', 'joined_on' => '2026-03-20'],
+        ['name' => 'Nobody Here', 'monthly_salary' => 400, 'joined_on' => '2026-03-20'],
+        ['employee_code' => 'EMP-1', 'monthly_salary' => -5, 'joined_on' => 'later'],
+    ]]));
+
+    $this->actingAs($superAdministrator)
+        ->post(route('payroll.import'), ['file' => $file])
+        ->assertRedirect()
+        ->assertSessionHas('importErrors', fn (array $errors): bool => count($errors) === 2 && str_contains($errors[0], 'Nobody Here'));
+
+    expect($byCode->refresh()->only(['monthly_salary', 'employment_type']))->toBe(['monthly_salary' => '550.00', 'employment_type' => EmploymentType::FullTime])
+        ->and($byEmail->refresh()->employment_type)->toBe(EmploymentType::PartTime)
+        ->and($byEmail->joined_on->toDateString())->toBe('2026-03-26')
+        ->and($byName->refresh()->monthly_salary)->toBe('400.00')
+        ->and($untouched->refresh()->monthly_salary)->toBeNull();
+    $this->assertDatabaseHas('audit_logs', ['user_id' => $superAdministrator->id, 'action' => 'payroll.salaries_imported']);
+});
+
+it('rejects a salary import that is not a list of members', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+
+    $this->actingAs($superAdministrator)
+        ->post(route('payroll.import'), ['file' => UploadedFile::fake()->createWithContent('salaries.json', '{"oops": true}')])
+        ->assertSessionHas('importErrors', ['The file must be a JSON list of members.']);
+});
+
+it('forbids salary imports for non super administrators', function () {
+    $administrator = User::factory()->administrator()->create();
+    $member = User::factory()->create(['employee_code' => 'EMP-1']);
+
+    $this->actingAs($administrator)
+        ->post(route('payroll.import'), ['file' => UploadedFile::fake()->createWithContent('salaries.json', '[{"employee_code":"EMP-1","monthly_salary":400,"joined_on":"2026-03-20"}]')])
+        ->assertForbidden();
+
+    expect($member->refresh()->monthly_salary)->toBeNull();
 });

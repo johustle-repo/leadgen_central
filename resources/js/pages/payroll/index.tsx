@@ -1,8 +1,9 @@
-import { Form, Head, router } from '@inertiajs/react';
+import { Form, Head, router, usePage } from '@inertiajs/react';
 import {
     Banknote,
     Calculator,
     FileDown,
+    FileUp,
     Pencil,
     Receipt,
     Users as UsersIcon,
@@ -44,7 +45,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { exportPdf, index } from '@/routes/payroll';
+import {
+    exportPdf,
+    importMethod as importSalaries,
+    index,
+} from '@/routes/payroll';
 import { update as updateMember } from '@/routes/payroll/members';
 import { update as updateMonth } from '@/routes/payroll/months';
 
@@ -220,6 +225,65 @@ function EditMemberDialog({
                 </Form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+const SALARY_IMPORT_EXAMPLE = `[
+  { "employee_code": "DUS-002", "name": "Jane Doe", "monthly_salary": 400, "employment_type": "full_time", "joined_on": "2026-03-20" }
+]`;
+
+function ImportSalariesCard() {
+    const { flash } = usePage().props;
+    const importErrors = flash.importErrors ?? [];
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Import salaries</CardTitle>
+                <CardDescription>
+                    Upload a JSON file to set monthly salary, category and date
+                    of join for many members at once. Members are matched by
+                    employee code, then email, then name.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+                <pre className="overflow-x-auto rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                    {SALARY_IMPORT_EXAMPLE}
+                </pre>
+                <Form
+                    {...importSalaries.form()}
+                    options={{ preserveScroll: true }}
+                    resetOnSuccess
+                    className="flex flex-wrap items-start gap-2"
+                >
+                    {({ errors, processing }) => (
+                        <>
+                            <div className="grid gap-1">
+                                <Input
+                                    name="file"
+                                    type="file"
+                                    accept=".json,application/json"
+                                    required
+                                    className="w-auto"
+                                />
+                                <InputError message={errors.file} />
+                            </div>
+                            <Button type="submit" disabled={processing}>
+                                <FileUp />
+                                Import
+                            </Button>
+                        </>
+                    )}
+                </Form>
+                {importErrors.length > 0 && (
+                    <ul className="list-disc space-y-1 pl-5 text-sm text-warning">
+                        {importErrors.map((error) => (
+                            <li key={error}>{error}</li>
+                        ))}
+                    </ul>
+                )}
+            </CardContent>
+        </Card>
     );
 }
 
@@ -553,6 +617,8 @@ export default function PayrollIndex({ payroll, employmentTypes }: Props) {
                 </Card>
 
                 <UtilitiesCard payroll={payroll} />
+
+                <ImportSalariesCard />
             </div>
 
             {editing && (
