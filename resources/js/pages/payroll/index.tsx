@@ -1,11 +1,10 @@
 import { Form, Head, router, usePage } from '@inertiajs/react';
 import {
-    Banknote,
+    CalendarDays,
     Calculator,
     FileDown,
     FileUp,
     Pencil,
-    Receipt,
     Users as UsersIcon,
     Wallet,
 } from 'lucide-react';
@@ -25,7 +24,6 @@ import {
     DialogClose,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -37,6 +35,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import {
     Table,
     TableBody,
@@ -50,8 +49,8 @@ import {
     importMethod as importSalaries,
     index,
 } from '@/routes/payroll';
+import { update as updateAdjustment } from '@/routes/payroll/adjustments';
 import { update as updateMember } from '@/routes/payroll/members';
-import { update as updateMonth } from '@/routes/payroll/months';
 
 type PayrollMember = {
     user_id: number;
@@ -60,7 +59,9 @@ type PayrollMember = {
     position: string;
     employment_type: string;
     employment_type_label: string;
+    default_employment_type: string;
     joined_on: string | null;
+    joined_this_month: boolean;
     monthly_salary: number | null;
     day_rate: number | null;
     hour_rate: number | null;
@@ -69,6 +70,8 @@ type PayrollMember = {
     worked_days: number;
     worked_minutes: number;
     paid_days: number;
+    paid_days_adjusted: boolean;
+    adjustment: { employment_type: string | null; paid_days: number | null };
     pay: number | null;
 };
 
@@ -78,30 +81,18 @@ type Payroll = {
     days_in_month: number;
     in_progress: boolean;
     members: PayrollMember[];
-    utilities: {
-        usd_to_php_rate: number | null;
-        items: {
-            key: string;
-            label: string;
-            php: number;
-            usd: number | null;
-        }[];
-        total_usd: number;
-    };
-    totals: {
-        salary: number;
-        service: number;
-        to_pay: number;
-        missing_salary_count: number;
-    };
+    totals: { salary: number; missing_salary_count: number };
 };
+
+type EmploymentTypeOption = { value: string; label: string };
 
 type Props = {
     payroll: Payroll;
-    employmentTypes: { value: string; label: string }[];
+    employmentTypes: EmploymentTypeOption[];
 };
 
 const PAID_HOURS_PER_DAY = 8;
+const DEFAULT_CATEGORY = 'default';
 
 function usd(amount: number | null): string {
     if (amount === null) {
@@ -111,8 +102,8 @@ function usd(amount: number | null): string {
     return `USD ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function php(amount: number): string {
-    return `PHP ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatDays(days: number): string {
+    return days.toLocaleString(undefined, { maximumFractionDigits: 3 });
 }
 
 function formatMinutes(minutes: number): string {
@@ -131,105 +122,243 @@ function formatDate(date: string | null): string {
     });
 }
 
+function MonthAdjustmentForm({
+    member,
+    payroll,
+    employmentTypes,
+    onSaved,
+}: {
+    member: PayrollMember;
+    payroll: Payroll;
+    employmentTypes: EmploymentTypeOption[];
+    onSaved: () => void;
+}) {
+    const [category, setCategory] = useState(
+        member.adjustment.employment_type ?? DEFAULT_CATEGORY,
+    );
+    const defaultLabel =
+        employmentTypes.find(
+            (type) => type.value === member.default_employment_type,
+        )?.label ?? member.default_employment_type;
+
+    return (
+        <Form
+            {...updateAdjustment.form({
+                month: payroll.month,
+                user: member.user_id,
+            })}
+            options={{ preserveScroll: true }}
+            onSuccess={onSaved}
+            className="grid gap-4"
+        >
+            {({ errors, processing }) => (
+                <>
+                    <div>
+                        <p className="font-medium">
+                            {payroll.month_label} only
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                            Use when this month was paid differently, e.g. a
+                            part-time month with a set number of paid days.
+                        </p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2">
+                            <Label htmlFor="month_employment_type">
+                                Category this month
+                            </Label>
+                            <Select
+                                value={category}
+                                onValueChange={setCategory}
+                            >
+                                <SelectTrigger id="month_employment_type">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={DEFAULT_CATEGORY}>
+                                        Same as usual ({defaultLabel})
+                                    </SelectItem>
+                                    {employmentTypes.map((type) => (
+                                        <SelectItem
+                                            key={type.value}
+                                            value={type.value}
+                                        >
+                                            {type.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <input
+                                type="hidden"
+                                name="employment_type"
+                                value={
+                                    category === DEFAULT_CATEGORY
+                                        ? ''
+                                        : category
+                                }
+                            />
+                            <InputError message={errors.employment_type} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="paid_days">Paid days</Label>
+                            <Input
+                                id="paid_days"
+                                name="paid_days"
+                                type="number"
+                                min="0"
+                                max={payroll.days_in_month}
+                                step="0.001"
+                                placeholder={`Auto (${formatDays(member.paid_days)})`}
+                                defaultValue={member.adjustment.paid_days ?? ''}
+                            />
+                            <InputError message={errors.paid_days} />
+                        </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        Leave paid days empty to calculate them from attendance.
+                    </p>
+                    <div className="flex justify-end">
+                        <Button type="submit" disabled={processing}>
+                            Save {payroll.month_label}
+                        </Button>
+                    </div>
+                </>
+            )}
+        </Form>
+    );
+}
+
+function MemberDetailsForm({
+    member,
+    employmentTypes,
+    onSaved,
+}: {
+    member: PayrollMember;
+    employmentTypes: EmploymentTypeOption[];
+    onSaved: () => void;
+}) {
+    return (
+        <Form
+            {...updateMember.form(member.user_id)}
+            options={{ preserveScroll: true }}
+            onSuccess={onSaved}
+            className="grid gap-4"
+        >
+            {({ errors, processing }) => (
+                <>
+                    <div>
+                        <p className="font-medium">All months</p>
+                        <p className="text-sm text-muted-foreground">
+                            Used for every month unless that month is set above.
+                        </p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="grid gap-2">
+                            <Label htmlFor="monthly_salary">
+                                Monthly salary (USD)
+                            </Label>
+                            <Input
+                                id="monthly_salary"
+                                name="monthly_salary"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                required
+                                defaultValue={member.monthly_salary ?? ''}
+                            />
+                            <InputError message={errors.monthly_salary} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="employment_type">Category</Label>
+                            <Select
+                                name="employment_type"
+                                defaultValue={member.default_employment_type}
+                            >
+                                <SelectTrigger id="employment_type">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {employmentTypes.map((type) => (
+                                        <SelectItem
+                                            key={type.value}
+                                            value={type.value}
+                                        >
+                                            {type.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <InputError message={errors.employment_type} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="joined_on">Date of join</Label>
+                            <Input
+                                id="joined_on"
+                                name="joined_on"
+                                type="date"
+                                required
+                                defaultValue={member.joined_on ?? ''}
+                            />
+                            <InputError message={errors.joined_on} />
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <DialogClose asChild>
+                            <Button type="button" variant="secondary">
+                                Close
+                            </Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={processing}>
+                            Save details
+                        </Button>
+                    </div>
+                </>
+            )}
+        </Form>
+    );
+}
+
 function EditMemberDialog({
     member,
+    payroll,
     employmentTypes,
     onClose,
 }: {
     member: PayrollMember;
-    employmentTypes: Props['employmentTypes'];
+    payroll: Payroll;
+    employmentTypes: EmploymentTypeOption[];
     onClose: () => void;
 }) {
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent>
-                <DialogTitle>Payroll details — {member.name}</DialogTitle>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogTitle>Payroll — {member.name}</DialogTitle>
                 <DialogDescription>
-                    Changes apply to every month&apos;s calculation for this
-                    member.
+                    Part-time is paid for hours worked ÷ {PAID_HOURS_PER_DAY}.
                 </DialogDescription>
-                <Form
-                    {...updateMember.form(member.user_id)}
-                    options={{ preserveScroll: true }}
-                    onSuccess={onClose}
-                    className="grid gap-4"
-                >
-                    {({ errors, processing }) => (
-                        <>
-                            <div className="grid gap-2">
-                                <Label htmlFor="monthly_salary">
-                                    Monthly salary (USD)
-                                </Label>
-                                <Input
-                                    id="monthly_salary"
-                                    name="monthly_salary"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    required
-                                    defaultValue={member.monthly_salary ?? ''}
-                                />
-                                <InputError message={errors.monthly_salary} />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="employment_type">
-                                    Category
-                                </Label>
-                                <Select
-                                    name="employment_type"
-                                    defaultValue={member.employment_type}
-                                >
-                                    <SelectTrigger id="employment_type">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {employmentTypes.map((type) => (
-                                            <SelectItem
-                                                key={type.value}
-                                                value={type.value}
-                                            >
-                                                {type.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <p className="text-xs text-muted-foreground">
-                                    Part-time is paid for hours worked ÷{' '}
-                                    {PAID_HOURS_PER_DAY}.
-                                </p>
-                                <InputError message={errors.employment_type} />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="joined_on">Date of join</Label>
-                                <Input
-                                    id="joined_on"
-                                    name="joined_on"
-                                    type="date"
-                                    required
-                                    defaultValue={member.joined_on ?? ''}
-                                />
-                                <InputError message={errors.joined_on} />
-                            </div>
-                            <DialogFooter>
-                                <DialogClose asChild>
-                                    <Button type="button" variant="secondary">
-                                        Cancel
-                                    </Button>
-                                </DialogClose>
-                                <Button type="submit" disabled={processing}>
-                                    Save
-                                </Button>
-                            </DialogFooter>
-                        </>
-                    )}
-                </Form>
+                <MonthAdjustmentForm
+                    member={member}
+                    payroll={payroll}
+                    employmentTypes={employmentTypes}
+                    onSaved={onClose}
+                />
+                <Separator />
+                <MemberDetailsForm
+                    member={member}
+                    employmentTypes={employmentTypes}
+                    onSaved={onClose}
+                />
             </DialogContent>
         </Dialog>
     );
 }
 
 const SALARY_IMPORT_EXAMPLE = `[
-  { "employee_code": "DUS-002", "name": "Jane Doe", "monthly_salary": 400, "employment_type": "full_time", "joined_on": "2026-03-20" }
+  {
+    "employee_code": "DUS-006", "name": "Jane Doe", "monthly_salary": 400,
+    "employment_type": "full_time", "joined_on": "2026-03-20",
+    "months": [{ "month": "2026-04", "employment_type": "part_time", "paid_days": 15.45 }]
+  }
 ]`;
 
 function ImportSalariesCard() {
@@ -242,8 +371,9 @@ function ImportSalariesCard() {
                 <CardTitle>Import salaries</CardTitle>
                 <CardDescription>
                     Upload a JSON file to set monthly salary, category and date
-                    of join for many members at once. Members are matched by
-                    employee code, then email, then name.
+                    of join for many members at once, plus optional per-month
+                    category and paid days. Members are matched by employee
+                    code, then email, then name.
                 </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
@@ -287,118 +417,15 @@ function ImportSalariesCard() {
     );
 }
 
-function UtilitiesCard({ payroll }: { payroll: Payroll }) {
-    const { utilities } = payroll;
-    const phpValue = (key: string) =>
-        utilities.items.find((item) => item.key === key)?.php ?? 0;
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Services</CardTitle>
-                <CardDescription>
-                    Utility bills for {payroll.month_label} in PHP, converted at
-                    the month&apos;s USD to PHP rate.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-6">
-                <Form
-                    key={payroll.month}
-                    {...updateMonth.form(payroll.month)}
-                    options={{ preserveScroll: true }}
-                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-                >
-                    {({ errors, processing }) => (
-                        <>
-                            <div className="grid gap-2">
-                                <Label htmlFor="usd_to_php_rate">
-                                    USD to PHP rate
-                                </Label>
-                                <Input
-                                    id="usd_to_php_rate"
-                                    name="usd_to_php_rate"
-                                    type="number"
-                                    min="0"
-                                    step="0.0001"
-                                    placeholder="e.g. 61.43"
-                                    defaultValue={
-                                        utilities.usd_to_php_rate ?? ''
-                                    }
-                                />
-                                <InputError message={errors.usd_to_php_rate} />
-                            </div>
-                            {utilities.items.map((item) => (
-                                <div key={item.key} className="grid gap-2">
-                                    <Label htmlFor={`${item.key}_php`}>
-                                        {item.label} (PHP)
-                                    </Label>
-                                    <Input
-                                        id={`${item.key}_php`}
-                                        name={`${item.key}_php`}
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        required
-                                        defaultValue={phpValue(item.key)}
-                                    />
-                                    <InputError
-                                        message={
-                                            errors[
-                                                `${item.key}_php` as keyof typeof errors
-                                            ]
-                                        }
-                                    />
-                                </div>
-                            ))}
-                            <div className="sm:col-span-2 lg:col-span-4">
-                                <Button type="submit" disabled={processing}>
-                                    Save services
-                                </Button>
-                            </div>
-                        </>
-                    )}
-                </Form>
-
-                <Table>
-                    <TableHeader>
-                        <TableRow className="hover:bg-transparent">
-                            <TableHead>Service</TableHead>
-                            <TableHead className="text-right">PHP</TableHead>
-                            <TableHead className="text-right">USD</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {utilities.items.map((item) => (
-                            <TableRow key={item.key}>
-                                <TableCell>{item.label}</TableCell>
-                                <TableCell className="text-right tabular-nums">
-                                    {php(item.php)}
-                                </TableCell>
-                                <TableCell className="text-right tabular-nums">
-                                    {usd(item.usd)}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                        <TableRow className="font-semibold hover:bg-transparent">
-                            <TableCell colSpan={2}>Total service</TableCell>
-                            <TableCell className="text-right tabular-nums">
-                                {usd(payroll.totals.service)}
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-                {utilities.usd_to_php_rate === null && (
-                    <p className="text-sm text-muted-foreground">
-                        Set the USD to PHP rate to convert the bills to USD.
-                    </p>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
 export default function PayrollIndex({ payroll, employmentTypes }: Props) {
-    const [editing, setEditing] = useState<PayrollMember | null>(null);
+    const [editingUserId, setEditingUserId] = useState<number | null>(null);
+    const editing =
+        payroll.members.find((member) => member.user_id === editingUserId) ??
+        null;
+    const totalPaidDays = payroll.members.reduce(
+        (sum, member) => sum + member.paid_days,
+        0,
+    );
 
     function changeMonth(month: string) {
         if (!month) {
@@ -416,7 +443,7 @@ export default function PayrollIndex({ payroll, employmentTypes }: Props) {
         <>
             <Head title="Payroll" />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     <StatTile
                         label="Payroll members"
                         value={payroll.members.length}
@@ -424,21 +451,15 @@ export default function PayrollIndex({ payroll, employmentTypes }: Props) {
                         tone="text-info"
                     />
                     <StatTile
-                        label="Total salary"
-                        value={usd(payroll.totals.salary)}
-                        icon={Wallet}
-                        tone="text-primary"
-                    />
-                    <StatTile
-                        label="Total service"
-                        value={usd(payroll.totals.service)}
-                        icon={Receipt}
+                        label="Total paid days"
+                        value={formatDays(totalPaidDays)}
+                        icon={CalendarDays}
                         tone="text-warning"
                     />
                     <StatTile
-                        label="Total to pay"
-                        value={usd(payroll.totals.to_pay)}
-                        icon={Banknote}
+                        label="Total salary"
+                        value={usd(payroll.totals.salary)}
+                        icon={Wallet}
                         tone="text-success"
                     />
                 </div>
@@ -490,10 +511,13 @@ export default function PayrollIndex({ payroll, employmentTypes }: Props) {
                                     ÷ {PAID_HOURS_PER_DAY} hours.
                                 </p>
                                 <p>
-                                    Full-time paid days count every day from the
-                                    join date, Sundays and holidays included,
-                                    minus absent workdays. Part-time paid days =
-                                    hours worked ÷ {PAID_HOURS_PER_DAY}.
+                                    Full-time paid days count every day of the
+                                    month, Sundays and holidays included, minus
+                                    absent workdays. In the month a member
+                                    joins, only the days worked are paid.
+                                    Part-time paid days = hours worked ÷{' '}
+                                    {PAID_HOURS_PER_DAY}. Paid days marked *
+                                    were set for this month.
                                     {payroll.in_progress &&
                                         ' This month is still in progress, so the remaining days are counted as paid.'}
                                 </p>
@@ -577,7 +601,8 @@ export default function PayrollIndex({ payroll, employmentTypes }: Props) {
                                             {member.absent_days}
                                         </TableCell>
                                         <TableCell className="text-right tabular-nums">
-                                            {member.paid_days}
+                                            {formatDays(member.paid_days)}
+                                            {member.paid_days_adjusted && '*'}
                                         </TableCell>
                                         <TableCell className="text-right font-semibold tabular-nums">
                                             {member.pay === null ? (
@@ -592,9 +617,11 @@ export default function PayrollIndex({ payroll, employmentTypes }: Props) {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                aria-label={`Edit payroll details for ${member.name}`}
+                                                aria-label={`Edit payroll for ${member.name}`}
                                                 onClick={() =>
-                                                    setEditing(member)
+                                                    setEditingUserId(
+                                                        member.user_id,
+                                                    )
                                                 }
                                             >
                                                 <Pencil />
@@ -616,16 +643,16 @@ export default function PayrollIndex({ payroll, employmentTypes }: Props) {
                     </CardContent>
                 </Card>
 
-                <UtilitiesCard payroll={payroll} />
-
                 <ImportSalariesCard />
             </div>
 
             {editing && (
                 <EditMemberDialog
+                    key={`${payroll.month}-${editing.user_id}`}
                     member={editing}
+                    payroll={payroll}
                     employmentTypes={employmentTypes}
-                    onClose={() => setEditing(null)}
+                    onClose={() => setEditingUserId(null)}
                 />
             )}
         </>

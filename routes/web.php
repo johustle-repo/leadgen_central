@@ -121,7 +121,7 @@ Route::middleware(['auth', 'auth.session', 'verified', 'active'])->group(functio
         Route::get('payroll/export.pdf', [PayrollController::class, 'exportPdf'])->middleware('throttle:data-exports')->name('payroll.export-pdf');
         Route::post('payroll/import', [PayrollController::class, 'importSalaries'])->middleware('throttle:data-imports')->name('payroll.import');
         Route::put('payroll/members/{user}', [PayrollController::class, 'updateMember'])->name('payroll.members.update');
-        Route::put('payroll/months/{month}', [PayrollController::class, 'updateMonth'])->where('month', '\d{4}-(0[1-9]|1[0-2])')->name('payroll.months.update');
+        Route::put('payroll/months/{month}/members/{user}', [PayrollController::class, 'updateAdjustment'])->where('month', '\d{4}-(0[1-9]|1[0-2])')->name('payroll.adjustments.update');
     });
 });
 

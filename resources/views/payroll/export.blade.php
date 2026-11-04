@@ -45,7 +45,6 @@
         .grid .muted { color: #94a3b8; }
         .code { font-family: Courier, monospace; font-size: 9px; color: #0e7490; }
 
-        .bottom td { vertical-align: top; }
         .approval { margin-top: 14px; width: 250px; page-break-inside: avoid; }
         .approval .caption { font-size: 8px; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; }
         .approval .signature { text-align: center; margin: 0 0 -12px; }
@@ -58,8 +57,7 @@
 <body>
     @php
         $usd = fn (?float $amount): string => $amount === null ? '-' : 'USD '.number_format($amount, 2);
-        $php = fn (float $amount): string => 'PHP '.number_format($amount, 2);
-        $days = fn (float $value): string => rtrim(rtrim(number_format($value, 2), '0'), '.');
+        $days = fn (float $value): string => rtrim(rtrim(number_format($value, 3), '0'), '.');
         $hours = fn (int $minutes): string => sprintf('%dh %02dm', intdiv($minutes, 60), $minutes % 60);
     @endphp
 
@@ -77,9 +75,9 @@
     <table class="stats">
         <tr>
             <td><div class="stat"><div class="label">Payroll Members</div><div class="value">{{ count($payroll['members']) }}</div></div></td>
-            <td><div class="stat"><div class="label">Total Salary</div><div class="value">{{ $usd($payroll['totals']['salary']) }}</div></div></td>
-            <td><div class="stat"><div class="label">Total Service</div><div class="value">{{ $usd($payroll['totals']['service']) }}</div></div></td>
-            <td><div class="stat accent"><div class="label">Total to Pay</div><div class="value">{{ $usd($payroll['totals']['to_pay']) }}</div></div></td>
+            <td><div class="stat"><div class="label">Days in Month</div><div class="value">{{ $payroll['days_in_month'] }}</div></div></td>
+            <td><div class="stat"><div class="label">Total Paid Days</div><div class="value">{{ $days(array_sum(array_column($payroll['members'], 'paid_days'))) }}</div></div></td>
+            <td><div class="stat accent"><div class="label">Total Salary</div><div class="value">{{ $usd($payroll['totals']['salary']) }}</div></div></td>
         </tr>
     </table>
 
@@ -87,8 +85,8 @@
     <p class="formula">
         Pay = Monthly Salary &divide; {{ $payroll['days_in_month'] }} days in {{ $payroll['month_label'] }} &times; Paid Days.
         Per Day = Monthly Salary &divide; {{ $payroll['days_in_month'] }}. Per Hour = Per Day &divide; {{ $paidHoursPerDay }} hours.
-        Full-time paid days count every day from the join date (Sundays and holidays included) minus absent workdays;
-        part-time paid days = hours worked &divide; {{ $paidHoursPerDay }}.
+        Full-time paid days count every day of the month (Sundays and holidays included) minus absent workdays; in the month a member joins, only the days worked are paid.
+        Part-time paid days = hours worked &divide; {{ $paidHoursPerDay }}. Paid days marked * were set manually for this month.
         @if ($payroll['in_progress'])
             This month is still in progress, so remaining days are counted as paid.
         @endif
@@ -114,7 +112,7 @@
                     <td class="number">{{ $usd($member['hour_rate']) }}</td>
                     <td class="number">{{ $hours($member['worked_minutes']) }}</td>
                     <td class="number">{{ $member['absent_days'] }}</td>
-                    <td class="number">{{ $days($member['paid_days']) }}</td>
+                    <td class="number">{{ $days($member['paid_days']) }}{{ $member['paid_days_adjusted'] ? '*' : '' }}</td>
                     <td class="number strong">{{ $member['pay'] === null ? 'Salary not set' : $usd($member['pay']) }}</td>
                 </tr>
             @endforeach
@@ -125,38 +123,6 @@
         </table>
     @endif
 
-    <table class="bottom">
-        <tr>
-            <td style="width: 55%; padding-right: 16px;">
-                <div class="section-title">Services</div>
-                <table class="grid">
-                    <tr>
-                        <th>Service</th><th class="number">PHP</th><th class="number">USD</th>
-                    </tr>
-                    @foreach ($payroll['utilities']['items'] as $item)
-                        <tr class="{{ $loop->even ? 'striped' : '' }}">
-                            <td>{{ $item['label'] }}</td>
-                            <td class="number">{{ $php($item['php']) }}</td>
-                            <td class="number">{{ $usd($item['usd']) }}</td>
-                        </tr>
-                    @endforeach
-                    <tr class="total">
-                        <td>USD to PHP rate: {{ $payroll['utilities']['usd_to_php_rate'] === null ? 'not set' : number_format($payroll['utilities']['usd_to_php_rate'], 2) }}</td>
-                        <td class="number">Total Service</td>
-                        <td class="number">{{ $usd($payroll['totals']['service']) }}</td>
-                    </tr>
-                </table>
-                <table class="grid">
-                    <tr class="total">
-                        <td>Total to Pay (Total Salary + Total Service)</td>
-                        <td class="number">{{ $usd($payroll['totals']['to_pay']) }}</td>
-                    </tr>
-                </table>
-            </td>
-            <td>
-                @include('attendance.partials.export-approval')
-            </td>
-        </tr>
-    </table>
+    @include('attendance.partials.export-approval')
 </body>
 </html>

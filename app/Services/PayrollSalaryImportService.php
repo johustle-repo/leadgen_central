@@ -3,16 +3,20 @@
 namespace App\Services;
 
 use App\EmploymentType;
+use App\Models\PayrollAdjustment;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
  * Bulk-sets payroll details from a JSON file: a list of members, or an
- * object with a "members" list, each with monthly_salary, joined_on and
- * an optional employment_type. Members are matched by employee_code,
+ * object with a "members" list, each with monthly_salary, joined_on, an
+ * optional employment_type and optional "months" adjustments
+ * ({month: "2026-03", employment_type, paid_days}) for months paid
+ * differently from attendance. Members are matched by employee_code,
  * then email, then name (ignoring middle initials). Rows that can't be
  * matched or don't validate are skipped and reported.
  */
@@ -60,6 +64,10 @@ class PayrollSalaryImportService
                 'monthly_salary' => ['required', 'numeric', 'min:0', 'max:1000000'],
                 'employment_type' => ['nullable', Rule::enum(EmploymentType::class)],
                 'joined_on' => ['required', 'date'],
+                'months' => ['nullable', 'array'],
+                'months.*.month' => ['required', 'date_format:Y-m'],
+                'months.*.employment_type' => ['nullable', Rule::enum(EmploymentType::class)],
+                'months.*.paid_days' => ['nullable', 'numeric', 'min:0', 'max:31'],
             ]);
 
             if ($validator->fails()) {
@@ -75,6 +83,15 @@ class PayrollSalaryImportService
                 'employment_type' => $validated['employment_type'] ?? $user->employment_type,
                 'joined_on' => $validated['joined_on'],
             ])->save();
+
+            foreach ($validated['months'] ?? [] as $adjustment) {
+                PayrollAdjustment::setFor(
+                    $user,
+                    Carbon::createFromFormat('Y-m-d', $adjustment['month'].'-01'),
+                    isset($adjustment['employment_type']) ? EmploymentType::from($adjustment['employment_type']) : null,
+                    $adjustment['paid_days'] ?? null,
+                );
+            }
 
             $updated++;
         }

@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\EmploymentType;
 use App\Exports\AttendanceSummarySheet;
+use App\Http\Requests\UpdatePayrollAdjustmentRequest;
 use App\Http\Requests\UpdatePayrollMemberRequest;
-use App\Http\Requests\UpdatePayrollMonthRequest;
 use App\Models\Attendance;
 use App\Models\AuditLog;
-use App\Models\PayrollMonth;
+use App\Models\PayrollAdjustment;
 use App\Models\User;
 use App\Services\PayrollCalculator;
 use App\Services\PayrollSalaryImportService;
@@ -61,16 +61,33 @@ class PayrollController extends Controller
         return back()->with('toast', ['type' => 'success', 'message' => "Payroll details saved for {$user->name}."]);
     }
 
-    public function updateMonth(UpdatePayrollMonthRequest $request, string $month): RedirectResponse
+    /**
+     * Sets or clears one member's category and paid days for one month.
+     */
+    public function updateAdjustment(UpdatePayrollAdjustmentRequest $request, string $month, User $user): RedirectResponse
     {
         $monthStart = Carbon::createFromFormat('Y-m-d', "{$month}-01")->startOfDay();
+        $employmentType = $request->validated('employment_type');
 
-        $payrollMonth = PayrollMonth::query()->whereDate('month', $monthStart->toDateString())->first()
-            ?? new PayrollMonth(['month' => $monthStart->toDateString()]);
+        PayrollAdjustment::setFor(
+            $user,
+            $monthStart,
+            $employmentType === null ? null : EmploymentType::from($employmentType),
+            $request->validated('paid_days'),
+        );
 
-        $payrollMonth->fill($request->validated())->save();
+        AuditLog::query()->create([
+            'user_id' => $request->user()->id,
+            'action' => 'payroll.adjustment_updated',
+            'auditable_type' => User::class,
+            'auditable_id' => $user->id,
+            'description' => "Updated {$user->name}'s payroll for ".$monthStart->format('F Y').'.',
+            'metadata' => ['month' => $monthStart->toDateString(), ...$request->validated()],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
 
-        return back()->with('toast', ['type' => 'success', 'message' => 'Utilities saved for '.$monthStart->format('F Y').'.']);
+        return back()->with('toast', ['type' => 'success', 'message' => "Saved {$user->name}'s ".$monthStart->format('F Y').' payroll.']);
     }
 
     /**
@@ -108,7 +125,7 @@ class PayrollController extends Controller
 
     /**
      * The payroll page as a printable PDF: salary per hour, per day and
-     * per month for each member, then utilities and the total to pay.
+     * per month for each member, with the total salary.
      */
     public function exportPdf(Request $request, PayrollCalculator $calculator): HttpResponse
     {

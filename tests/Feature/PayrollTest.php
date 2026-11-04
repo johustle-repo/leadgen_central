@@ -2,7 +2,7 @@
 
 use App\EmploymentType;
 use App\Models\Attendance;
-use App\Models\PayrollMonth;
+use App\Models\PayrollAdjustment;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\View;
@@ -29,17 +29,17 @@ it('allows only the super administrator to use payroll', function (Closure $make
     $this->actingAs($user)->get(route('payroll.index'))->assertForbidden();
     $this->actingAs($user)->get(route('payroll.export-pdf'))->assertForbidden();
     $this->actingAs($user)->put(route('payroll.members.update', $member), ['monthly_salary' => 999, 'employment_type' => 'full_time', 'joined_on' => '2026-03-20'])->assertForbidden();
-    $this->actingAs($user)->put(route('payroll.months.update', '2026-04'), ['internet_php' => 1, 'electricity_php' => 1, 'water_php' => 1])->assertForbidden();
+    $this->actingAs($user)->put(route('payroll.adjustments.update', ['month' => '2026-04', 'user' => $member]), ['paid_days' => 10])->assertForbidden();
 
     expect($member->refresh()->monthly_salary)->toBeNull()
-        ->and(PayrollMonth::query()->count())->toBe(0);
+        ->and(PayrollAdjustment::query()->count())->toBe(0);
 })->with([
     'administrator' => fn () => User::factory()->administrator()->create(),
     'agent' => fn () => User::factory()->create(),
 ]);
 
-it('pays every day from the join date minus absent workdays', function () {
-    $this->travelTo(Carbon\Carbon::parse('2026-04-15 04:00:00', 'UTC'));
+it('pays only worked days in the join month and every day minus absences after', function () {
+    $this->travelTo(Carbon\Carbon::parse('2026-05-15 04:00:00', 'UTC'));
     $superAdministrator = User::factory()->superAdministrator()->create();
     $member = User::factory()->create(['name' => 'Alex Member', 'monthly_salary' => 400, 'joined_on' => '2026-03-20']);
     User::factory()->create(['name' => 'No Salary Yet', 'joined_on' => '2026-03-01']);
@@ -55,14 +55,22 @@ it('pays every day from the join date minus absent workdays', function () {
             ->where('payroll.members.0.name', 'Alex Member')
             ->where('payroll.members.0.employed_days', 12)
             ->where('payroll.members.0.absent_days', 1)
-            ->where('payroll.members.0.paid_days', 11)
+            ->where('payroll.members.0.paid_days', 9)
             ->where('payroll.members.0.day_rate', 12.9)
             ->where('payroll.members.0.hour_rate', 1.61)
-            ->where('payroll.members.0.pay', 141.94)
+            ->where('payroll.members.0.pay', 116.13)
             ->where('payroll.members.1.name', 'No Salary Yet')
             ->where('payroll.members.1.pay', null)
-            ->where('payroll.totals.salary', 141.94)
+            ->where('payroll.totals.salary', 116.13)
             ->where('payroll.totals.missing_salary_count', 1));
+
+    $this->actingAs($superAdministrator)->get(route('payroll.index', ['month' => '2026-04']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('payroll.days_in_month', 30)
+            ->where('payroll.members.0.name', 'Alex Member')
+            ->where('payroll.members.0.absent_days', 26)
+            ->where('payroll.members.0.paid_days', 4)
+            ->where('payroll.members.0.pay', 53.33));
 });
 
 it('pays part-time members for hours worked divided by eight', function () {
@@ -105,36 +113,44 @@ it('rejects invalid member payroll details', function () {
     expect($member->refresh()->monthly_salary)->toBeNull();
 });
 
-it('converts the month utilities to USD and adds them to the total to pay', function () {
-    $this->travelTo(Carbon\Carbon::parse('2026-05-15 04:00:00', 'UTC'));
+it('applies a one-month category and paid days adjustment', function () {
+    $this->travelTo(Carbon\Carbon::parse('2026-06-15 04:00:00', 'UTC'));
     $superAdministrator = User::factory()->superAdministrator()->create();
-    User::factory()->create(['monthly_salary' => 400, 'joined_on' => '2026-03-20']);
+    $member = User::factory()->create(['monthly_salary' => 400, 'joined_on' => '2026-03-20']);
 
     $this->actingAs($superAdministrator)
-        ->put(route('payroll.months.update', '2026-04'), ['usd_to_php_rate' => 61.43, 'internet_php' => 1798.81, 'electricity_php' => 5679.41, 'water_php' => 0])
-        ->assertSessionHasNoErrors();
-    $this->actingAs($superAdministrator)
-        ->put(route('payroll.months.update', '2026-04'), ['usd_to_php_rate' => 61.43, 'internet_php' => 1798.81, 'electricity_php' => 5679.41, 'water_php' => 0])
+        ->put(route('payroll.adjustments.update', ['month' => '2026-04', 'user' => $member]), ['employment_type' => 'part_time', 'paid_days' => '15.45'])
         ->assertSessionHasNoErrors();
 
-    expect(PayrollMonth::query()->count())->toBe(1);
     $this->actingAs($superAdministrator)->get(route('payroll.index', ['month' => '2026-04']))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('payroll.utilities.items.0.usd', 29.28)
-            ->where('payroll.utilities.items.1.usd', 92.45)
-            ->where('payroll.totals.service', 121.73)
-            ->where('payroll.totals.salary', 53.33)
-            ->where('payroll.totals.to_pay', 175.06));
-});
-
-it('rejects invalid utilities', function () {
-    $superAdministrator = User::factory()->superAdministrator()->create();
+            ->where('payroll.members.0.employment_type', 'part_time')
+            ->where('payroll.members.0.default_employment_type', 'full_time')
+            ->where('payroll.members.0.paid_days', 15.45)
+            ->where('payroll.members.0.paid_days_adjusted', true)
+            ->where('payroll.members.0.pay', 206));
+    $this->actingAs($superAdministrator)->get(route('payroll.index', ['month' => '2026-05']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('payroll.members.0.employment_type', 'full_time')
+            ->where('payroll.members.0.paid_days_adjusted', false));
+    $this->assertDatabaseHas('audit_logs', ['user_id' => $superAdministrator->id, 'action' => 'payroll.adjustment_updated', 'auditable_id' => $member->id]);
 
     $this->actingAs($superAdministrator)
-        ->put(route('payroll.months.update', '2026-04'), ['usd_to_php_rate' => 0, 'internet_php' => -5, 'electricity_php' => '', 'water_php' => 0])
-        ->assertSessionHasErrors(['usd_to_php_rate', 'internet_php', 'electricity_php']);
+        ->put(route('payroll.adjustments.update', ['month' => '2026-04', 'user' => $member]), ['employment_type' => '', 'paid_days' => ''])
+        ->assertSessionHasNoErrors();
 
-    expect(PayrollMonth::query()->count())->toBe(0);
+    expect(PayrollAdjustment::query()->count())->toBe(0);
+});
+
+it('rejects an invalid payroll adjustment', function () {
+    $superAdministrator = User::factory()->superAdministrator()->create();
+    $member = User::factory()->create();
+
+    $this->actingAs($superAdministrator)
+        ->put(route('payroll.adjustments.update', ['month' => '2026-04', 'user' => $member]), ['employment_type' => 'contractor', 'paid_days' => 40])
+        ->assertSessionHasErrors(['employment_type', 'paid_days']);
+
+    expect(PayrollAdjustment::query()->count())->toBe(0);
 });
 
 it('downloads the payroll as a PDF and records the export', function () {
@@ -155,7 +171,8 @@ it('downloads the payroll as a PDF and records the export', function () {
         ->toContain('Sample Agent')
         ->toContain('USD 13.33')
         ->toContain('USD 1.67')
-        ->toContain('USD 400.00');
+        ->toContain('USD 400.00')
+        ->not->toContain('Total Service');
     $this->assertDatabaseHas('audit_logs', ['user_id' => $superAdministrator->id, 'action' => 'payroll.exported_pdf']);
 });
 
@@ -168,7 +185,7 @@ it('imports salaries from a JSON file matching by code, email or name', function
 
     $file = UploadedFile::fake()->createWithContent('salaries.json', json_encode(['members' => [
         ['employee_code' => 'EMP-1', 'monthly_salary' => 550, 'joined_on' => '2026-03-20'],
-        ['email' => 'AGENT@example.com', 'monthly_salary' => 400, 'employment_type' => 'part_time', 'joined_on' => '2026-03-26'],
+        ['email' => 'AGENT@example.com', 'monthly_salary' => 400, 'employment_type' => 'part_time', 'joined_on' => '2026-03-26', 'months' => [['month' => '2026-04', 'employment_type' => 'full_time', 'paid_days' => 21.75]]],
         ['name' => 'Casey Rivera', 'monthly_salary' => '400.00', 'joined_on' => '2026-03-20'],
         ['name' => 'Nobody Here', 'monthly_salary' => 400, 'joined_on' => '2026-03-20'],
         ['employee_code' => 'EMP-1', 'monthly_salary' => -5, 'joined_on' => 'later'],
@@ -183,7 +200,8 @@ it('imports salaries from a JSON file matching by code, email or name', function
         ->and($byEmail->refresh()->employment_type)->toBe(EmploymentType::PartTime)
         ->and($byEmail->joined_on->toDateString())->toBe('2026-03-26')
         ->and($byName->refresh()->monthly_salary)->toBe('400.00')
-        ->and($untouched->refresh()->monthly_salary)->toBeNull();
+        ->and($untouched->refresh()->monthly_salary)->toBeNull()
+        ->and(PayrollAdjustment::query()->sole()->only(['user_id', 'paid_days']))->toBe(['user_id' => $byEmail->id, 'paid_days' => '21.750']);
     $this->assertDatabaseHas('audit_logs', ['user_id' => $superAdministrator->id, 'action' => 'payroll.salaries_imported']);
 });
 
