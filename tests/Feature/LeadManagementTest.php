@@ -88,6 +88,40 @@ it('includes contacts outside the current list filter in the company count', fun
         ->assertInertia(fn (Assert $page) => $page->has('leads.data', 1)->where('leads.data.0.company_contact_count', 2));
 });
 
+it('keeps a long tendata source link intact on a manual lead', function () {
+    $agent = User::factory()->create();
+    $tendataLink = 'https://bizr.tendata.cn/enterprise#/contact?name=ICCGSA%2520-%2520Ingenieros%2520Civiles%2520y%2520Contratistas%2520Generales%2520S.A.%2520-%2520P%25C3%25A1gina%2520Oficial&country=PER&type=BUYER&website=iccgsa.com&source=INTERNET&initSearch=1&from=companyDetailTabChange';
+
+    $this->actingAs($agent)->post(route('leads.store'), ['company_name' => 'ICCGSA', 'contact_person' => 'Ada', 'email' => 'hello@iccgsa.com', 'source_url' => $tendataLink])
+        ->assertSessionHasNoErrors();
+
+    expect(Lead::firstOrFail()->source_url)->toBe($tendataLink);
+});
+
+it('rejects a manual source link over 2048 characters', function () {
+    $agent = User::factory()->create();
+
+    $this->actingAs($agent)->post(route('leads.store'), ['company_name' => 'Acme', 'contact_person' => 'Ada', 'email' => 'hello@acme.test', 'source_url' => 'https://example.com/'.str_repeat('a', 2100)])
+        ->assertSessionHasErrors('source_url');
+});
+
+it('keeps a linkedin link over 255 characters on a manual lead', function () {
+    $agent = User::factory()->create();
+    $linkedInLink = 'https://linkedin.com/sales/lead/'.str_repeat('a', 300);
+
+    $this->actingAs($agent)->post(route('leads.store'), ['company_name' => 'Acme', 'contact_person' => 'Ada', 'email' => 'hello@acme.test', 'linkedin_url' => $linkedInLink])
+        ->assertSessionHasNoErrors();
+
+    expect(Lead::firstOrFail()->linkedin_url)->toBe($linkedInLink);
+});
+
+it('rejects a manual linkedin link over 2048 characters', function () {
+    $agent = User::factory()->create();
+
+    $this->actingAs($agent)->post(route('leads.store'), ['company_name' => 'Acme', 'contact_person' => 'Ada', 'email' => 'hello@acme.test', 'linkedin_url' => 'https://linkedin.com/sales/lead/'.str_repeat('a', 2100)])
+        ->assertSessionHasErrors('linkedin_url');
+});
+
 it('creates a manual lead owned by the authenticated agent', function () {
     $agent = User::factory()->create();
     $response = $this->actingAs($agent)->post(route('leads.store'), ['lead_date' => '2026-08-25', 'company_name' => 'Acme Ventures', 'website' => 'acme.test', 'contact_person' => 'Ada', 'email' => 'hello@acme.test', 'country_code' => 'us', 'city' => 'Austin', 'import_trades' => 'Machinery', 'linkedin_url' => 'https://linkedin.com/company/acme', 'data_source' => 'Tendata/Lusha', 'source_url' => 'https://example.com/acme']);

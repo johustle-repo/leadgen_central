@@ -98,7 +98,7 @@ class UploadBatchProcessor
             // LinkedIn and the source link are both optional and never block a
             // row: a missing or malformed value in either should never cost a
             // lead its place - it's still stored as submitted.
-            $validator = Validator::make($processed, ['lead_date' => ['nullable', 'date'], 'company_name' => ['required', 'string', 'max:255'], 'website' => ['nullable', 'string', 'max:255'], 'country_code' => ['nullable', 'string', 'size:2'], 'email' => ['nullable', 'email', 'max:255'], 'linkedin_url' => ['nullable', 'string', 'max:255'], 'source_url' => ['nullable', 'string', 'max:255']]);
+            $validator = Validator::make($processed, ['lead_date' => ['nullable', 'date'], 'company_name' => ['required', 'string', 'max:255'], 'website' => ['nullable', 'string', 'max:255'], 'country_code' => ['nullable', 'string', 'size:2'], 'email' => ['nullable', 'email', 'max:255'], 'linkedin_url' => ['nullable', 'string', 'max:2048'], 'source_url' => ['nullable', 'string', 'max:2048']]);
             if ($validator->fails()) {
                 $row->update(['processed_data' => $processed, 'processing_status' => UploadRowStatus::Rejected, 'error_category' => 'validation', 'error_message' => $validator->errors()->first()]);
 
@@ -215,11 +215,13 @@ class UploadBatchProcessor
             unset($processed['country']);
         }
         $processed['lead_date'] = $this->resolveLeadDate($processed['lead_date'] ?? null, $batch);
-        // A source link over the validator's 255-character limit would otherwise
+        // A link over the validator's 2048-character limit would otherwise
         // reject an entire row over one long tracking URL - shortening it keeps
         // the row (and the rest of its data) instead of losing it.
-        if (isset($processed['source_url']) && mb_strlen((string) $processed['source_url']) > 255) {
-            $processed['source_url'] = mb_substr((string) $processed['source_url'], 0, 255);
+        foreach (['source_url', 'linkedin_url'] as $linkField) {
+            if (isset($processed[$linkField]) && mb_strlen((string) $processed[$linkField]) > 2048) {
+                $processed[$linkField] = mb_substr((string) $processed[$linkField], 0, 2048);
+            }
         }
 
         return $processed;

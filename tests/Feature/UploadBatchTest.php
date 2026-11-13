@@ -527,26 +527,28 @@ it('retains a lead whose source link is empty or badly formatted', function () {
     $this->assertDatabaseMissing('upload_rows', ['upload_batch_id' => $batch->id, 'error_category' => 'validation']);
 });
 
-it('shortens a source link over 255 characters instead of rejecting the row', function () {
+it('shortens source and linkedin links over 2048 characters instead of rejecting the row', function () {
     Storage::fake('local');
     $agent = User::factory()->create();
-    $longLink = 'https://example.test/'.str_repeat('a', 300);
+    $longLink = 'https://example.test/'.str_repeat('a', 2100);
+    $longLinkedIn = 'https://linkedin.com/sales/lead/'.str_repeat('b', 2100);
     $file = UploadedFile::fake()->createWithContent(
         'long-link.csv',
-        "Company,Email,Link\nAcme,ada@acme.test,{$longLink}\n",
+        "Company,Email,Link,LinkedIn\nAcme,ada@acme.test,{$longLink},{$longLinkedIn}\n",
     );
     $this->actingAs($agent)->post(route('uploads.store'), ['file' => $file]);
     $batch = UploadBatch::firstOrFail();
 
     $this->actingAs($agent)->post(route('uploads.process', $batch), ['mapping' => [
-        0 => 'company_name', 1 => 'email', 2 => 'source_url',
+        0 => 'company_name', 1 => 'email', 2 => 'source_url', 3 => 'linkedin_url',
     ]]);
 
     $batch->refresh();
     expect($batch->rejected_rows)->toBe(0)->and($batch->accepted_rows)->toBe(1);
     $lead = Lead::query()->where('email', 'ada@acme.test')->firstOrFail();
-    expect(mb_strlen($lead->source_url))->toBe(255)
-        ->and($lead->source_url)->toBe(mb_substr($longLink, 0, 255));
+    expect(mb_strlen($lead->source_url))->toBe(2048)
+        ->and($lead->source_url)->toBe(mb_substr($longLink, 0, 2048))
+        ->and($lead->linkedin_url)->toBe(mb_substr($longLinkedIn, 0, 2048));
 });
 
 it('accepts a completed row whose country and city do not match any reference location', function () {
