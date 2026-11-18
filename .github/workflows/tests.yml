@@ -40,7 +40,24 @@ jobs:
       - name: Audit dependencies
         run: |
           composer audit --locked
-          npm audit --audit-level=high
+          npm audit --json > "$RUNNER_TEMP/npm-audit.json" || true
+          node -e '
+            // GHSA-fc5q-39xc-vjpf: picomatch <=4.0.7 ReDoS, no patched release yet.
+            // Build-time only (Vite/ESLint globbing); remove once picomatch ships a fix.
+            const ignored = new Set(["GHSA-fc5q-39xc-vjpf"]);
+            const report = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            if (report.error) { console.error(report.error); process.exit(1); }
+            const blocking = new Set();
+            for (const vulnerability of Object.values(report.vulnerabilities ?? {})) {
+              for (const via of vulnerability.via) {
+                if (typeof via === "object" && ["high", "critical"].includes(via.severity) && !ignored.has(via.url.split("/").pop())) {
+                  blocking.add(`${via.severity} ${via.name} ${via.range} ${via.url}`);
+                }
+              }
+            }
+            if (blocking.size > 0) { console.error([...blocking].join("\n")); process.exit(1); }
+            console.log(`No high npm advisories (temporarily ignored: ${[...ignored].join(", ")}).`);
+          ' "$RUNNER_TEMP/npm-audit.json"
 
       - name: Verify production optimization
         run: php artisan optimize
