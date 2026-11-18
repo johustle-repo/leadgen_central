@@ -226,7 +226,7 @@ class VerificationController extends Controller
                 return;
             }
             fputcsv($stream, ['Lead Code', 'Date', 'Company', 'Contact Person', 'Position', 'Email', 'Phone', 'Website', 'City', 'Country', 'Industry', 'Product Requested', 'Owner', 'Documents'], escape: '');
-            foreach ($query->cursor() as $lead) {
+            foreach ($query->lazy() as $lead) {
                 fputcsv($stream, $csv->sanitizeRow([$lead->lead_code, $lead->lead_date?->format('m/d/Y'), $lead->company_name, $lead->contact_person, $lead->position, $lead->email, $lead->phone, $lead->website, $lead->city, $lead->country_code ?: $lead->country, $lead->industry, $lead->product_requested, $lead->agent?->name, $lead->attachments_count]), escape: '');
             }
             fclose($stream);

@@ -327,7 +327,7 @@ class UploadBatchController extends Controller
             }
 
             fputcsv($stream, ['Date', 'Company', 'Website', 'First Name', 'Email', 'Country', 'City', 'Import Trades', 'LinkedIn', 'Sources of Data', 'Link'], escape: '');
-            foreach ($uploadBatch->rows()->where('processing_status', UploadRowStatus::Accepted)->whereNotNull('lead_id')->with('lead')->orderBy('row_number')->cursor() as $row) {
+            foreach ($uploadBatch->rows()->where('processing_status', UploadRowStatus::Accepted)->whereNotNull('lead_id')->with('lead')->orderBy('row_number')->lazy() as $row) {
                 $lead = $row->lead;
                 if ($lead === null) {
                     continue;
