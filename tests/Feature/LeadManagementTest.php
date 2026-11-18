@@ -134,6 +134,18 @@ it('creates a manual lead owned by the authenticated agent', function () {
     $this->getJson(route('leads.company-contact-count', ['company_name' => 'Acme Ventures']))->assertJson(['count' => 1]);
 });
 
+it('accepts accented contact names and emails', function () {
+    $agent = User::factory()->create();
+
+    $this->actingAs($agent)->post(route('leads.store'), ['company_name' => 'El Sauce', 'contact_person' => 'Álex Peña', 'email' => 'Alex.Peña@elsauce.cl', 'secondary_email' => 'josé@müller.de'])
+        ->assertSessionHasNoErrors();
+
+    expect(Lead::firstOrFail())
+        ->contact_person->toBe('Álex Peña')
+        ->email->toBe('alex.peña@elsauce.cl')
+        ->secondary_email->toBe('josé@müller.de');
+});
+
 it('saves lowercased primary and secondary emails', function () {
     $agent = User::factory()->create();
     $this->actingAs($agent)->post(route('leads.store'), ['lead_date' => '2026-08-25', 'company_name' => 'Acme Ventures', 'contact_person' => 'Ada', 'email' => 'Hello@ACME.test', 'secondary_email' => 'Backup@Acme.test']);

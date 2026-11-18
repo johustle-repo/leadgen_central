@@ -163,13 +163,13 @@ class GmailReplySynchronizer
             $body,
         ]));
 
-        preg_match_all('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/iu', $content, $matches);
+        preg_match_all('/[\p{L}\p{N}._%+\-]+@[\p{L}\p{N}.\-]+\.\p{L}{2,}/u', $content, $matches);
 
         $emails = array_map(fn (string $email): string => mb_strtolower(trim($email)), $matches[0]);
 
         return array_values(array_unique(array_filter(
             $emails,
-            fn (string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
+            fn (string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL, FILTER_FLAG_EMAIL_UNICODE) !== false,
         )));
     }
 

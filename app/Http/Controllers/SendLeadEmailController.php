@@ -30,7 +30,7 @@ class SendLeadEmailController extends Controller
             return back()->with('toast', ['type' => 'error', 'message' => 'Connect Gmail before sending an email.']);
         }
 
-        if (! is_string($lead->email) || filter_var($lead->email, FILTER_VALIDATE_EMAIL) === false) {
+        if (! is_string($lead->email) || filter_var($lead->email, FILTER_VALIDATE_EMAIL, FILTER_FLAG_EMAIL_UNICODE) === false) {
             return back()->with('toast', ['type' => 'error', 'message' => 'This lead does not have a valid email address.']);
         }
 

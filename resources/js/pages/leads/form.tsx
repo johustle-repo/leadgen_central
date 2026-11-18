@@ -515,8 +515,17 @@ export default function LeadForm({
                                                             id={field.name}
                                                             name={field.name}
                                                             type={
-                                                                field.type ??
-                                                                'text'
+                                                                field.type ===
+                                                                'email'
+                                                                    ? 'text'
+                                                                    : (field.type ??
+                                                                      'text')
+                                                            }
+                                                            inputMode={
+                                                                field.type ===
+                                                                'email'
+                                                                    ? 'email'
+                                                                    : undefined
                                                             }
                                                             defaultValue={
                                                                 field.type ===

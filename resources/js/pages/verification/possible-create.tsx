@@ -65,7 +65,8 @@ function SimpleField({
             <Input
                 id={name}
                 name={name}
-                type={type}
+                type={type === 'email' ? 'text' : type}
+                inputMode={type === 'email' ? 'email' : undefined}
                 required={name === 'company_name'}
                 onBlur={
                     name === 'contact_person'

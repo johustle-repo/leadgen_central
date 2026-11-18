@@ -1195,7 +1195,8 @@ export default function VerificationShow({
                                             />
                                             <Input
                                                 name="recipient_email"
-                                                type="email"
+                                                type="text"
+                                                inputMode="email"
                                                 placeholder="Recipient email"
                                             />
                                             <Input

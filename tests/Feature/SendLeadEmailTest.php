@@ -52,6 +52,19 @@ it('allows an agent to send the DUSCAFF email to their lead with the brochure at
     ]);
 });
 
+it('sends email to a lead whose address contains accented characters', function () {
+    $agent = User::factory()->create();
+    $lead = Lead::factory()->for($agent, 'agent')->create(['email' => 'alex.peña@elsauce.cl']);
+    GmailConnection::factory()->for($agent, 'user')->create();
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/send' => Http::response(['id' => 'gmail-message-123']),
+    ]);
+
+    $this->actingAs($agent)->post(route('leads.send-email', $lead), ['subject' => 'Hello', 'body' => 'Hi Álex.'])
+        ->assertSessionHas('toast.message', 'Email sent successfully to alex.peña@elsauce.cl.');
+});
+
 it('prevents an agent from sending email to another agents lead', function () {
     $agent = User::factory()->create();
     $lead = Lead::factory()->create();
