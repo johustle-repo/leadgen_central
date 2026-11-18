@@ -18,7 +18,8 @@ class ImportLocationDataset extends Command
     public function handle(LocationDatasetImporter $importer): int
     {
         try {
-            $counts = $importer->import((string) $this->argument('path'));
+            $path = $this->argument('path');
+            $counts = $importer->import(is_string($path) ? $path : '');
             $this->info("Imported {$counts['countries']} countries and {$counts['cities']} canonical cities.");
 
             return self::SUCCESS;

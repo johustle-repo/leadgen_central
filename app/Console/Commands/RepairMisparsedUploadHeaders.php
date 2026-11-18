@@ -19,7 +19,7 @@ class RepairMisparsedUploadHeaders extends Command
 {
     public function handle(CsvHeaderMapper $mapper, CsvDelimiterDetector $delimiters, CsvEncodingSanitizer $encoding): int
     {
-        $ids = array_map('intval', $this->argument('ids'));
+        $ids = array_map('intval', (array) $this->argument('ids'));
 
         $batches = $ids !== []
             ? UploadBatch::query()->whereKey($ids)->get()
